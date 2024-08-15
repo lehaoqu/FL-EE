@@ -10,9 +10,10 @@ def args_parser():
     parser.add_argument('alg', type=str, default='fedavg')
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--model', type=str, default='mlp')
+    parser.add_argument('--config_path', type=str, default='../models/facebook/deit-small-patch16-224')
 
     # ===== Training Setting =====
-    parser.add_argument('--total_num', type=int, default=5, help="Total clients num")
+    parser.add_argument('--total_num', type=int, default=12, help="Total clients num")
     parser.add_argument('--sr', type=float, default=0.3, help="Clients sample rate")
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
@@ -25,7 +26,9 @@ def args_parser():
 
     parser.add_argument('--test_gap', type=int, default=1, help='Rounds between two test phases')
 
-    # ===== System Heterogeneity Setting =====
+    # ===== Clients Heterogeneous Setting =====
+    parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')
+    parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs=4, help='device\'s depth')
     parser.add_argument('--lag_level', type=int, default=3, help="Lag level used to simulate latency of device")
     parser.add_argument('--lag_rate', type=float, default=0.3, help="Proportion of stale device")
 

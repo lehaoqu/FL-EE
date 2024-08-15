@@ -1,5 +1,6 @@
 .DS_Store
 **/.DS_Store
 .idea
-./dataset/cifar*
-./models
+dataset/cifar*/
+models/
+__pycache__/

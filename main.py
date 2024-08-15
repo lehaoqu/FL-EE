@@ -2,10 +2,12 @@ import importlib
 import sys
 import numpy as np
 import os
+import copy
 
 from utils.options import args_parser
 from utils.dataprocess import DataProcessor
 from tqdm import tqdm
+from utils.modelload.modelloader import load_model
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -32,9 +34,25 @@ class FedSim:
         self.res_output = open(result_path, 'a')
         args.output = self.output
 
+        # === init pre-trainde model ===
+        ratios = ()
+        for i in range(len(args.eq_ratios)):
+            ratios += (sum(args.eq_ratios[:i+1]),)
+        ranges_to_gropus = {int(args.total_num * ratio)-1 : group for (group, ratio) in enumerate(ratios)}
+        print(ranges_to_gropus)
+        eq_model = {}
+        for depth in args.eq_depths:
+            eq_model[depth] = load_model(args, model_depth=depth)
+        
         # === init clients & server ===
-        self.clients = [trainer_module.Client(idx, args, None) for idx in range(args.total_num)]
-        self.server = trainer_module.Server(0, args, None, self.clients)
+        self.clients = []
+        for idx in range(args.total_num):
+            for end_of_range in sorted(ranges_to_gropus, reverse=False):
+                if idx <= end_of_range: 
+                    depth = args.eq_depths[ranges_to_gropus[end_of_range]]
+                    break
+            self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth))
+        self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model))
 
     def simulate(self):
         TEST_GAP = self.args.test_gap
@@ -52,6 +70,7 @@ class FedSim:
                 self.acc_processor.append(ret_dict['acc'])
 
                 self.output.write(f'========== Round {rnd} ==========\n')
+                print(f'========== Round {rnd} ==========\n')
                 self.output.write('server, accuracy: %.2f, ' % ret_dict['acc'])
                 self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()
