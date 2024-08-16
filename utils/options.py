@@ -20,7 +20,7 @@ def args_parser():
 
     parser.add_argument('--rnd', type=int, default=10, help="Communication rounds")
     parser.add_argument('--bs', type=int, default=32, help="Batch size")
-    parser.add_argument('--epoch', type=int, default=3, help="Epoch num")
+    parser.add_argument('--epoch', type=int, default=1, help="Epoch num")
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
 

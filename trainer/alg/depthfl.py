@@ -16,8 +16,9 @@ class Client(BaseClient):
             for idx, (image, label) in enumerate(self.loader_train):
                 self.optim.zero_grad()
                 image, label = image.to(self.device), label.to(self.device)
-                last_logits = self.model(image)[-1]
-                loss = self.loss_func(last_logits, label)
+                loss = torch.tensor(0.0).to(self.device)
+                for logits in self.model(image):
+                    loss += self.loss_func(logits, label)
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.item())

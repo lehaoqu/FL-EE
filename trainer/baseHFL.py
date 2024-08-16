@@ -112,8 +112,8 @@ class BaseServer:
         self.clients = clients
         self.sampled_clients = []
         self.total_round = args.rnd
-        self.eq_model = eq_model
-        self.global_model = global_model
+        self.eq_model = {eq: model.to(args.device) for eq, model in eq_model.items()}
+        self.global_model = global_model.to(args.device)
         self.eq_depths = list(self.eq_model.keys())
         self.sampled_submodel_clients: Dict[int:List[BaseClient]] = {}
 
