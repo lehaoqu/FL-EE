@@ -3,4 +3,5 @@
 .idea
 dataset/cifar*/
 models/
+script/08*/
 __pycache__/

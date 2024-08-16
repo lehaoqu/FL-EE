@@ -409,7 +409,8 @@ class ViTExitEncoder(nn.Module):
             layer_head_mask = head_mask[i] if head_mask is not None else None
             layer_outputs = layer_module(hidden_states, layer_head_mask)
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
-            exits_logits += (exit_logits,)
+            if layer_module.exit:
+                exits_logits += (exit_logits,)
         return exits_logits
 
 
