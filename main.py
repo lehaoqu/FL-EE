@@ -43,7 +43,7 @@ class FedSim:
         eq_model = {}
         for depth in args.eq_depths:
             eq_model[depth] = load_model(args, model_depth=depth)
-        exit(0)
+
         # === init clients & server ===
         self.clients = []
         for idx in range(args.total_num):
@@ -52,7 +52,7 @@ class FedSim:
                     depth = args.eq_depths[ranges_to_gropus[end_of_range]]
                     break
             self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth))
-        self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model))
+        self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]))
 
     def simulate(self):
         TEST_GAP = self.args.test_gap

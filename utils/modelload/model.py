@@ -34,21 +34,27 @@ class BaseModule(nn.Module):
             layer_idx = name.split('.')[3]
         return int(layer_idx)
 
-    def parameters_to_tensor(self, blocks=(2,5,8,11))->Tuple[torch.tensor]:
-        tensors = ()
-        block_idx = 0
-        params = []
-        for idx, (name, param) in enumerate(self.named_parameters()):
-            layer_idx = self.get_layer_idx(name)
-            if layer_idx <= blocks[block_idx]:
+    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False):
+        if is_split:
+            tensors = ()
+            block_idx = 0
+            params = []
+            for idx, (name, param) in enumerate(self.named_parameters()):
+                layer_idx = self.get_layer_idx(name)
+                if layer_idx > blocks[block_idx]:
+                    tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
+                    block_idx += 1
+                    params = []
                 params.append(param.view(-1))
-            else:
+            if params != []: 
                 tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
-                block_idx += 1
-                params = []
-        if params != []: 
-            tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
-        return tensors
+            return tensors
+        else:
+            params = []
+            for idx, (name, param) in enumerate(self.named_parameters()):
+                params.append(param.view(-1))
+            tensor = torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
+            return tensor
 
     def tensor_to_parameters(self, tensor, local_params=None):
         param_index = 0
@@ -403,7 +409,7 @@ class ViTExitEncoder(nn.Module):
             layer_head_mask = head_mask[i] if head_mask is not None else None
             layer_outputs = layer_module(hidden_states, layer_head_mask)
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
-            exits_logits += exit_logits
+            exits_logits += (exit_logits,)
         return exits_logits
 
 

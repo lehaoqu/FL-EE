@@ -3,6 +3,8 @@ import torch.nn as nn
 import time
 import random
 
+from typing import *
+
 from utils.data_utils import read_client_data
 from utils.modelload.modelloader import load_model
 from utils.dataprocess import DataProcessor
@@ -23,7 +25,8 @@ class BaseClient:
         self.batch_size = args.bs
         self.epoch = args.epoch
         self.eq_depth = depth
-        self.model = load_model(args, model_depth=self.eq_depth).to(args.device) if model is None else model
+        self.model = model.to(self.device)
+        
         self.loss_func = nn.CrossEntropyLoss()
         self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
 
@@ -50,6 +53,7 @@ class BaseClient:
         self.training_time = None
         self.lag_level = args.lag_level
         self.weight = 1
+        self.submodel_weights = {}
 
     def run(self):
         raise NotImplementedError()
@@ -71,8 +75,9 @@ class BaseClient:
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
 
     def clone_model(self, target):
-        p_tensor = target.model.parameters_to_tensor()
-        self.model.tensor_to_parameters(p_tensor)
+        p_tensors = target.parameters_to_tensor(is_split=True)
+        idx = self.args.eq_depths.index(self.eq_depth)
+        self.model.tensor_to_parameters(torch.cat(p_tensors[:idx+1], 0))
 
     def local_test(self):
         self.model.eval()
@@ -84,8 +89,8 @@ class BaseClient:
                 images, labels = data
                 images = images.to(self.device)
                 labels = labels.to(self.device)
-                outputs = self.model(images)
-                _, predicted = torch.max(outputs.data, 1)
+                last_logits = self.model(images)[-1]
+                _, predicted = torch.max(last_logits, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
         acc = 100.00 * correct / total
@@ -100,7 +105,7 @@ class BaseClient:
 
 
 class BaseServer:
-    def __init__(self, id, args, dataset, clients, eq_model=None):
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
         # super().__init__(id, args, dataset)
         self.client_num = args.total_num
         self.sample_rate = args.sr
@@ -108,6 +113,9 @@ class BaseServer:
         self.sampled_clients = []
         self.total_round = args.rnd
         self.eq_model = eq_model
+        self.global_model = global_model
+        self.eq_depths = list(self.eq_model.keys())
+        self.sampled_submodel_clients: Dict[int:List[BaseClient]] = {}
 
         self.round = 0
         self.wall_clock_time = 0
@@ -118,22 +126,42 @@ class BaseServer:
             client.server = self
 
         self.TO_LOG = True
+            
+        self.metric = {
+            'acc': DataProcessor(),
+            'loss': DataProcessor(),
+        }
 
     def run(self):
         raise NotImplementedError()
 
     def sample(self):
+        self.sampled_submodel_clients.clear()
+        
         sample_num = int(self.sample_rate * self.client_num)
-        self.sampled_clients = random.sample(self.clients, sample_num)
+        
+        check_all_depths_sampled = {}
+        while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
+            check_all_depths_sampled.clear()
+            self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
+            for client in self.sampled_clients:
+                check_all_depths_sampled[client.eq_depth] = 1
 
-        total_samples = sum(len(client.dataset_train) for client in self.sampled_clients)
-        for client in self.sampled_clients:
-            client.weight = len(client.dataset_train) / total_samples
+        for submodel_depth in self.eq_depths:
+            for client in self.sampled_clients:
+                if client.eq_depth >= submodel_depth:
+                    self.sampled_submodel_clients.setdefault(submodel_depth, []).append(client)
 
+        for submodel_depth, clients in self.sampled_submodel_clients.items():
+            total_samples = sum(len(client.dataset_train) for client in clients)
+            for client in clients:
+                client.submodel_weights[submodel_depth] = len(client.dataset_train) / total_samples
+        
     def downlink(self):
         assert (len(self.sampled_clients) > 0)
         for client in self.sampled_clients:
-            client.clone_model(self)
+            # client.clone_model(self.eq_model[client.eq_depth])
+            client.clone_model(self.global_model)
 
     def client_update(self):
         for client in self.sampled_clients:
@@ -147,13 +175,16 @@ class BaseServer:
 
     def uplink(self):
         assert (len(self.sampled_clients) > 0)
-        self.received_params = [client.model.parameters_to_tensor() * client.weight
-                                for client in self.sampled_clients]
+        self.received_params = ()
+        for idx, submodel_depth in enumerate(self.eq_depths):
+            self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
+                                for client in self.sampled_submodel_clients[submodel_depth]],)
 
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
-        avg_tensor = sum(self.received_params)
-        self.model.tensor_to_parameters(avg_tensor)
+        avg_eq_tensor = [sum(eq_tensors) for eq_tensors in self.received_params]
+        avg_tensor = torch.cat(avg_eq_tensor, 0)
+        self.global_model.tensor_to_parameters(avg_tensor)
 
     def test_all(self):
         for client in self.clients:
@@ -161,7 +192,7 @@ class BaseServer:
             if client in self.sampled_clients:
                 self.metric['loss'].append(c_metric['loss'].last())
 
-            client.clone_model(self)
+            client.clone_model(self.global_model)
             client.local_test()
 
             self.metric['acc'].append(c_metric['acc'].last())

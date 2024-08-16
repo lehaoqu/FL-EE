@@ -37,11 +37,15 @@ def load_model(args, model_depth=None):
             model = ViTExitForImageClassification(eq_exit_config)
             model.load_state_dict(pre_model.state_dict(), strict=False)
 
-            # tensors = model.parameters_to_tensor((2,5,8,11))
+            # tensors = model.parameters_to_tensor((2,5,8,11), is_split=True)
             # print(len(tensors))
             # for tensor in tensors:
             #     print(tensor.shape)
                 
+            # print(model.parameters_to_tensor().shape)
+            # for name, param in model.named_parameters():
+            #     print(name)
+            # exit(0)            
     else:
         exit('Error: unrecognized model')
     return model

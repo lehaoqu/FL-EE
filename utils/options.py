@@ -13,13 +13,13 @@ def args_parser():
     parser.add_argument('--config_path', type=str, default='../models/facebook/deit-small-patch16-224')
 
     # ===== Training Setting =====
-    parser.add_argument('--total_num', type=int, default=12, help="Total clients num")
+    parser.add_argument('--total_num', type=int, default=4, help="Total clients num")
     parser.add_argument('--sr', type=float, default=0.3, help="Clients sample rate")
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
 
     parser.add_argument('--rnd', type=int, default=10, help="Communication rounds")
-    parser.add_argument('--bs', type=int, default=10, help="Batch size")
+    parser.add_argument('--bs', type=int, default=32, help="Batch size")
     parser.add_argument('--epoch', type=int, default=3, help="Epoch num")
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
