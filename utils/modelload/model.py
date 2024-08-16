@@ -19,9 +19,8 @@ from transformers.utils import (
     logging,
 )
 from transformers.models.vit.configuration_vit import ViTConfig
-from transformers.utils import ModelOutput
 from transformers.models.vit import ViTPreTrainedModel, ViTConfig
-from transformers.models.vit.modeling_vit import ViTModel, ViTPooler, ViTEmbeddings, ViTPatchEmbeddings, ViTLayer, ViTForImageClassification
+from transformers.models.vit.modeling_vit import *
 # from models.utils.ree import Ree
 logger = logging.get_logger(__name__)
 
@@ -29,29 +28,41 @@ class BaseModule(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def parameters_to_tensor(self, local_params=None):
+    def get_layer_idx(self, name):
+        layer_idx = 0
+        if 'vit.encoder.layer' in name:
+            layer_idx = name.split('.')[3]
+        return int(layer_idx)
+
+    def parameters_to_tensor(self, blocks=(2,5,8,11))->Tuple[torch.tensor]:
+        tensors = ()
+        block_idx = 0
         params = []
         for idx, (name, param) in enumerate(self.named_parameters()):
-            # NOTE: only send global params
-            if local_params is None or local_params[idx] is False:
+            layer_idx = self.get_layer_idx(name)
+            if layer_idx <= blocks[block_idx]:
                 params.append(param.view(-1))
-        params = torch.cat(params, 0)
-        return torch.nan_to_num(params, nan=0.0, posinf=0.0, neginf=0.0)
+            else:
+                tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
+                block_idx += 1
+                params = []
+        if params != []: 
+            tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
+        return tensors
 
     def tensor_to_parameters(self, tensor, local_params=None):
         param_index = 0
         for idx, (name, param) in enumerate(self.named_parameters()):
-            if local_params is None or local_params[idx] is False:
-                # === get shape & total size ===
-                shape = param.shape
-                param_size = 1
-                for s in shape:
-                    param_size *= s
+            # === get shape & total size ===
+            shape = param.shape
+            param_size = 1
+            for s in shape:
+                param_size *= s
 
-                # === put value into param ===
-                # .clone() is a deep copy here
-                param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
-                param_index += param_size
+            # === put value into param ===
+            # .clone() is a deep copy here
+            param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
+            param_index += param_size
 
 class CNNCifar(BaseModule):
     def __init__(self, args, dim_out):
@@ -128,14 +139,7 @@ class CNNMnist(BaseModule):
         x = self.fc(x)
         return F.log_softmax(x, dim=1)
 
-@dataclass
-class ImageClassifierExitOutput(ModelOutput):
-    loss: Optional[torch.FloatTensor] = None
-    logits: torch.FloatTensor = None
-    all_logits: Optional[Tuple[torch.FloatTensor]] = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
-    
+
 # @dataclass
 # class EncoderOutputRee(ModelOutput):
 #     last_hidden_state: torch.FloatTensor = None
@@ -337,9 +341,116 @@ class ViTExitConfig(ViTConfig):
 #         return encoder_outputs.ree_exit_outputs
         
 
-class ViTExitForImageClassification(ViTPreTrainedModel):
-    def __init__(self, config: ViTExitConfig) -> None:
+class ViTExitLayer(nn.Module):
+
+    def __init__(self, config: ViTExitConfig, index: int) -> None:
+        super().__init__()
+        self.exit = True if index in config.exits else False
+        if self.exit:
+            self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.chunk_size_feed_forward = config.chunk_size_feed_forward
+        self.seq_len_dim = 1
+        self.attention = ViTAttention(config)
+        self.intermediate = ViTIntermediate(config)
+        self.output = ViTOutput(config)
+        self.layernorm_before = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.layernorm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        head_mask: Optional[torch.Tensor] = None
+    ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor]]:
+        self_attention_outputs = self.attention(
+            self.layernorm_before(hidden_states),  # in ViT, layernorm is applied before self-attention
+            head_mask,
+        )
+        attention_output = self_attention_outputs[0]
+        outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
+
+        # first residual connection
+        hidden_states = attention_output + hidden_states
+
+        # in ViT, layernorm is also applied after self-attention
+        layer_output = self.layernorm_after(hidden_states)
+        layer_output = self.intermediate(layer_output)
+
+        # second residual connection is done here
+        layer_output = self.output(layer_output, hidden_states)
+        
+        # exit
+        logits = self.classifier(self.layernorm(layer_output)[:, 0, :]) if self.exit else None
+        outputs = (layer_output, logits, outputs)
+        return outputs
+
+
+class ViTExitEncoder(nn.Module):
+    
+    def __init__(self, config: ViTConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.layer = nn.ModuleList([ViTExitLayer(config, index) for index in range(config.num_hidden_layers)])
+        self.gradient_checkpointing = False
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        head_mask: Optional[torch.Tensor] = None,
+    ) -> Union[tuple, BaseModelOutput]:
+        exits_logits = ()
+        for i, layer_module in enumerate(self.layer):
+            layer_head_mask = head_mask[i] if head_mask is not None else None
+            layer_outputs = layer_module(hidden_states, layer_head_mask)
+            hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+            exits_logits += exit_logits
+        return exits_logits
+
+
+
+class ViTExitModel(ViTPreTrainedModel):
+    
+    def __init__(self, config: ViTConfig, add_pooling_layer: bool = True, use_mask_token: bool = False):
         super().__init__(config)
+        self.config = config
+
+        self.embeddings = ViTEmbeddings(config, use_mask_token=use_mask_token)
+        self.encoder = ViTExitEncoder(config)
+
+        # self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pooler = ViTPooler(config) if add_pooling_layer else None
+
+        self.post_init()
+
+    def forward(
+        self,
+        pixel_values: Optional[torch.Tensor] = None,
+        bool_masked_pos: Optional[torch.BoolTensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        interpolate_pos_encoding: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPooling]:
+        
+        head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
+
+        expected_dtype = self.embeddings.patch_embeddings.projection.weight.dtype
+        if pixel_values.dtype != expected_dtype:
+            pixel_values = pixel_values.to(expected_dtype)
+        embedding_output = self.embeddings(
+            pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding
+        )
+        encoder_outputs = self.encoder(
+            embedding_output,
+            head_mask=head_mask
+        )
+        return encoder_outputs
+
+
+
+class ViTExitForImageClassification(ViTPreTrainedModel, BaseModule):
+    
+    def __init__(self, config: ViTExitConfig) -> None:
+        ViTPreTrainedModel.__init__(self, config)
+        BaseModule.__init__(self,)
 
         self.num_labels = config.num_labels
         # if config.classifier_archi == 'ree':
@@ -348,58 +459,37 @@ class ViTExitForImageClassification(ViTPreTrainedModel):
         #     self.vit = ViTModel(config, add_pooling_layer=False)
         #     for i in config.exits:
         #         setattr(self, f"classifier_{i}", nn.Linear(config.hidden_size, config.num_labels))
-        self.vit = ViTModel(config, add_pooling_layer=False)
-        for i in config.exits:
-            setattr(self, f"classifier_{i}", nn.Linear(config.hidden_size, config.num_labels))
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.vit = ViTExitModel(config, add_pooling_layer=False)
         self.post_init()
-
 
     def forward(
         self,
         pixel_values: Optional[torch.Tensor] = None,
         head_mask: Optional[torch.Tensor] = None,
-        labels: Optional[torch.Tensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        interpolate_pos_encoding: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        train_EE_method: Optional[str] = None,
-    ) -> Union[tuple, ImageClassifierOutput]:
-        r"""
-        labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
-            Labels for computing the image classification/regression loss. Indices should be in `[0, ...,
-            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
-            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
-        """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        interpolate_pos_encoding: Optional[bool] = None,
+
+    ) -> Union[tuple, ImageClassifierOutput]:
         outputs = self.vit(
             pixel_values,
             head_mask=head_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            interpolate_pos_encoding=interpolate_pos_encoding,
-            return_dict=return_dict,
+            interpolate_pos_encoding=interpolate_pos_encoding
         )
 
         # sequence_output = outputs[0]
         # logits = self.classifier(sequence_output[:, 0, :])
         
-        if self.config.classifier_archi == 'ree':
-            all_logits = outputs
-            logits = outputs[self.config.exits[-1]]
-        else:
-            hidden_states = BaseModelOutputWithPooling(outputs).hidden_states
-            logits = getattr(self, f"classifier_{self.config.exits[-1]}")(self.layernorm(hidden_states[self.config.exits[-1]])[:, 0, :])
+        # if self.config.classifier_archi == 'ree':
+        #     all_logits = outputs
+        #     logits = outputs[self.config.exits[-1]]
+        # else:
+        #     hidden_states = BaseModelOutputWithPooling(outputs).hidden_states
+        #     logits = getattr(self, f"classifier_{self.config.exits[-1]}")(self.layernorm(hidden_states[self.config.exits[-1]])[:, 0, :])
             
-            all_logits = tuple()
-            for i in range(len(self.config.exits)):
-                exit = self.config.exits[i]
-                classifier = getattr(self, f"classifier_{exit}")
-                all_logits += (classifier(self.layernorm(hidden_states[exit + 1])[:, 0, :]), )
+        #     all_logits = tuple()
+        #     for i in range(len(self.config.exits)):
+        #         exit = self.config.exits[i]
+        #         classifier = getattr(self, f"classifier_{exit}")
+        #         all_logits += (classifier(self.layernorm(hidden_states[exit + 1])[:, 0, :]), )
 
-        return ImageClassifierExitOutput(
-            logits=logits,
-            all_logits=all_logits
-        )
+        return outputs

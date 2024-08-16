@@ -47,7 +47,6 @@ class BaseClient:
                 collate_fn=None
             )
 
-        self.local_params = None
         self.training_time = None
         self.lag_level = args.lag_level
         self.weight = 1
@@ -72,8 +71,8 @@ class BaseClient:
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
 
     def clone_model(self, target):
-        p_tensor = target.model.parameters_to_tensor(self.local_params)
-        self.model.tensor_to_parameters(p_tensor, self.local_params)
+        p_tensor = target.model.parameters_to_tensor()
+        self.model.tensor_to_parameters(p_tensor)
 
     def local_test(self):
         self.model.eval()
@@ -114,7 +113,6 @@ class BaseServer:
         self.wall_clock_time = 0
 
         self.received_params = []
-        self.local_params = self.clients[0].local_params if len(self.clients) > 0 else None
 
         for client in self.clients:
             client.server = self
@@ -149,13 +147,13 @@ class BaseServer:
 
     def uplink(self):
         assert (len(self.sampled_clients) > 0)
-        self.received_params = [client.model.parameters_to_tensor(self.local_params) * client.weight
+        self.received_params = [client.model.parameters_to_tensor() * client.weight
                                 for client in self.sampled_clients]
 
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
         avg_tensor = sum(self.received_params)
-        self.model.tensor_to_parameters(avg_tensor, self.local_params)
+        self.model.tensor_to_parameters(avg_tensor)
 
     def test_all(self):
         for client in self.clients:

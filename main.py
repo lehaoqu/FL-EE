@@ -43,7 +43,7 @@ class FedSim:
         eq_model = {}
         for depth in args.eq_depths:
             eq_model[depth] = load_model(args, model_depth=depth)
-        
+        exit(0)
         # === init clients & server ===
         self.clients = []
         for idx in range(args.total_num):
