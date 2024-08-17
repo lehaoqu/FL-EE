@@ -10,6 +10,10 @@ def add_args(parser):
     return parser.parse_args()
 
 class Client(BaseClient):
+    def __init__(self, id, args, dataset, model=None, depth=None):
+        super().__init__(id, args, dataset, model, depth)
+        self.optim = self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
+    
     def run(self):
         self.train()
     
@@ -54,6 +58,20 @@ class Client(BaseClient):
 
 
 class Server(BaseServer):
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model)
+        
+        # == ditillation beta ==
+        self.beta = 0.2
+        
+        # == fedada ==
+        self.m_t = {}
+        self.v_t = {}
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
+        self.tau = 0.000001
+        self.eta = 0.001
+    
     def run(self):
         self.sample()
         self.downlink()
@@ -73,6 +91,7 @@ class Server(BaseServer):
                 sum_named_grads[name] = sum_named_grads.get(name, 0.0) + grad
         return sum_named_grads
     
+    # get grads from model state_dict
     def get_named_from_dict(self, origin_named_grads, layer_idx_range=None, include_IC=True):
         named_grads = {}
         for idx, (name, param) in enumerate(origin_named_grads.items()):
@@ -85,10 +104,18 @@ class Server(BaseServer):
             named_grads[name] = param.grad.detach()
         return named_grads
     
-    def modifier_grads(self, origin_named_grad, new_named_grads):
+    # modifier grads
+    def modifier_grads(self, origin_named_grad:dict, new_named_grads:dict):
         for name, grad in new_named_grads:
             origin_named_grad[name] = grad.clone()
         return origin_named_grad
+    
+    # state_dict to tensor
+    def state_dict_to_tensor(self, state_dict: dict):
+        params = []
+        for (name, param) in state_dict.items():
+            params.append(param.view(-1))
+        return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
     
     def sample(self):
         self.sampled_eq_clients = {}
@@ -129,7 +156,6 @@ class Server(BaseServer):
             
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
-        beta = 0.1
         
         # == Homomorphic aggregate ==
         momentum_eq = {}
@@ -154,12 +180,22 @@ class Server(BaseServer):
                 eq_last_layer_grads = self.get_named_from_dict(eq_named_grads[eq_depth], layer_idx_range=eq_depth-1, include_IC=False)
                 next_larger_eq_depth = self.eq_depths[eq_index+1]
                 momentum = momentum_eq[next_larger_eq_depth]
-                eq_last_layer_grads = self.sum([self.weighted(momentum, beta), self.weighted(eq_last_layer_grads, 1-beta)])
+                eq_last_layer_grads = self.sum([self.weighted(momentum, self.beta), self.weighted(eq_last_layer_grads, 1-self.beta)])
                 eq_named_grads[eq_depth] = self.modifier_grads(eq_named_grads[eq_depth], eq_last_layer_grads)
             
-            # == update eq_models using grads ==
-            eq_model.load_state_dict({n: a+grad for (n, a), (n, grad) in zip(eq_model.state_dict().items(), eq_named_grads[eq_depth].items())})
-        
+            eq_tensor_origin = eq_model.parameters_to_tensor()
+            grad = self.state_dict_to_tensor(eq_named_grads[eq_depth])
+            
+            # == fedavg ==
+            eq_tensor_updated = eq_tensor_origin + grad
+            
+            # == fedadam ==
+            self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
+            self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
+            eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
+            
+            # == update ==
+            eq_model.tensor_to_parameters(eq_tensor_updated)
         
         # == Heterogeneous aggregation ==
         depth_weighted_tensor:Dict[int:List[torch.tensor]] = {}
