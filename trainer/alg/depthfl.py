@@ -40,7 +40,6 @@ class Client(BaseClient):
                     for j, student_logits in enumerate(exit_logits):
                         if i == j: continue
                         else: 
-                            print(kd_loss.item())
                             kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exit_logits)-1)
                 loss = ce_loss + kd_loss
                 loss.backward()
@@ -54,8 +53,13 @@ class Client(BaseClient):
 class Server(BaseServer):
     def run(self):
         self.sample()
+        # print('sample')
         self.downlink()
+        # print('downlink')
         self.client_update()
+        # print('client_update')
         self.uplink()
+        # print('unlink')
         self.aggregate()
+        # print('aggregate')
         

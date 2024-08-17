@@ -11,7 +11,7 @@
             "program": "../main.py",
             "cwd": "./script",
             "args": [
-                "heterofl",
+                "depthfl",
                 "--suffix", 
                 "0816",
                 "--dataset",

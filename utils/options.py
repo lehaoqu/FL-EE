@@ -18,10 +18,10 @@ def args_parser():
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
 
-    parser.add_argument('--rnd', type=int, default=10, help="Communication rounds")
+    parser.add_argument('--rnd', type=int, default=1000, help="Communication rounds")
     parser.add_argument('--bs', type=int, default=32, help="Batch size")
     parser.add_argument('--epoch', type=int, default=1, help="Epoch num")
-    parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
+    parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
 
     parser.add_argument('--test_gap', type=int, default=1, help='Rounds between two test phases')

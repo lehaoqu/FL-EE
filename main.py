@@ -70,7 +70,7 @@ class FedSim:
                 self.acc_processor.append(ret_dict['acc'])
 
                 self.output.write(f'========== Round {rnd} ==========\n')
-                print(f'========== Round {rnd} ==========\n')
+                # print(f'========== Round {rnd} ==========\n')
                 self.output.write('server, accuracy: %.2f, ' % ret_dict['acc'])
                 self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()

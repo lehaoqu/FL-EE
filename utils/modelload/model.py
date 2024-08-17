@@ -34,7 +34,21 @@ class BaseModule(nn.Module):
             layer_idx = name.split('.')[3]
         return int(layer_idx)
 
-    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False):
+    def grads_to_named(self, layer_idx_range=None, include_IC=True)->Dict[str, torch.tensor]:
+        named_grads = {}
+        for idx, (name, param) in enumerate(self.named_parameters()):
+            if layer_idx_range is not None:
+                if len(layer_idx_range) == 1:
+                    if self.get_layer_idx(name) != layer_idx_range: continue
+                else:
+                    if self.get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
+            if param.requires_grad is False: continue
+            if 'classifier' in name & include_IC is False: continue
+            named_grads[name] = param.grad.detach()
+        return named_grads
+            
+    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False):
+        if is_inclusivefl: blocks = (1,4,7,11)
         if is_split:
             tensors = ()
             block_idx = 0
@@ -53,8 +67,7 @@ class BaseModule(nn.Module):
             params = []
             for idx, (name, param) in enumerate(self.named_parameters()):
                 params.append(param.view(-1))
-            tensor = torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
-            return tensor
+            return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
 
     def tensor_to_parameters(self, tensor, local_params=None):
         param_index = 0
@@ -414,7 +427,6 @@ class ViTExitEncoder(nn.Module):
         return exits_logits
 
 
-
 class ViTExitModel(ViTPreTrainedModel):
     
     def __init__(self, config: ViTConfig, add_pooling_layer: bool = True, use_mask_token: bool = False):
@@ -450,7 +462,6 @@ class ViTExitModel(ViTPreTrainedModel):
             head_mask=head_mask
         )
         return encoder_outputs
-
 
 
 class ViTExitForImageClassification(ViTPreTrainedModel, BaseModule):

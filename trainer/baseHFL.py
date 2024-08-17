@@ -9,6 +9,8 @@ from utils.data_utils import read_client_data
 from utils.modelload.modelloader import load_model
 from utils.dataprocess import DataProcessor
 from torch.utils.data import DataLoader
+from utils.modelload.model import BaseModule
+from utils.train_utils import AdamW
 
 
 class BaseClient:
@@ -28,7 +30,14 @@ class BaseClient:
         self.model = model.to(self.device)
         
         self.loss_func = nn.CrossEntropyLoss()
-        self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
+        param_optimizer = list(self.model.named_parameters())
+        no_decay = ['bias', 'gamma', 'beta']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+             'weight_decay_rate': 0.01},
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+        ]
+        self.optim = AdamW(params=optimizer_grouped_parameters, lr=self.lr, correct_bias=False)
 
         self.metric = {
             'acc': DataProcessor(),
@@ -112,7 +121,7 @@ class BaseServer:
         self.clients = clients
         self.sampled_clients = []
         self.total_round = args.rnd
-        self.eq_model = {eq: model.to(args.device) for eq, model in eq_model.items()}
+        self.eq_model:Dict[int:BaseModule] = {eq: model.to(args.device) for eq, model in eq_model.items()}
         self.global_model = global_model.to(args.device)
         self.eq_depths = list(self.eq_model.keys())
         self.sampled_submodel_clients: Dict[int:List[BaseClient]] = {}
