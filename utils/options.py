@@ -24,7 +24,7 @@ def args_parser():
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
 
-    parser.add_argument('--test_gap', type=int, default=1, help='Rounds between two test phases')
+    parser.add_argument('--test_gap', type=int, default=10, help='Rounds between two test phases')
 
     # ===== Clients Heterogeneous Setting =====
     parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')

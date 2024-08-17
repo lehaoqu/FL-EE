@@ -1,3 +1,5 @@
+import math
+import torch
 from torch.optim import Optimizer
 
 class AdamW(Optimizer):
@@ -81,3 +83,9 @@ class AdamW(Optimizer):
                     p.data.add_(-group['lr'] * group['weight_decay'], p.data)
 
         return loss
+
+def get_layer_idx(name):
+    layer_idx = 0
+    if 'vit.encoder.layer' in name:
+        layer_idx = name.split('.')[3]
+    return int(layer_idx)

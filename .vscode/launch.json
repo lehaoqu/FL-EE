@@ -11,15 +11,17 @@
             "program": "../main.py",
             "cwd": "./script",
             "args": [
-                "depthfl",
+                "inclusivefl",
                 "--suffix", 
-                "0816",
+                "0817-inclusivefl",
                 "--dataset",
                 "cifar100-224-d03",
                 "--model",
                 "vit",
                 "--sr", 
-                "1"
+                "1",
+                "--total_num",
+                "4"
             ],
         }
     ]

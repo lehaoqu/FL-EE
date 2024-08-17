@@ -39,19 +39,20 @@ class FedSim:
         for i in range(len(args.eq_ratios)):
             ratios += (sum(args.eq_ratios[:i+1]),)
         ranges_to_gropus = {int(args.total_num * ratio)-1 : group for (group, ratio) in enumerate(ratios)}
-        print(ranges_to_gropus)
+        # print(ranges_to_gropus)
         eq_model = {}
         for depth in args.eq_depths:
             eq_model[depth] = load_model(args, model_depth=depth)
 
         # === init clients & server ===
         self.clients = []
-        for idx in range(args.total_num):
+        for idx in tqdm(range(args.total_num), desc='Client compeleted'):
             for end_of_range in sorted(ranges_to_gropus, reverse=False):
                 if idx <= end_of_range: 
                     depth = args.eq_depths[ranges_to_gropus[end_of_range]]
                     break
             self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth))
+            # print(f'client {idx} compeleted')
         self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]))
 
     def simulate(self):

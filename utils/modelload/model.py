@@ -3,14 +3,13 @@ import torch.cuda
 import torch
 from torch import nn
 import torch.nn.functional as F
-import collections.abc
-import math
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import *
 
 import torch
 import torch.utils.checkpoint
 from torch import nn
 from dataclasses import dataclass
+from utils.train_utils import get_layer_idx
 from transformers.modeling_outputs import (
     BaseModelOutputWithPooling,
     ImageClassifierOutput,
@@ -28,20 +27,14 @@ class BaseModule(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_layer_idx(self, name):
-        layer_idx = 0
-        if 'vit.encoder.layer' in name:
-            layer_idx = name.split('.')[3]
-        return int(layer_idx)
-
     def grads_to_named(self, layer_idx_range=None, include_IC=True)->Dict[str, torch.tensor]:
         named_grads = {}
         for idx, (name, param) in enumerate(self.named_parameters()):
             if layer_idx_range is not None:
                 if len(layer_idx_range) == 1:
-                    if self.get_layer_idx(name) != layer_idx_range: continue
+                    if get_layer_idx(name) != layer_idx_range: continue
                 else:
-                    if self.get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
+                    if get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
             if param.requires_grad is False: continue
             if 'classifier' in name & include_IC is False: continue
             named_grads[name] = param.grad.detach()
@@ -54,7 +47,7 @@ class BaseModule(nn.Module):
             block_idx = 0
             params = []
             for idx, (name, param) in enumerate(self.named_parameters()):
-                layer_idx = self.get_layer_idx(name)
+                layer_idx = get_layer_idx(name)
                 if layer_idx > blocks[block_idx]:
                     tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
                     block_idx += 1

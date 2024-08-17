@@ -98,10 +98,11 @@ class BaseClient:
                 images, labels = data
                 images = images.to(self.device)
                 labels = labels.to(self.device)
-                last_logits = self.model(images)[-1]
-                _, predicted = torch.max(last_logits, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+                exits_logits = self.model(images)
+                for exit_logits in exits_logits:
+                    _, predicted = torch.max(exit_logits, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
         acc = 100.00 * correct / total
 
         self.metric['acc'].append(acc)

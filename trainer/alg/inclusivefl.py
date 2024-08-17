@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 import random
+import copy
 from typing import *
 
 from trainer.baseHFL import BaseServer, BaseClient
 from utils.modelload.model import BaseModule
+from utils.train_utils import get_layer_idx
 
 def add_args(parser):
     return parser.parse_args()
@@ -18,15 +20,6 @@ class Client(BaseClient):
         self.train()
     
     def train(self):
-        
-        def kd_loss_func(pred, teacher):
-            kld_loss = nn.KLDivLoss(reduction='batchmean')
-            log_softmax = nn.LogSoftmax(dim=-1)
-            softmax = nn.Softmax(dim=1)
-            T=0.1
-            _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
-            return _kld
-        
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
@@ -35,31 +28,43 @@ class Client(BaseClient):
                 image, label = image.to(self.device), label.to(self.device)
                 
                 # == ce loss ==
-                ce_loss = torch.zeros(1).to(self.device)
+                loss = torch.zeros(1).to(self.device)
                 exit_logits = self.model(image)
                 for logits in exit_logits:
-                    ce_loss += self.loss_func(logits, label)
-                
-                # == kd loss ==    
-
-                kd_loss = torch.zeros(1).to(self.device)
-                # for i, teacher_logits in enumerate(exit_logits):
-                #     for j, student_logits in enumerate(exit_logits):
-                #         if i == j: continue
-                #         else: 
-                #             kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exit_logits)-1)
-                loss = ce_loss + kd_loss
+                    loss += self.loss_func(logits, label)
+                # loss = self.loss_func(self.model(image)[-1], label)
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+    
+    # def local_test(self, eq_models):
+    #     correct = 0
+    #     total = 0
+    #     for eq_model in eq_models:
+    #         self.clone_model(eq_model)
+    #         self.model.eval()
+    #         with torch.no_grad():
+    #             for data in self.loader_test:
+    #                 images, labels = data
+    #                 images = images.to(self.device)
+    #                 labels = labels.to(self.device)
+    #                 _, predicted = torch.max(self.model(images)[-1] , 1)
+    #                 total += labels.size(0)
+    #                 correct += (predicted == labels).sum().item()
+        
+    #     acc = 100.00 * correct / total
+    #     self.metric['acc'].append(acc)
 
 
 class Server(BaseServer):
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
         super().__init__(id, args, dataset, clients, eq_model, global_model)
+        
+        # == global model is largest eq model ==
+        self.global_model = self.eq_model[max(self.eq_depths)]
         
         # == ditillation beta ==
         self.beta = 0.2
@@ -74,10 +79,15 @@ class Server(BaseServer):
     
     def run(self):
         self.sample()
+        # print('sample')
         self.downlink()
+        # print('downlink')
         self.client_update()
+        # print('client_update')
         self.uplink()
+        # print('uplink')
         self.aggregate()
+        # print('aggregate')
         
     def weighted(self, named_grads, weight):
         for name, grad in named_grads.items():
@@ -87,33 +97,20 @@ class Server(BaseServer):
     def sum(self, named_grads_list):
         sum_named_grads: Dict[str, torch.tensor] = {}
         for named_grads in named_grads_list:
-            for name, grad in named_grads:
+            for name, grad in named_grads.items():
                 sum_named_grads[name] = sum_named_grads.get(name, 0.0) + grad
         return sum_named_grads
     
-    # get grads from model state_dict
-    def get_named_from_dict(self, origin_named_grads, layer_idx_range=None, include_IC=True):
-        named_grads = {}
-        for idx, (name, param) in enumerate(origin_named_grads.items()):
-            if layer_idx_range is not None:
-                if len(layer_idx_range) == 1:
-                    if self.get_layer_idx(name) != layer_idx_range: continue
-                else:
-                    if self.get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
-            if 'classifier' in name & include_IC is False: continue
-            named_grads[name] = param.grad.detach()
-        return named_grads
-    
-    # modifier grads
-    def modifier_grads(self, origin_named_grad:dict, new_named_grads:dict):
-        for name, grad in new_named_grads:
-            origin_named_grad[name] = grad.clone()
-        return origin_named_grad
-    
     # state_dict to tensor
-    def state_dict_to_tensor(self, state_dict: dict):
+    def state_dict_to_tensor(self, state_dict: dict, layer_idx_range=None, include_IC=True):
         params = []
         for (name, param) in state_dict.items():
+            if layer_idx_range is not None:
+                if len(layer_idx_range) == 1:
+                    if get_layer_idx(name) != layer_idx_range[0]: continue
+                else:
+                    if get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
+            if 'classifier' in name and include_IC is False: continue
             params.append(param.view(-1))
         return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
     
@@ -159,7 +156,7 @@ class Server(BaseServer):
         
         # == Homomorphic aggregate ==
         momentum_eq = {}
-        eq_named_grads: Dict[Dict[str, torch.tensor]] = {}
+        eq_named_grads: Dict[int: object]= {}
         for eq_depth in reversed(self.eq_depths):
             eq_received_params = self.sum(self.received_params[eq_depth])
             
@@ -172,46 +169,66 @@ class Server(BaseServer):
             # == is not smallest eq, attain momentum ==
             if eq_depth != min(self.eq_depths):
                 next_small_eq_depth = self.eq_depths[eq_index-1]
-                weighted_deeper_grads = [self.weighted(self.get_named_from_dict(eq_named_grads[eq_depth], layer_idx_range=depth, include_IC=False), 1/(eq_depth-next_small_eq_depth+1)) for depth in range(next_small_eq_depth-1, eq_depth)]
-                momentum_eq[eq_depth] = self.sum(weighted_deeper_grads)
+                weighted_deeper_grads = [1/(eq_depth-next_small_eq_depth+1) * self.state_dict_to_tensor(eq_named_grads[eq_depth], layer_idx_range=(depth,), include_IC=False) for depth in range(next_small_eq_depth-1, eq_depth)]
+                stacked_tensor = torch.stack(weighted_deeper_grads)
+                momentum_eq[eq_depth] = torch.mean(stacked_tensor, dim=0)
             
             # == is not largest eq, learn momentum ==
             if eq_depth != max(self.eq_depths):
-                eq_last_layer_grads = self.get_named_from_dict(eq_named_grads[eq_depth], layer_idx_range=eq_depth-1, include_IC=False)
+                eq_last_layer_grads = self.state_dict_to_tensor(eq_named_grads[eq_depth], layer_idx_range=(eq_depth-1,), include_IC=False)
                 next_larger_eq_depth = self.eq_depths[eq_index+1]
                 momentum = momentum_eq[next_larger_eq_depth]
-                eq_last_layer_grads = self.sum([self.weighted(momentum, self.beta), self.weighted(eq_last_layer_grads, 1-self.beta)])
-                eq_named_grads[eq_depth] = self.modifier_grads(eq_named_grads[eq_depth], eq_last_layer_grads)
+                
+                eq_last_layer_grads = self.beta * momentum + (1 - self.beta) * eq_last_layer_grads
+                
+                eq_named_grads[eq_depth] = self.state_dict_to_tensor(eq_named_grads[eq_depth])
+                eq_named_grads[eq_depth][-(eq_last_layer_grads.shape[0]):] = eq_last_layer_grads
+                
+            else:
+                # max eq's params -> tensor
+                eq_named_grads[eq_depth] = self.state_dict_to_tensor(eq_named_grads[eq_depth])
+            
+            # eq_named_grads[eq_depth] = self.state_dict_to_tensor(eq_named_grads[eq_depth])
+            
             
             eq_tensor_origin = eq_model.parameters_to_tensor()
-            grad = self.state_dict_to_tensor(eq_named_grads[eq_depth])
+            grad = eq_named_grads[eq_depth]
             
             # == fedavg ==
-            eq_tensor_updated = eq_tensor_origin + grad
+            # eq_tensor_updated = eq_tensor_origin + grad
             
             # == fedadam ==
             self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
             self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
             eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
             
-            # == update ==
+            # == update eq model ==
             eq_model.tensor_to_parameters(eq_tensor_updated)
         
         # == Heterogeneous aggregation ==
-        depth_weighted_tensor:Dict[int:List[torch.tensor]] = {}
+        depth_weighted_tensor:Dict[int: torch.tensor] = {}
         eq_tensors = {}
         for eq_depth in self.eq_depths:
             eq_model = self.eq_model[eq_depth]
             tensors = eq_model.parameters_to_tensor(is_split=True, is_inclusivefl=True)
             eq_tensors[eq_depth] = tensors
             for idx in range(len(tensors)-1):
-                depth_weighted_tensor.setdefault(idx, []).append(tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[eq_depth])
+                depth_weighted_tensor[idx] = depth_weighted_tensor.get(idx, 0.0) + tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[self.eq_depths[idx]]
         
-        updated_tensors = [sum(tensors) for (idx, tensors) in depth_weighted_tensor.items()]
+        aggregated_tensors = list(depth_weighted_tensor.values())
         for idx, eq_depth in enumerate(self.eq_depths):
-            if eq_depth != max(self.eq_depths):
-                updated_tensor = torch.cat(updated_tensors[:idx+1].append(eq_tensors[-1]), 0)
-            else:
-                updated_tensor = torch.cat(updated_tensors, 0)
+            aggregated_tensor = torch.cat(aggregated_tensors[:idx+1] + [eq_tensors[eq_depth][-1]], 0)
             eq_model: BaseModule = self.eq_model[eq_depth]
-            eq_model.tensor_to_parameters(updated_tensor)
+            length = eq_model.parameters_to_tensor().shape[0]
+            eq_model.tensor_to_parameters(aggregated_tensor)
+    
+    # def test_all(self):
+    #     for client in self.clients:
+    #         c_metric = client.metric
+    #         if client in self.sampled_clients:
+    #             self.metric['loss'].append(c_metric['loss'].last())
+
+    #         client.local_test(self.eq_model.values())
+
+    #         self.metric['acc'].append(c_metric['acc'].last())
+    #     return self.analyse_metric()
