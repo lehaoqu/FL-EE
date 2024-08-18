@@ -89,3 +89,28 @@ def get_layer_idx(name):
     if 'vit.encoder.layer' in name:
         layer_idx = name.split('.')[3]
     return int(layer_idx)
+
+
+def crop_tensor_dimensions(tensor, origin_target):
+    """
+    裁剪张量中指定大小的维度到新的尺寸。
+    
+    参数:
+    - tensor: 要裁剪的原始张量。
+    - target_sizes: 一个包含需要裁剪的维度大小的列表。
+    - new_size: 新的维度大小。
+    
+    返回:
+    - cropped_tensor: 裁剪后的张量。
+    """
+    # 找到所有需要裁剪的维度的索引
+    indices_to_crop = [i for i, size in enumerate(tensor.shape) if size in origin_target.keys()]
+    
+    # 裁剪每个找到的维度
+    cropped_tensor = tensor
+    for index in indices_to_crop:
+        # 确保我们不会裁剪超出原始尺寸的范围
+        crop_size = min(origin_target[tensor.shape[index]], tensor.shape[index])
+        cropped_tensor = cropped_tensor.narrow(index, 0, crop_size)
+    
+    return cropped_tensor

@@ -31,7 +31,7 @@ class FedSim:
         self.output = open(output_path, 'a')
         result_path = f'./{args.suffix}/result_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}.txt'
-        self.res_output = open(result_path, 'a')
+        # self.res_output = open(result_path, 'a')
         args.output = self.output
 
         self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
@@ -45,8 +45,11 @@ class FedSim:
         # print(ranges_to_gropus)
         eq_model = {}
         for depth in args.eq_depths:
-            eq_model[depth] = load_model(args, model_depth=depth)
-
+            eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'))
+        # == for scalefl ==
+        largest_model = eq_model[max(args.eq_depths)]
+        args.origin_width = [largest_model.config.hidden_size, largest_model.config.intermediate_size]
+        
         # === init clients & server ===
         self.clients = []
         for idx in tqdm(range(args.total_num), desc='Client compeleted'):
@@ -102,7 +105,7 @@ class FedSim:
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
 
-            self.res_output.write(f'{self.args.alg}, best_rnd: {best_rnd}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
+            # self.res_output.write(f'{self.args.alg}, best_rnd: {best_rnd}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
 
 
 if __name__ == '__main__':

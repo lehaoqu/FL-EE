@@ -40,8 +40,9 @@ class BaseModule(nn.Module):
             named_grads[name] = param.grad.detach()
         return named_grads
             
-    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False):
+    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False, is_scalefl=False):
         if is_inclusivefl: blocks = (1,4,7,11)
+        if is_scalefl: blocks = (3,6,9,11)
         if is_split:
             tensors = ()
             block_idx = 0
@@ -61,6 +62,22 @@ class BaseModule(nn.Module):
             for idx, (name, param) in enumerate(self.named_parameters()):
                 params.append(param.view(-1))
             return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
+        
+    def split_state_dict(self, blocks=(2,5,8,11)):
+        state_dict_tuple = ()
+        block_idx = 0
+        filter_state_dict = {}
+        for idx, (name, param) in enumerate(self.named_parameters()):
+            layer_idx = get_layer_idx(name)
+            if layer_idx > blocks[block_idx]:
+                state_dict_tuple += (filter_state_dict,)
+                block_idx += 1
+                filter_state_dict = {}
+            filter_state_dict[name] = param
+        if filter_state_dict != {}:
+            state_dict_tuple += (filter_state_dict,)
+        return state_dict_tuple
+                
 
     def tensor_to_parameters(self, tensor, local_params=None):
         param_index = 0

@@ -11,9 +11,9 @@
             "program": "../main.py",
             "cwd": "./script",
             "args": [
-                "inclusivefl",
+                "scalefl",
                 "--suffix", 
-                "0817-inclusivefl",
+                "scalefl",
                 "--dataset",
                 "cifar100-224-d03",
                 "--model",
