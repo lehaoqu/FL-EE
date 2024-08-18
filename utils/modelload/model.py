@@ -75,6 +75,15 @@ class BaseModule(nn.Module):
             # .clone() is a deep copy here
             param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
             param_index += param_size
+    
+    def model_lora(self):
+        params_with_grad = {name: param for name, param in self.named_parameters() if param.requires_grad}
+        return params_with_grad
+    
+    def save_model(self, path):
+        params_is_grads = self.model_lora()
+        torch.save(params_is_grads, path)
+        
 
 class CNNCifar(BaseModule):
     def __init__(self, args, dim_out):

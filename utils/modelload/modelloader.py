@@ -33,6 +33,8 @@ def load_model(args, model_depth=None):
             pre_model = ViTForImageClassification.from_pretrained(pretrained_model_name_or_path=config_path)
             eq_config = pre_model.config
             eq_config.num_hidden_layers = model_depth
+            # eq_config.hidden_size = int(eq_config.hidden_size * 0.75)
+            # eq_config.intermediate_size = int(eq_config.intermediate_size * 0.75)
             eq_exit_config = ViTExitConfig(eq_config, num_labels=100, exits=(2,5,8,11)) 
             model = ViTExitForImageClassification(eq_exit_config)
             model.load_state_dict(pre_model.state_dict(), strict=False)
@@ -44,7 +46,7 @@ def load_model(args, model_depth=None):
                 
             # print(model.parameters_to_tensor().shape)
             # for name, param in model.named_parameters():
-            #     print(name)
+            #     print(name, param.shape)
             # exit(0)            
     else:
         exit('Error: unrecognized model')

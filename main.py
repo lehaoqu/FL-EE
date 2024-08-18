@@ -34,6 +34,9 @@ class FedSim:
         self.res_output = open(result_path, 'a')
         args.output = self.output
 
+        self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.pth'
+
         # === init pre-trainde model ===
         ratios = ()
         for i in range(len(args.eq_ratios)):
@@ -57,6 +60,8 @@ class FedSim:
 
     def simulate(self):
         TEST_GAP = self.args.test_gap
+        best_acc = 0.0
+        best_rnd = 0
         try:
             for rnd in tqdm(range(self.server.total_round), desc='Communication Round', leave=False):
                 # ===================== train =====================
@@ -69,6 +74,10 @@ class FedSim:
 
                 ret_dict = self.server.test_all()
                 self.acc_processor.append(ret_dict['acc'])
+                if ret_dict['acc'] > best_acc:
+                    best_acc = ret_dict['acc']
+                    best_rnd = rnd
+                    self.server.global_model.save_model(self.model_save_path)
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')
@@ -93,7 +102,7 @@ class FedSim:
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
 
-            self.res_output.write(f'{self.args.alg}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
+            self.res_output.write(f'{self.args.alg}, best_rnd: {best_rnd}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
 
 
 if __name__ == '__main__':

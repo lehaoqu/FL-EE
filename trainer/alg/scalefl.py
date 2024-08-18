@@ -30,18 +30,20 @@ class Client(BaseClient):
                 # == ce loss ==
                 ce_loss = torch.zeros(1).to(self.device)
                 exit_logits = self.model(image)
-                for logits in exit_logits:
-                    ce_loss += self.loss_func(logits, label)
+                exit_num = len(exit_logits)
+                
+                for i, logits in enumerate(exit_logits):
+                    ce_loss += self.loss_func(logits, label) * (i+1)
                 
                 # == kd loss ==    
-
                 kd_loss = torch.zeros(1).to(self.device)
-                for i, teacher_logits in enumerate(exit_logits):
-                    for j, student_logits in enumerate(exit_logits):
-                        if i == j: continue
-                        else: 
-                            kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exit_logits)-1)
-                loss = ce_loss + kd_loss
+                teacher_logits = exit_logits[-1]
+                teacher_idx = exit_num-1
+                for student_idx, student_logits in enumerate(exit_logits):
+                    if student_idx < teacher_idx:
+                        kd_loss += kd_loss_func(student_logits, teacher_logits) * (student_idx+1)
+                        
+                loss = (ce_loss + kd_loss)/(exit_num*(exit_num+1))
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.item())
