@@ -67,7 +67,7 @@ class BaseClient:
         self.policy = None
         if args.policy != 'none':
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
-            self.policy = policy_module(args)
+            self.policy = policy_module.Policy(args)
         
     def run(self):
         raise NotImplementedError()
