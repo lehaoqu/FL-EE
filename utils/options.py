@@ -32,6 +32,9 @@ def args_parser():
     parser.add_argument('--lag_level', type=int, default=3, help="Lag level used to simulate latency of device")
     parser.add_argument('--lag_rate', type=float, default=0.3, help="Proportion of stale device")
 
+    # ===== train-test mismatch Policy =====
+    parser.add_argument('--policy', type=str, default='none', help="early exit train-test mismatch policy")
+
     # ===== Other Setting =====
     # Asynchronous aggregation
     parser.add_argument('--alpha', type=float, default=0.3, help='Weight decay')

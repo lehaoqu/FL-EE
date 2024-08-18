@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import time
 import random
+import importlib
 
 from typing import *
 
@@ -63,7 +64,11 @@ class BaseClient:
         self.lag_level = args.lag_level
         self.weight = 1
         self.submodel_weights = {}
-
+        self.policy = None
+        if args.policy != 'none':
+            policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
+            self.policy = policy_module(args)
+        
     def run(self):
         raise NotImplementedError()
 
