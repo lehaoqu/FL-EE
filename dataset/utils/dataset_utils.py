@@ -19,11 +19,13 @@ import os
 import ujson
 import numpy as np
 import gc
+import torch
 from sklearn.model_selection import train_test_split
+import pickle as pkl
 
-batch_size = 10
-train_ratio = 0.75 # merge original training set and test set, then split it manually. 
-alpha = 0.3 # for Dirichlet distribution
+batch_size = 32
+train_ratio = 0.8 # merge original training set and test set, then split it manually. 
+alpha = 1000 # for Dirichlet distribution
 
 def check(config_path, train_path, test_path, num_clients, niid=False, 
         balance=True, partition=None):
@@ -147,8 +149,8 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
 
 def split_data(X, y):
     # Split dataset
-    train_data, test_data = [], []
-    num_samples = {'train':[], 'test':[]}
+    train_data, valid_data = [], []
+    num_samples = {'train':[], 'valid':[]}
 
     for i in range(len(y)):
         X_train, X_test, y_train, y_test = train_test_split(
@@ -156,19 +158,19 @@ def split_data(X, y):
 
         train_data.append({'x': X_train, 'y': y_train})
         num_samples['train'].append(len(y_train))
-        test_data.append({'x': X_test, 'y': y_test})
-        num_samples['test'].append(len(y_test))
+        valid_data.append({'x': X_test, 'y': y_test})
+        num_samples['valid'].append(len(y_test))
 
-    print("Total number of samples:", sum(num_samples['train'] + num_samples['test']))
+    print("Total number of samples:", sum(num_samples['train'] + num_samples['valid']))
     print("The number of train samples:", num_samples['train'])
-    print("The number of test samples:", num_samples['test'])
+    print("The number of valid samples:", num_samples['valid'])
     print()
     del X, y
     # gc.collect()
 
-    return train_data, test_data
+    return train_data, valid_data
 
-def save_file(config_path, train_path, test_path, train_data, test_data, num_clients, 
+def save_file(config_path, train_path, valid_path, train_data, valid_data, num_clients, 
                 num_classes, statistic, niid=False, balance=True, partition=None):
     config = {
         'num_clients': num_clients, 
@@ -187,10 +189,24 @@ def save_file(config_path, train_path, test_path, train_data, test_data, num_cli
     for idx, train_dict in enumerate(train_data):
         with open(train_path + str(idx) + '.npz', 'wb') as f:
             np.savez_compressed(f, data=train_dict)
-    for idx, test_dict in enumerate(test_data):
-        with open(test_path + str(idx) + '.npz', 'wb') as f:
-            np.savez_compressed(f, data=test_dict)
+    for idx, valid_dict in enumerate(valid_data):
+        with open(valid_path + str(idx) + '.npz', 'wb') as f:
+            np.savez_compressed(f, data=valid_dict)
     with open(config_path, 'w') as f:
         ujson.dump(config, f)
 
     print("Finish generating dataset.\n")
+
+
+def save_origin_file(path, set, set_len):
+
+    loader = torch.utils.data.DataLoader(
+        set, batch_size=set_len, shuffle=False)
+
+    for idx, data in enumerate(loader, 0):
+        set.data, set.targets = data
+    
+    dict = {'x': set.data.cpu().detach().numpy(), 'y': set.targets.cpu().detach().numpy()}
+    
+    with open(path + '.npz', 'wb') as f:
+        np.savez_compressed(f, data=dict)

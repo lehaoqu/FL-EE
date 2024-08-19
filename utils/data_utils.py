@@ -30,13 +30,13 @@ def read_data(dataset, idx, is_train=True):
         return train_data
 
     else:
-        test_data_dir = os.path.join('../dataset', dataset, 'test/')
+        valid_data_dir = os.path.join('../dataset', dataset, 'valid/')
 
-        test_file = test_data_dir + str(idx) + '.npz'
-        with open(test_file, 'rb') as f:
-            test_data = np.load(f, allow_pickle=True)['data'].tolist()
+        valid_file = valid_data_dir + str(idx) + '.npz'
+        with open(valid_file, 'rb') as f:
+            valid_data = np.load(f, allow_pickle=True)['data'].tolist()
 
-        return test_data
+        return valid_data
 
 
 def read_client_data(dataset, idx, is_train=True):
@@ -52,11 +52,11 @@ def read_client_data(dataset, idx, is_train=True):
         train_data = [(x, y) for x, y in zip(X_train, y_train)]
         return train_data
     else:
-        test_data = read_data(dataset, idx, is_train)
-        X_test = torch.Tensor(test_data['x']).type(torch.float32)
-        y_test = torch.Tensor(test_data['y']).type(torch.int64)
-        test_data = [(x, y) for x, y in zip(X_test, y_test)]
-        return test_data
+        valid_data = read_data(dataset, idx, is_train)
+        X_valid = torch.Tensor(valid_data['x']).type(torch.float32)
+        y_valid = torch.Tensor(valid_data['y']).type(torch.int64)
+        valid_data = [(x, y) for x, y in zip(X_valid, y_valid)]
+        return valid_data
 
 
 def read_client_data_text(dataset, idx, is_train=True):
@@ -72,16 +72,16 @@ def read_client_data_text(dataset, idx, is_train=True):
         train_data = [((x, lens), y) for x, lens, y in zip(X_train, X_train_lens, y_train)]
         return train_data
     else:
-        test_data = read_data(dataset, idx, is_train)
-        X_test, X_test_lens = list(zip(*test_data['x']))
-        y_test = test_data['y']
+        valid_data = read_data(dataset, idx, is_train)
+        X_valid, X_valid_lens = list(zip(*valid_data['x']))
+        y_valid = valid_data['y']
 
-        X_test = torch.Tensor(X_test).type(torch.int64)
-        X_test_lens = torch.Tensor(X_test_lens).type(torch.int64)
-        y_test = torch.Tensor(test_data['y']).type(torch.int64)
+        X_valid = torch.Tensor(X_valid).type(torch.int64)
+        X_valid_lens = torch.Tensor(X_valid_lens).type(torch.int64)
+        y_valid = torch.Tensor(valid_data['y']).type(torch.int64)
 
-        test_data = [((x, lens), y) for x, lens, y in zip(X_test, X_test_lens, y_test)]
-        return test_data
+        valid_data = [((x, lens), y) for x, lens, y in zip(X_valid, X_valid_lens, y_valid)]
+        return valid_data
 
 
 def read_client_data_Shakespeare(dataset, idx, is_train=True):
@@ -93,9 +93,9 @@ def read_client_data_Shakespeare(dataset, idx, is_train=True):
         train_data = [(x, y) for x, y in zip(X_train, y_train)]
         return train_data
     else:
-        test_data = read_data(dataset, idx, is_train)
-        X_test = torch.Tensor(test_data['x']).type(torch.int64)
-        y_test = torch.Tensor(test_data['y']).type(torch.int64)
-        test_data = [(x, y) for x, y in zip(X_test, y_test)]
-        return test_data
+        valid_data = read_data(dataset, idx, is_train)
+        X_valid = torch.Tensor(valid_data['x']).type(torch.int64)
+        y_valid = torch.Tensor(valid_data['y']).type(torch.int64)
+        valid_data = [(x, y) for x, y in zip(X_valid, y_valid)]
+        return valid_data
 

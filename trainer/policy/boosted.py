@@ -12,17 +12,17 @@ class Policy():
         self.loss_func = nn.CrossEntropyLoss()
     
     def __call__(self, args) -> torch.tensor:
-        exits_logtis = args.exits_logits
-        assert self.exits_num == len(exits_logtis), f'expected {self.exits_num}, but {len(exits_logtis)}'
+        exits_logits = args.exits_logits
+        assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
         
         label = args.label
         pred_ensembels = [torch.zeros(1).to(self.device)]
-        for i, logits in enumerate(exits_logtis):
+        for i, logits in enumerate(exits_logits):
             tmp = logits + pred_ensembels[-1]
             pred_ensembels.append(tmp)
             
         loss = torch.zeros(1).to(self.device)
-        for i, logits in enumerate(exits_logtis):
+        for i, logits in enumerate(exits_logits):
             with torch.no_grad:
                 pred_ensembel = pred_ensembels[i]
             pred_final = pred_ensembel + logits
