@@ -19,7 +19,7 @@ class BaseClient:
         self.id = id
         self.args = args
         self.dataset_train = read_client_data(args.dataset, self.id, is_train=True)
-        self.dataset_test = read_client_data(args.dataset, self.id, is_train=False)
+        self.dataset_valid = read_client_data(args.dataset, self.id, is_train=False)
         self.device = args.device
         
         self.server = None
@@ -52,9 +52,9 @@ class BaseClient:
                 shuffle=True,
                 collate_fn=None
             )
-        if self.dataset_test is not None:
-            self.loader_test = DataLoader(
-                dataset=self.dataset_test,
+        if self.dataset_valid is not None:
+            self.loader_valid = DataLoader(
+                dataset=self.dataset_valid,
                 batch_size=self.batch_size,
                 shuffle=True,
                 collate_fn=None
@@ -93,13 +93,13 @@ class BaseClient:
         idx = self.args.eq_depths.index(self.eq_depth)
         self.model.tensor_to_parameters(torch.cat(p_tensors[:idx+1], 0))
 
-    def local_test(self):
+    def local_valid(self):
         self.model.eval()
         correct = 0
         total = 0
 
         with torch.no_grad():
-            for data in self.loader_test:
+            for data in self.loader_valid:
                 images, labels = data
                 images = images.to(self.device)
                 labels = labels.to(self.device)
@@ -202,14 +202,14 @@ class BaseServer:
         avg_tensor = torch.cat(avg_eq_tensor, 0)
         self.global_model.tensor_to_parameters(avg_tensor)
 
-    def test_all(self):
+    def valid_all(self):
         for client in self.clients:
             c_metric = client.metric
             if client in self.sampled_clients:
                 self.metric['loss'].append(c_metric['loss'].last())
 
             client.clone_model(self.global_model)
-            client.local_test()
+            client.local_valid()
 
             self.metric['acc'].append(c_metric['acc'].last())
         return self.analyse_metric()

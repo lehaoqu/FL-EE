@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import os
 import copy
+import json
 
 from utils.options import args_parser
 from utils.dataprocess import DataProcessor
@@ -34,6 +35,8 @@ class FedSim:
         # self.res_output = open(result_path, 'a')
         args.output = self.output
 
+        self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.json'
         self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}.pth'
 
@@ -62,7 +65,12 @@ class FedSim:
         self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]))
 
     def simulate(self):
-        TEST_GAP = self.args.test_gap
+        
+        # == save global model's config if model is transformer type ==
+        with open(self.config_save_path, 'w', encoding='utf-8') as f:
+            json.dump(self.server.global_model.config.to_dict(), f, ensure_ascii=False, indent=4)
+        
+        valid_GAP = self.args.valid_gap
         best_acc = 0.0
         best_rnd = 0
         try:
@@ -71,11 +79,11 @@ class FedSim:
                 self.server.round = rnd
                 self.server.run()
 
-                # ===================== test =====================
-                if rnd % TEST_GAP:
+                # ===================== valid =====================
+                if rnd % valid_GAP:
                     continue
 
-                ret_dict = self.server.test_all()
+                ret_dict = self.server.valid_all()
                 self.acc_processor.append(ret_dict['acc'])
                 if ret_dict['acc'] > best_acc:
                     best_acc = ret_dict['acc']

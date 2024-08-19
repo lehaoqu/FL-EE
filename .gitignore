@@ -4,4 +4,5 @@
 dataset/cifar*/
 models/
 script/08*/
+exps/
 __pycache__/

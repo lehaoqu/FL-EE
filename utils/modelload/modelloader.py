@@ -1,4 +1,5 @@
 import copy
+import json
 
 from utils.modelload.model import *
 from utils.train_utils import *
@@ -73,4 +74,20 @@ def load_model(args, model_depth=None, is_scalefl=False):
         
     else:
         exit('Error: unrecognized model')
+    return model
+
+def load_model_eval(args, model_path, config_path=None):
+    model_arg = args.model
+    dataset_arg = args.dataset
+    if CIFAR100 in dataset_arg:
+        if VIT in model_arg:            
+            exit_config = ViTConfig.from_pretrained(pretrained_model_name_or_path=config_path)
+            model = ViTExitForImageClassification(config=exit_config)
+            state_dict = torch.load(model_path)
+            model.load_state_dict(state_dict)
+            print('model load compeleted')
+    
+    else:
+        exit('Error: unrecognized model')
+    
     return model

@@ -10,7 +10,7 @@ def args_parser():
     parser.add_argument('alg', type=str, default='fedavg')
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--model', type=str, default='mlp')
-    parser.add_argument('--config_path', type=str, default='../models/facebook/deit-small-patch16-224')
+    parser.add_argument('--config_path', type=str, default='models/facebook/deit-small-patch16-224')
 
     # ===== Training Setting =====
     parser.add_argument('--total_num', type=int, default=4, help="Total clients num")
@@ -24,7 +24,7 @@ def args_parser():
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
 
-    parser.add_argument('--test_gap', type=int, default=10, help='Rounds between two test phases')
+    parser.add_argument('--valid_gap', type=int, default=10, help='Rounds between two valid phases')
 
     # ===== Clients Heterogeneous Setting =====
     parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')
@@ -38,6 +38,11 @@ def args_parser():
     # ===== Other Setting =====
     # Asynchronous aggregation
     parser.add_argument('--alpha', type=float, default=0.3, help='Weight decay')
+    
+    # ===== Eval Setting =====
+    parser.add_argument('--if_mode', type=str, default='anytime', help='Mode of inference')
+    parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of valid for train_dataset')
+    parser.add_argument('--eval_models_dir', type=str, default='script/0818-1e-1', help='dict need to evaled. config.json and model.pkl')
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]

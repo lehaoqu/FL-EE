@@ -16,18 +16,20 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import os
+import torch.utils
+import torch.utils.data
 import ujson
 import numpy as np
 import gc
 import torch
 from sklearn.model_selection import train_test_split
-import pickle as pkl
+import pickle
 
 batch_size = 32
-train_ratio = 0.8 # merge original training set and test set, then split it manually. 
+train_ratio = 0.8 # merge original training set and valid set, then split it manually. 
 alpha = 1000 # for Dirichlet distribution
 
-def check(config_path, train_path, test_path, num_clients, niid=False, 
+def check(config_path, train_path, valid_path, num_clients, niid=False, 
         balance=True, partition=None):
     # check existing dataset
     if os.path.exists(config_path):
@@ -45,7 +47,7 @@ def check(config_path, train_path, test_path, num_clients, niid=False,
     dir_path = os.path.dirname(train_path)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    dir_path = os.path.dirname(test_path)
+    dir_path = os.path.dirname(valid_path)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
@@ -57,7 +59,7 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
     statistic = [[] for _ in range(num_clients)]
 
     dataset_content, dataset_label = data
-    # guarantee that each client must have at least one batch of data for testing. 
+    # guarantee that each client must have at least one batch of data for validing. 
     least_samples = int(min(batch_size / (1-train_ratio), len(dataset_label) / num_clients / 2))
 
     dataidx_map = {}
@@ -146,20 +148,19 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
 
     return X, y, statistic
 
-
 def split_data(X, y):
     # Split dataset
     train_data, valid_data = [], []
     num_samples = {'train':[], 'valid':[]}
 
     for i in range(len(y)):
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train, X_valid, y_train, y_valid = train_valid_split(
             X[i], y[i], train_size=train_ratio, shuffle=True)
 
         train_data.append({'x': X_train, 'y': y_train})
         num_samples['train'].append(len(y_train))
-        valid_data.append({'x': X_test, 'y': y_test})
-        num_samples['valid'].append(len(y_test))
+        valid_data.append({'x': X_valid, 'y': y_valid})
+        num_samples['valid'].append(len(y_valid))
 
     print("Total number of samples:", sum(num_samples['train'] + num_samples['valid']))
     print("The number of train samples:", num_samples['train'])
@@ -210,3 +211,38 @@ def save_origin_file(path, set, set_len):
     
     with open(path + '.npz', 'wb') as f:
         np.savez_compressed(f, data=dict)
+        
+
+
+def load_tsv(data_path):
+    list_data_dict = []
+    with open(data_path, 'r') as f:
+        try:
+            for line_id, line in enumerate(f):
+                if line_id == 0:
+                    continue
+                else:
+                    line = line.strip().split('\t')
+                    if len(line) == 2:
+                        new_item = dict(
+                            label=int(line[0]),
+                            input_id=line[1]
+                        )
+                    else:
+                        new_item = dict(
+                            label=int(line[0]),
+                            input_id=(line[1], line[2])
+                        )
+                    list_data_dict.append(new_item)
+        except Exception as e:
+            print(line)
+        f.close()
+    return list_data_dict
+
+
+def load_pickle(file):
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+    return dict
+
+

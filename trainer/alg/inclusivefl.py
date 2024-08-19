@@ -40,23 +40,7 @@ class Client(BaseClient):
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
     
-    # def local_test(self, eq_models):
-    #     correct = 0
-    #     total = 0
-    #     for eq_model in eq_models:
-    #         self.clone_model(eq_model)
-    #         self.model.eval()
-    #         with torch.no_grad():
-    #             for data in self.loader_test:
-    #                 images, labels = data
-    #                 images = images.to(self.device)
-    #                 labels = labels.to(self.device)
-    #                 _, predicted = torch.max(self.model(images)[-1] , 1)
-    #                 total += labels.size(0)
-    #                 correct += (predicted == labels).sum().item()
-        
-    #     acc = 100.00 * correct / total
-    #     self.metric['acc'].append(acc)
+
 
 
 class Server(BaseServer):
@@ -222,13 +206,3 @@ class Server(BaseServer):
             length = eq_model.parameters_to_tensor().shape[0]
             eq_model.tensor_to_parameters(aggregated_tensor)
     
-    # def test_all(self):
-    #     for client in self.clients:
-    #         c_metric = client.metric
-    #         if client in self.sampled_clients:
-    #             self.metric['loss'].append(c_metric['loss'].last())
-
-    #         client.local_test(self.eq_model.values())
-
-    #         self.metric['acc'].append(c_metric['acc'].last())
-    #     return self.analyse_metric()

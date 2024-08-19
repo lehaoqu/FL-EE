@@ -46,32 +46,7 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
 
     if check(config_path, train_path, valid_path, num_clients, niid, balance, partition):
         return
-    
-    
-    # # == save train valid test for global (server) (32*32) ==
-    # transform = transforms.Compose([transforms.ToTensor()])
-    
-    # trainset = torchvision.datasets.CIFAR100(
-    #     root=dir_path+"rawdata", train=True, download=True, transform=transform)
-    # testset = torchvision.datasets.CIFAR100(
-    #     root=dir_path+"rawdata", train=True, download=True, transform=transform)
-    
-    # origin_train_len = len(trainset)
-    # train_len = int(origin_train_len * train_ratio)
-    # valid_len = origin_train_len - train_len
-    
-    # validset = torch.utils.data.Subset(trainset, list(range(train_len, origin_train_len)))
-    # trainset = torch.utils.data.Subset(trainset, list(range(train_len)))
-    
-    # print('Saving origin train global to disk.\n')
-    # save_origin_file(dir_path+"train", trainset, train_len)
-    # print('Saving origin valid global to disk.\n')
-    # save_origin_file(dir_path+"valid", validset, valid_len)
-    # print('Saving origin test global to disk.\n')
-    # save_origin_file(dir_path+"test", testset, len(testset))
-    
-    
-    
+       
     # == save train valid for clients  ==
     # Get Cifar100 data
     transform = transforms.Compose([transforms.Resize(224),

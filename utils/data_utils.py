@@ -21,7 +21,7 @@ import torch
 
 def read_data(dataset, idx, is_train=True):
     if is_train:
-        train_data_dir = os.path.join('../dataset', dataset, 'train/')
+        train_data_dir = os.path.join('dataset', dataset, 'train/')
 
         train_file = train_data_dir + str(idx) + '.npz'
         with open(train_file, 'rb') as f:
@@ -30,7 +30,7 @@ def read_data(dataset, idx, is_train=True):
         return train_data
 
     else:
-        valid_data_dir = os.path.join('../dataset', dataset, 'valid/')
+        valid_data_dir = os.path.join('dataset', dataset, 'valid/')
 
         valid_file = valid_data_dir + str(idx) + '.npz'
         with open(valid_file, 'rb') as f:
