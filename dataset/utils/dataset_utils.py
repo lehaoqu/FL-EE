@@ -53,9 +53,10 @@ def check(config_path, train_path, valid_path, num_clients, niid=False,
 
     return False
 
-def separate_data(data, num_clients, num_classes, niid=False, balance=False, partition=None, class_per_client=None):
+def separate_data(data, num_clients, num_classes, niid=False, balance=False, partition=None, class_per_client=None, attention_mask=None):
     X = [[] for _ in range(num_clients)]
     y = [[] for _ in range(num_clients)]
+    m = [[] for _ in range(num_clients)]
     statistic = [[] for _ in range(num_clients)]
 
     dataset_content, dataset_label = data
@@ -110,7 +111,7 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
         while min_size < least_samples:
             if try_cnt > 1:
                 print(f'Client data size does not meet the minimum requirement {least_samples}. Try allocating again for the {try_cnt}-th time.')
-
+            if try_cnt == 5: break
             idx_batch = [[] for _ in range(num_clients)]
             for k in range(K):
                 idx_k = np.where(dataset_label == k)[0]
@@ -133,6 +134,8 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
         idxs = dataidx_map[client]
         X[client] = dataset_content[idxs]
         y[client] = dataset_label[idxs]
+        if attention_mask is not None:
+            m[client] = attention_mask[idxs]
 
         for i in np.unique(y[client]):
             statistic[client].append((int(i), int(sum(y[client]==i))))
@@ -146,7 +149,10 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
         print(f"\t\t Samples of labels: ", [i for i in statistic[client]])
         print("-" * 50)
 
-    return X, y, statistic
+    if attention_mask is not None:
+        del attention_mask
+        return X, y, m, statistic
+    else: return X, y, statistic 
 
 def split_data(X, y):
     # Split dataset
@@ -244,5 +250,4 @@ def load_pickle(file):
     with open(file, 'rb') as fo:
         dict = pickle.load(fo, encoding='bytes')
     return dict
-
 

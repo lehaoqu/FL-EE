@@ -1,12 +1,8 @@
-import copy
-import json
-
 import torch
 from torch.utils.data import Dataset
-import pandas as pd
-from configs.training import train_config
+
 import logging
-from dataset.utils.dataset_utils import load_tsv
+from utils.dataset_utils import load_tsv
 
 logger = logging.getLogger(__name__)
 
@@ -15,17 +11,16 @@ transformers.logging.set_verbosity_error()
 
 
 class GLUEClassificationDataset(Dataset):
-    def __init__(self, path, tokenizer, partition="all"):
-        list_dic = load_tsv(path)
-        self.ann = list_dic
-        if partition == "all":
-            self.ann = self.ann
-        elif partition == "train":
-            self.ann = self.ann[:2*len(self.ann)//3]
-        elif partition == "val":
-            self.ann = self.ann[2*len(self.ann)//3:]
-        elif partition == "test":
-            pass
+    def __init__(self, args=None,  path=None, tokenizer=None, is_valid=None, valid_ratio=0.2, ann=None):
+        if ann is not None:
+            self.ann = ann
+        else:
+            self.path = path
+            self.ann = load_tsv(path)
+            valid_ratio = valid_ratio if args is None else args.valid_ratio
+            if is_valid is not None:
+                if is_valid is True:
+                    self.ann = self.ann[int(len(self.ann)*(1-args.valid_ratio)):]
 
         labels = [item["label"] for item in self.ann]
         input_ids = [item["input_id"] for item in self.ann]
@@ -42,7 +37,7 @@ class GLUEClassificationDataset(Dataset):
                 return_tensors="pt",
                 padding='max_length',
                 truncation=True,
-                max_length=train_config.max_length
+                max_length=128
             )
         input_ids = labels = [
             tokenized_list.input_ids[i] for i in range(len(strings))

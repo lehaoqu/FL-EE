@@ -6,4 +6,5 @@ dataset/cifar*/
 models/
 script/08*/
 exps/
+dataset/glue/
 __pycache__/
