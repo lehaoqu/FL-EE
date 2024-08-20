@@ -37,7 +37,7 @@ class CIFARClassificationDataset(Dataset):
         self.ann:dict = load_pickle(self.path)
         if is_valid is not None:
             if is_valid is True:
-                self.ann:dict = {key: value[int((1-args.valid_ratio)*len(value)):] if isinstance(value, list) else value for key, value in self.ann.items()}
+                self.ann:dict = {key: value[int((1-args.valid_ratio)*len(value)):] if isinstance(value, list) or isinstance(value, np.ndarray) else value for key, value in self.ann.items()}
         # self.transform_for_vit()
         
     def __len__(self):

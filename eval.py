@@ -6,7 +6,7 @@ import math
 from tqdm import tqdm
 
 from utils.options import args_parser
-from dataset.utils.dataloader_utils import load_dataset_loader
+from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.modelloader import load_model_eval
 
 
@@ -16,7 +16,7 @@ class Eval():
         self.args = args
         self.if_mode = args.if_mode
         self.device = args.device
-        args.valid_ratio = 0.8
+        args.valid_ratio = 0.2
         self.valid_dataloader = load_dataset_loader(args=args, is_valid=True)
         self.test_dataloader = load_dataset_loader(args=args, is_valid=False)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
@@ -24,7 +24,7 @@ class Eval():
 
         
     def eval(self, model_path, config_path):
-        self.eval_output.write((f'eval model_path:{model_path}'+'\n').center(80, '='))
+        self.eval_output.write((f'eval model:{os.path.basename(model_path)}'+'\n').center(80, '='))
         self.model = load_model_eval(self.args, model_path, config_path)
         self.n_exits = len(self.model.config.exits)
         self.args.n_exits = self.n_exits
@@ -32,7 +32,6 @@ class Eval():
         self.tester = Tester(self.model, self.args)
         
         self.test_exits_preds, self.test_targets = self.tester.calc_logtis(self.test_dataloader)
-        print(self.test_exits_preds.device, self.test_targets.device)
         self.valid_exits_preds, self.valid_targets = self.tester.calc_logtis(self.valid_dataloader)
         
         self.eval_output.write('logits calc compeleted\n')
@@ -42,8 +41,8 @@ class Eval():
         elif self.args.if_mode == 'budgeted':
             self.budgeted()
         else:
-            self.anytime()
             self.budgeted()
+            self.anytime()
         
     
     def anytime(self,):
@@ -54,7 +53,7 @@ class Eval():
             crt_list[i] += (predicted == self.test_targets).sum().item()
         
         acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.n_exits)]
-        self.eval_output.write('{}\n'.format(acc_list))
+        self.eval_output.write('Anytime:\n{}\n'.format(acc_list))
         self.eval_output.flush()
         
     
@@ -63,15 +62,14 @@ class Eval():
         # TODO flops need to be measured
         flops = [i+1 for i in range(self.n_exits)]
         for p in range(1, rnd):
-            self.eval_output.write("*********************")
+            # self.eval_output.write("\n*********************\n")
             _p = torch.tensor([p * (1.0/(rnd/2))], dtype=torch.float32).to(self.device)
-            probs = torch.exp(torch.log(_p) * torch.range(1, self.n_exits).to(self.device))
+            probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(self.n_exits)]).to(self.device))
             probs /= probs.sum()
-            self.eval_output.write(probs)
             
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
-            acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.valid_targets, flops, T)
-            self.eval_output('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}'.format(p, acc_val, acc_test, exp_flops))
+            acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
+            self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
             
@@ -120,7 +118,7 @@ class Tester(object):
         """
         n_exits, n_sample, n_class = preds.size()
         max_preds, argmax_preds = preds.max(dim=2, keepdim=False)
-        _, sorted_idx = max_preds.sort()
+        _, sorted_idx = max_preds.sort(dim=1, descending=True)
         filtered = torch.zeros(n_sample)
         T = torch.tensor([1e8 for _ in range(n_exits)]).to(self.device)
         

@@ -50,18 +50,25 @@ from utils.train_utils import crop_tensor_dimensions
 # samples = [wa,wb]
 # print(a_scale_tensors(tensors, samples))
 
-a = torch.tensor([[[1,2,4],
-                   [5,4,9],
-                   [7,8,2],],
-                  [
-                   [5,6,1],
-                   [9,8,5],
-                   [4,5,5]
-                  ]])
-max_pres, argmax_pres = a.max(dim=2, keepdim=False)
-print(max_pres)
-print(argmax_pres)
+# a = torch.tensor([[[1,2,4],
+#                    [5,4,9],
+#                    [7,8,2],],
+#                   [
+#                    [5,6,1],
+#                    [9,8,5],
+#                    [4,5,5]
+#                   ]])
+# max_pres, argmax_pres = a.max(dim=2, keepdim=False)
+# print(max_pres)
+# print(argmax_pres)
 
-_,sorted_idx = max_pres.sort(dim=1, descending=True)
-print(_)
-print(sorted_idx)
+# _,sorted_idx = max_pres.sort(dim=1, descending=True)
+# print(_)
+# print(sorted_idx)
+
+print(torch.range(1, 4))
+_p = torch.tensor([40 * (1.0/(40/2))], dtype=torch.float32)
+print(torch.log(_p))
+probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(4)]))
+probs /= probs.sum()
+print(probs)

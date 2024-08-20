@@ -32,7 +32,7 @@
             "args": [
                 "depthfl",
                 "--suffix", 
-                "exps/depthfl",
+                "exps/0820-1e-1-cifar100",
                 "--dataset",
                 "cifar100-224-d03",
                 "--model",

@@ -154,7 +154,7 @@ def split_data(X, y):
     num_samples = {'train':[], 'valid':[]}
 
     for i in range(len(y)):
-        X_train, X_valid, y_train, y_valid = train_valid_split(
+        X_train, X_valid, y_train, y_valid = train_test_split(
             X[i], y[i], train_size=train_ratio, shuffle=True)
 
         train_data.append({'x': X_train, 'y': y_train})
