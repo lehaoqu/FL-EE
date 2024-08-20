@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import copy
 
 from typing import *
 from functools import reduce
@@ -56,8 +57,11 @@ class Client(BaseClient):
                     if student_idx < teacher_idx:
                         kd_loss += kd_loss_func(student_logits, teacher_logits) * (student_idx+1)
                         
-                loss = (ce_loss + kd_loss)/(exit_num*(exit_num+1))
-                # loss = (ce_loss + kd_loss)
+                loss = 2*(ce_loss + kd_loss)/(exit_num*(exit_num+1))
+                
+                # for i, logits in enumerate(exit_logits):
+                #     ce_loss += self.loss_func(logits, label)
+                
                 # loss = ce_loss
                 loss.backward()
                 self.optim.step()
@@ -72,8 +76,9 @@ class Client(BaseClient):
         new_state_dict = {}
         for name, param in self.model.named_parameters():
             if target_state_dict[name].shape != param.shape:
-                param = crop_tensor_dimensions(param, self.origin_target)
-            new_state_dict[name] = param
+                prune_param = crop_tensor_dimensions(target_state_dict[name], self.origin_target)
+            else: prune_param = target_state_dict[name]
+            new_state_dict[name] = prune_param
         self.model.load_state_dict(new_state_dict)
 
 
@@ -95,7 +100,7 @@ class Server(BaseServer):
         self.received_params = ()
 
         for idx, submodel_depth in enumerate(self.eq_depths):
-            self.received_params += ([{'state_dict': client.model.split_state_dict(blocks=(3,6,9,11))[idx], 'sample': len(client.dataset_train)} for client in self.sampled_submodel_clients[submodel_depth]],)
+            self.received_params += ([{'state_dict': client.model.split_state_dict(blocks=self.global_model.config.exits)[idx], 'sample': len(client.dataset_train)} for client in self.sampled_submodel_clients[submodel_depth]],)
             
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
