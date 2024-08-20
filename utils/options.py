@@ -18,7 +18,7 @@ def args_parser():
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
 
-    parser.add_argument('--rnd', type=int, default=500, help="Communication rounds")
+    parser.add_argument('--rnd', type=int, default=20, help="Communication rounds")
     parser.add_argument('--bs', type=int, default=32, help="Batch size")
     parser.add_argument('--epoch', type=int, default=1, help="Epoch num")
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
@@ -40,7 +40,7 @@ def args_parser():
     parser.add_argument('--alpha', type=float, default=0.3, help='Weight decay')
     
     # ===== Eval Setting =====
-    parser.add_argument('--if_mode', type=str, default='anytime', help='Mode of inference')
+    parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')
     parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of valid for train_dataset')
     parser.add_argument('--eval_models_dir', type=str, default='script/0818-1e-1', help='dict need to evaled. config.json and model.pkl')
 

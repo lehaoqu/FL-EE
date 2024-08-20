@@ -23,6 +23,25 @@
                 "--total_num",
                 "4"
             ],
+        },
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "eval debug",
+            "program": "eval.py",
+            "args": [
+                "depthfl",
+                "--suffix", 
+                "exps/depthfl",
+                "--dataset",
+                "cifar100-224-d03",
+                "--model",
+                "vit",
+                "--sr", 
+                "1",
+                "--total_num",
+                "4"
+            ],
         }
     ]
 }

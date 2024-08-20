@@ -1,7 +1,7 @@
 dts=cifar100-224-d03
 md=vit
-sr=1
-total_num=4
+sr=0.1
+total_num=120
 
 python main.py depthfl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3
 # python main.py scalefl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3
