@@ -57,7 +57,7 @@ class Client(BaseClient):
                         kd_loss += kd_loss_func(student_logits, teacher_logits) * (student_idx+1)
                         
                 loss = (ce_loss + kd_loss)/(exit_num*(exit_num+1))
-                loss = (ce_loss + kd_loss)
+                # loss = (ce_loss + kd_loss)
                 # loss = ce_loss
                 loss.backward()
                 self.optim.step()

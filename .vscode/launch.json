@@ -8,8 +8,7 @@
             "type": "debugpy",
             "request": "launch",
             "name": "run.sh debug",
-            "program": "../main.py",
-            "cwd": "./script",
+            "program": "main.py",
             "args": [
                 "scalefl",
                 "--suffix", 
