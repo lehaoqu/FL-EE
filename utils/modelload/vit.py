@@ -8,190 +8,22 @@ from typing import *
 import torch
 import torch.utils.checkpoint
 from torch import nn
-from dataclasses import dataclass
-from utils.train_utils import get_layer_idx
+
 from transformers.modeling_outputs import (
     BaseModelOutputWithPooling,
     ImageClassifierOutput,
 )
-from transformers.utils import (
-    logging,
-)
-from transformers.models.vit.configuration_vit import ViTConfig
+
+from transformers.models.vit.configuration_vit import ViTConfig as Config
 from transformers.models.vit import ViTPreTrainedModel
 from transformers.models.vit.modeling_vit import *
-from transformers.models.bert.configuration_bert import BertConfig
-from transformers.models.bert import BertPreTrainedModel
+from transformers.models.vit.modeling_vit import ViTForImageClassification as Model
+
 from transformers.models.bert.modeling_bert import *
+from utils.modelload.model import BaseModule
 
 
-# from models.utils.ree import Ree
-logger = logging.get_logger(__name__)
-
-class BaseModule(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def grads_to_named(self, layer_idx_range=None, include_IC=True)->Dict[str, torch.tensor]:
-        named_grads = {}
-        for idx, (name, param) in enumerate(self.named_parameters()):
-            if layer_idx_range is not None:
-                if len(layer_idx_range) == 1:
-                    if get_layer_idx(name) != layer_idx_range: continue
-                else:
-                    if get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
-            if param.requires_grad is False: continue
-            if 'classifier' in name & include_IC is False: continue
-            named_grads[name] = param.grad.detach()
-        return named_grads
-            
-    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False, is_scalefl=False):
-        if is_inclusivefl: blocks = (1,4,7,11)
-        if is_scalefl: blocks = (3,6,9,11)
-        if is_split:
-            tensors = ()
-            block_idx = 0
-            params = []
-            for idx, (name, param) in enumerate(self.named_parameters()):
-                layer_idx = get_layer_idx(name)
-                if layer_idx > blocks[block_idx]:
-                    tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
-                    block_idx += 1
-                    params = []
-                params.append(param.view(-1))
-            if params != []: 
-                tensors += (torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0),)
-            return tensors
-        else:
-            params = []
-            for idx, (name, param) in enumerate(self.named_parameters()):
-                params.append(param.view(-1))
-            return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
-        
-    def split_state_dict(self, blocks=(2,5,8,11)):
-        state_dict_tuple = ()
-        block_idx = 0
-        filter_state_dict = {}
-        for idx, (name, param) in enumerate(self.named_parameters()):
-            layer_idx = get_layer_idx(name)
-            if layer_idx > blocks[block_idx]:
-                state_dict_tuple += (filter_state_dict,)
-                block_idx += 1
-                filter_state_dict = {}
-            filter_state_dict[name] = param
-        if filter_state_dict != {}:
-            state_dict_tuple += (filter_state_dict,)
-        return state_dict_tuple
-                
-
-    def tensor_to_parameters(self, tensor, local_params=None):
-        param_index = 0
-        for idx, (name, param) in enumerate(self.named_parameters()):
-            # === get shape & total size ===
-            shape = param.shape
-            param_size = 1
-            for s in shape:
-                param_size *= s
-
-            # === put value into param ===
-            # .clone() is a deep copy here
-            param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
-            param_index += param_size
-    
-    def model_lora(self):
-        params_with_grad = {name: param for name, param in self.named_parameters() if param.requires_grad}
-        return params_with_grad
-    
-    def save_model(self, path):
-        params_is_grads = self.model_lora()
-        torch.save(params_is_grads, path)
-        
-
-class CNNCifar(BaseModule):
-    def __init__(self, args, dim_out):
-        super(CNNCifar, self).__init__()
-        self.args = args
-        self.conv1 = nn.Conv2d(3, 64, 5)
-        self.conv2 = nn.Conv2d(64, 64, 5)
-        self.fc1 = nn.Linear(64 * 5 * 5, 384)
-        self.fc2 = nn.Linear(384, 192)
-
-        self.fc = nn.Linear(192, dim_out)
-
-    def forward(self, x):
-        x = self.features(x)
-        x = self.fc(x)
-        return F.log_softmax(x, dim=1)
-
-    def features(self, x):
-        x = F.max_pool2d(F.relu(self.conv1(x)), kernel_size=2, stride=2)
-        x = F.max_pool2d(F.relu(self.conv2(x)), kernel_size=2, stride=2)
-        x = x.view(-1, 64 * 5 * 5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return x
-
-    def logits(self, x):
-        x = self.features(x)
-        x = self.fc(x)
-        return x
-
-class MLP(BaseModule):
-    def __init__(self, args, dim_in, dim_hidden, dim_out):
-        super(MLP, self).__init__()
-        self.args = args
-        self.layer_input = nn.Linear(dim_in, 512)
-        self.layer_hidden1 = nn.Linear(512, 256)
-        self.layer_hidden2 = nn.Linear(256, 64)
-
-        self.fc = nn.Linear(64, dim_out)
-
-    def features(self, x):
-        x = x.view(-1, x.shape[1] * x.shape[-2] * x.shape[-1])
-        x = F.relu(self.layer_input(x))
-        x = F.relu(self.layer_hidden1(x))
-        x = F.relu(self.layer_hidden2(x))
-        return x
-
-    def forward(self, x):
-        x = self.features(x)
-        x = self.fc(x)
-        return F.log_softmax(x, dim=1)
-
-class CNNMnist(BaseModule):
-    def __init__(self, args, dim_out):
-        super(CNNMnist, self).__init__()
-        self.args = args
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=5)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=5)
-        self.fc1 = nn.Linear(1024, 128)
-        self.fc2 = nn.Linear(128, 64)
-
-        self.fc = nn.Linear(64, dim_out)
-
-    def features(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(F.dropout2d(self.conv2(x)), 2))
-        x = x.view(-1, x.shape[1] * x.shape[2] * x.shape[3])
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return x
-
-    def forward(self, x):
-        x = self.features(x)
-        x = self.fc(x)
-        return F.log_softmax(x, dim=1)
-
-
-# @dataclass
-# class EncoderOutputRee(ModelOutput):
-#     last_hidden_state: torch.FloatTensor = None
-#     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-#     attentions: Optional[Tuple[torch.FloatTensor]] = None
-#     ree_exit_outputs: Optional[Tuple[torch.FloatTensor]] = None
-
-
-class ViTExitConfig(ViTConfig):
+class ExitConfig(ViTConfig):
     
     model_type = "vit"
 
@@ -386,7 +218,7 @@ class ViTExitConfig(ViTConfig):
 
 class ViTExitLayer(nn.Module):
 
-    def __init__(self, config: ViTExitConfig, index: int) -> None:
+    def __init__(self, config: ExitConfig, index: int) -> None:
         super().__init__()
         self.exit = True if index in config.exits else False
         if self.exit:
@@ -488,9 +320,9 @@ class ViTExitModel(ViTPreTrainedModel):
         return encoder_outputs
 
 
-class ViTExitForImageClassification(ViTPreTrainedModel, BaseModule):
+class ExitModel(ViTPreTrainedModel, BaseModule):
     
-    def __init__(self, config: ViTExitConfig) -> None:
+    def __init__(self, config: ExitConfig) -> None:
         ViTPreTrainedModel.__init__(self, config)
         BaseModule.__init__(self,)
 
@@ -537,197 +369,3 @@ class ViTExitForImageClassification(ViTPreTrainedModel, BaseModule):
         return outputs
 
 
-# === Bert ===
-class BertExitConfig(BertConfig):
-
-    model_type = "bert-exit"
-
-    def __init__(
-            self,
-            config,
-            exits=None,
-            num_labels=None,
-            base_model=None,
-            classifier_archi=None,
-            **kwargs,
-    ):
-        super().__init__(
-            vocab_size=config.vocab_size,
-            hidden_size=config.hidden_size,
-            num_hidden_layers=config.num_hidden_layers,
-            num_attention_heads=config.num_attention_heads,
-            intermediate_size=config.intermediate_size,
-            hidden_act=config.hidden_act,
-            hidden_dropout_prob=config.hidden_dropout_prob,
-            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-            max_position_embeddings=config.max_position_embeddings,
-            type_vocab_size=config.type_vocab_size,
-            initializer_range=config.initializer_range,
-            layer_norm_eps=config.layer_norm_eps,
-            pad_token_id=config.pad_token_id,
-            position_embedding_type=config.position_embedding_type,
-            use_cache=config.use_cache,
-            classifier_dropout=config.classifier_dropout,
-            **kwargs,
-        )
-        self.exits = exits if exits is not None else tuple(range(config.num_hidden_layers))
-        self.base_model = base_model
-        self.num_labels = num_labels if num_labels is not None else 2
-        self.classifier_atchi = classifier_archi
-
-
-class MultiHeadedAttention(nn.Module):
-    """
-    Each head is a self-attention operation.
-    self-attention refers to https://arxiv.org/pdf/1706.03762.pdf
-    """
-
-    def __init__(self, hidden_size, heads_num, dropout):
-        super(MultiHeadedAttention, self).__init__()
-        self.hidden_size = hidden_size
-        self.heads_num = heads_num
-        self.per_head_size = hidden_size // heads_num
-
-        self.linear_layers = nn.ModuleList([
-            nn.Linear(hidden_size, hidden_size) for _ in range(3)
-        ])
-
-        self.dropout = nn.Dropout(dropout)
-        self.final_linear = nn.Linear(hidden_size, hidden_size)
-
-    def forward(self, key, value, query, mask):
-        """
-        Args:
-            key: [batch_size x seq_length x hidden_size]
-            value: [batch_size x seq_length x hidden_size]
-            query: [batch_size x seq_length x hidden_size]
-            mask: [batch_size x 1 x seq_length x seq_length]
-
-        Returns:
-            output: [batch_size x seq_length x hidden_size]
-        """
-        batch_size, seq_length, hidden_size = key.size()
-        heads_num = self.heads_num
-        per_head_size = self.per_head_size
-
-        def shape(x):
-            return x. \
-                contiguous(). \
-                view(batch_size, seq_length, heads_num, per_head_size). \
-                transpose(1, 2)
-
-        def unshape(x):
-            return x. \
-                transpose(1, 2). \
-                contiguous(). \
-                view(batch_size, seq_length, hidden_size)
-
-        query, key, value = [l(x). \
-                                 view(batch_size, -1, heads_num, per_head_size). \
-                                 transpose(1, 2) \
-                             for l, x in zip(self.linear_layers, (query, key, value))
-                             ]
-
-        scores = torch.matmul(query, key.transpose(-2, -1))
-        scores = scores / math.sqrt(float(per_head_size))
-        # print(scores.shape)
-        # print(mask.shape)
-        # print(scores[0][0])
-        scores = scores + mask
-        # print(scores[0][0])
-        probs = nn.Softmax(dim=-1)(scores)
-        probs = self.dropout(probs)
-        output = unshape(torch.matmul(probs, value))
-        output = self.final_linear(output)
-
-        return output
-
-
-class Classifier(nn.Module):
-
-    def __init__(self, config, input_size, labels_num):
-        super(Classifier, self).__init__()
-        self.input_size = input_size
-        self.cla_hidden_size = 128
-        self.cla_heads_num = 2
-        self.labels_num = labels_num
-        self.output_layer_0 = nn.Linear(input_size, self.cla_hidden_size)
-        classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
-        )
-        self.self_atten = MultiHeadedAttention(self.cla_hidden_size, self.cla_heads_num, classifier_dropout)
-        self.output_layer_1 = nn.Linear(self.cla_hidden_size, self.cla_hidden_size)
-        self.output_layer_2 = nn.Linear(self.cla_hidden_size, labels_num)
-
-        self.dropout = nn.Dropout(classifier_dropout)
-
-    def forward(self, hidden, mask):
-        mask = (mask > 0). \
-                unsqueeze(1). \
-                repeat(1, mask.shape[-1], 1). \
-                unsqueeze(1)
-        mask = mask.float()
-        mask = (1.0 - mask) * -10000.0
-
-        hidden = torch.tanh(self.output_layer_0(hidden))
-        hidden = self.self_atten(hidden, hidden, hidden, mask)
-
-        hidden = hidden[:, 0]
-
-        output_1 = torch.tanh(self.dropout(self.output_layer_1(hidden)))
-        logits = self.output_layer_2(self.dropout(output_1))
-        return logits
-
-
-class BertExitForSequenceClassification(BertPreTrainedModel):
-    def __init__(self, config: BertExitConfig):
-        super().__init__(config)
-        self.num_labels = config.num_labels
-        self.config = config
-
-        self.bert = BertModel(config)
-        classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
-        )
-
-        self.dropout = nn.Dropout(classifier_dropout)
-
-        for i in config.exits:
-            setattr(self.bert.encoder.layer[i], f"classifier", Classifier(config, config.hidden_size, self.num_labels))
-
-        self.post_init()
-
-
-    def forward(
-        self,
-        input_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        token_type_ids: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        head_mask: Optional[torch.Tensor] = None,
-        inputs_embeds: Optional[torch.Tensor] = None,
-        labels: Optional[torch.Tensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = True,
-    ):
-
-        outputs = self.bert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-        )
-                
-        hidden_states = BaseModelOutputWithPoolingAndCrossAttentions(outputs).hidden_states
-
-        all_logits = tuple()
-        for i in range(len(self.config.exits)):
-            exit = self.config.exits[i]
-            classifier = getattr(self, f"classifier_{exit}")
-            all_logits += (classifier(hidden_states[exit + 1], attention_mask),)
-
-        return all_logits

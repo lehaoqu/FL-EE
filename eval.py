@@ -53,7 +53,7 @@ class Eval():
             crt_list[i] += (predicted == self.test_targets).sum().item()
         
         acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.n_exits)]
-        self.eval_output.write('Anytime:\n{}\n'.format(acc_list))
+        self.eval_output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, [acc/sum(acc_list) for acc in acc_list]))
         self.eval_output.flush()
         
     

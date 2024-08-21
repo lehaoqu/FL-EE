@@ -66,9 +66,19 @@ from utils.train_utils import crop_tensor_dimensions
 # print(_)
 # print(sorted_idx)
 
-print(torch.range(1, 4))
-_p = torch.tensor([40 * (1.0/(40/2))], dtype=torch.float32)
-print(torch.log(_p))
-probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(4)]))
-probs /= probs.sum()
-print(probs)
+# print(torch.range(1, 4))
+# _p = torch.tensor([40 * (1.0/(40/2))], dtype=torch.float32)
+# print(torch.log(_p))
+# probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(4)]))
+# probs /= probs.sum()
+# print(probs)
+
+from utils.modelload.model import *
+
+config_path = '/data/qvlehao/FL-EE/models/google-bert/bert-base-uncased/config.json'
+config = BertConfig.from_pretrained(pretrained_model_name_or_path=config_path)
+exit_config = BertExitConfig(config=config)
+model = BertExitForSequenceClassification(config=exit_config)
+print(model)
+for name, param in model.named_parameters():
+    print(name)

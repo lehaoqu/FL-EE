@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 import logging
-from utils.dataset_utils import load_tsv
+from dataset.utils.dataset_utils import load_tsv
 
 logger = logging.getLogger(__name__)
 
