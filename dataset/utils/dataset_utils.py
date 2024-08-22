@@ -246,8 +246,13 @@ def load_tsv(data_path):
     return list_data_dict
 
 
-def load_pickle(file):
-    with open(file, 'rb') as fo:
-        dict = pickle.load(fo, encoding='bytes')
+def load_np(file):
+    with open(file, 'rb') as f:
+        dict = np.load(f, allow_pickle=True)['data'].tolist()
+    return dict
+
+def load_pkl(file):
+    with open(file, 'rb') as f:
+        dict = pickle.load(f, encoding='bytes')
     return dict
 

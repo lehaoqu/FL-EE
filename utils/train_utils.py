@@ -86,7 +86,7 @@ class AdamW(Optimizer):
 
 def get_layer_idx(name):
     layer_idx = 0
-    if 'vit.encoder.layer' in name or 'bert.model.layer' in name:
+    if 'vit.encoder.layer' in name or 'bert.encoder.layer' in name:
         layer_idx = name.split('.')[3]
     return int(layer_idx)
 

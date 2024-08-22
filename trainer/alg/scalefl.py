@@ -37,17 +37,18 @@ class Client(BaseClient):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
-            for idx, (image, label) in enumerate(self.loader_train):
+            for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                image, label = image.to(self.device), label.to(self.device)
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels']
                 
                 # == ce loss ==
                 ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(image)
+                exit_logits = self.model(**batch)
                 exit_num = len(exit_logits)
-                
-                for i, logits in enumerate(exit_logits):
-                    ce_loss += self.loss_func(logits, label) * (i+1)
+                ce_loss = self.policy(self.args, exit_logits, ws=[i+1 for i in range(exit_num)])
                 
                 # == kd loss ==    
                 kd_loss = torch.zeros(1).to(self.device)

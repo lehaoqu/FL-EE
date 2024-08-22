@@ -2,6 +2,7 @@ import torch
 
 from typing import *
 from utils.train_utils import crop_tensor_dimensions
+from dataset import get_glue_dataset, get_cifar_dataset
 
 
 # def a_scale_tensors(tensors, samples):
@@ -72,13 +73,10 @@ from utils.train_utils import crop_tensor_dimensions
 # probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(4)]))
 # probs /= probs.sum()
 # print(probs)
+# dataset = get_glue_dataset(path=f'dataset/glue/sst2/train/0.npz', need_process=False)
 
-from utils.modelload.model import *
+dataset = get_cifar_dataset(path=f'dataset/cifar100-224-d03/valid/0.npz', need_process=False)
+dataset_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=None)
 
-config_path = '/data/qvlehao/FL-EE/models/google-bert/bert-base-uncased/config.json'
-config = BertConfig.from_pretrained(pretrained_model_name_or_path=config_path)
-exit_config = BertExitConfig(config=config)
-model = BertExitForSequenceClassification(config=exit_config)
-print(model)
-for name, param in model.named_parameters():
-    print(name)
+for i, data in enumerate(dataset_loader):
+    print(data.keys())

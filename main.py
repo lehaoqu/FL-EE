@@ -51,6 +51,7 @@ class FedSim:
             eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'))
         # == for scalefl ==
         largest_model = eq_model[max(args.eq_depths)]
+        exits = largest_model.config.exits
         args.origin_width = [largest_model.config.hidden_size, largest_model.config.intermediate_size]
         
         # === init clients & server ===
@@ -60,7 +61,8 @@ class FedSim:
                 if idx <= end_of_range: 
                     depth = args.eq_depths[ranges_to_gropus[end_of_range]]
                     break
-            self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth))
+            client_exits = exits[:args.eq_depths.index(depth)+1]
+            self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth, client_exits))
             # print(f'client {idx} compeleted')
         self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]))
 

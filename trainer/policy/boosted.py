@@ -11,11 +11,10 @@ class Policy():
         self.exits_num = self.args.exits_num
         self.loss_func = nn.CrossEntropyLoss()
     
-    def __call__(self, args) -> torch.tensor:
-        exits_logits = args.exits_logits
+    def __call__(self, args, exits_logits, label, ws=None) -> torch.tensor:
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
         
-        label = args.label
+        ws = [i+1 for i in range(self.exits_num)] if ws is None else ws
         pred_ensembels = [torch.zeros(1).to(self.device)]
         for i, logits in enumerate(exits_logits):
             tmp = logits + pred_ensembels[-1]
@@ -23,12 +22,17 @@ class Policy():
             
         loss = torch.zeros(1).to(self.device)
         for i, logits in enumerate(exits_logits):
-            with torch.no_grad:
+            with torch.no_grad():
                 pred_ensembel = pred_ensembels[i]
             pred_final = pred_ensembel + logits
             
-            loss += self.loss_func(pred_final, label)
+            loss += self.loss_func(pred_final, label) * ws[i]
         return loss
 
-    def eval(self, former_exits_logits:List[torch.tensor]):
-        return torch.sum(former_exits_logits)
+    def eval(self, exits_logits:List[torch.tensor]):
+        pred_ensembels = [torch.zeros(1).to(self.device)]
+        for i in range(self.exits_num):
+            tmp = pred_ensembels[-1] + exits_logits[i]
+            pred_ensembels.append(tmp)
+        ensemble_exits_logits = [pred_ensembels[i+1] for i in range(len(exits_logits))]
+        return ensemble_exits_logits

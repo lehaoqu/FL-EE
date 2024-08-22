@@ -3,7 +3,7 @@ import numpy as np
 from torchvision import transforms
 
 from torch.utils.data import Dataset
-from dataset.utils.dataset_utils import load_pickle
+from dataset.utils.dataset_utils import load_np, load_pkl
 
 
 import torch.nn.functional as F
@@ -32,29 +32,44 @@ class CIFARClassificationDataset(Dataset):
         self.ann[b'data'] = images_transformed
     
     
-    def __init__(self, args=None, path=None, ann=None, is_valid=None):
+    def __init__(self, args=None, path=None, valid_ratio=0.2, need_process=True, eval_valids=False):
         self.path = path
-        self.ann:dict = load_pickle(self.path)
-        if is_valid is not None:
-            if is_valid is True:
-                self.ann:dict = {key: value[int((1-args.valid_ratio)*len(value)):] if isinstance(value, list) or isinstance(value, np.ndarray) else value for key, value in self.ann.items()}
-        # self.transform_for_vit()
+        if eval_valids:
+            dict_all = [load_np(f'{path}{i}.npz') for i in range(args.total_num)]
+            total_data = {}
+            for key in dict_all[0].keys():
+                for dic in dict_all:
+                    total_data.setdefault(key, []).extend(dic[key])
+            self.ann = total_data
+            
+        else:
+            self.ann = load_pkl(path) if need_process else load_np(path)
+            valid_ratio = valid_ratio if args is None else args.valid_ratio
+            
+            if need_process:    
+                self.transform_for_vit()
+            else:
+                # TODO data fine_labels
+                self.ann[b'data'] = [torch.tensor(row, dtype=torch.float64) for row in self.ann['pixel_values']]
+                self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann['labels']]
+            
+        self.pixel_values = self.ann[b'data'] if b'data' in self.ann.keys() else self.ann['pixel_values']
+        self.labels = self.ann[b'fine_labels'] if b'fine_labels' in self.ann.keys() else self.ann['labels']
         
     def __len__(self):
-        return len(self.ann[b'fine_labels'])
+        return len(self.labels)
     
     def __getitem__(self, index):
-        image = self.ann[b'data'][index]
-        
-        image_reshape = np.reshape(image, (3, 32, 32)).transpose(1, 2, 0)/255
-        image_transformed = self.transform(image_reshape)
+        # image = self.ann[b'data'][index]
+        # image_reshape = np.reshape(image, (3, 32, 32)).transpose(1, 2, 0)/255
+        # image_transformed = self.transform(image_reshape)
+        # return dict(
+        #     pixel_values=image_transformed,
+        #     labels=self.ann[b'fine_labels'][index],
+        # )
         return dict(
-            pixel_values=image_transformed,
-            labels=self.ann[b'fine_labels'][index],
-        )
-        return dict(
-            pixel_values=image,
-            labels=self.ann[b'fine_labels'][index],
+            pixel_values=self.pixel_values[index],
+            labels=self.labels[index],
         )
         
 

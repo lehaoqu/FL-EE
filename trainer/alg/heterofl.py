@@ -13,13 +13,17 @@ class Client(BaseClient):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
-            for idx, (image, label) in enumerate(self.loader_train):
+            for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                image, label = image.to(self.device), label.to(self.device)
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels']
+                
                 loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(image)
+                exit_logits = self.model(**batch)
                 for logits in exit_logits:
-                    loss += self.loss_func(logits, label)
+                    loss += self.loss_func(logits, label.view(-1))
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.item())

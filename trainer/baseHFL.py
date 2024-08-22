@@ -6,22 +6,21 @@ import importlib
 
 from typing import *
 
-from utils.data_utils import read_client_data
-from utils.modelload.modelloader import load_model
+from utils.dataloader_utils import load_dataset_loader
 from utils.dataprocess import DataProcessor
-from torch.utils.data import DataLoader
+
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
 
 class BaseClient:
-    def __init__(self, id, args, dataset, model=None, depth=None):
+    def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
         self.id = id
         self.args = args
-        self.dataset_train = read_client_data(args.dataset, self.id, is_train=True)
-        self.dataset_valid = read_client_data(args.dataset, self.id, is_train=False)
+        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', id=id, need_process=False)
+        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', id=id, need_process=False)
         self.device = args.device
-        
+        self.exits = exits
         self.server = None
 
         self.lr = args.lr
@@ -29,6 +28,7 @@ class BaseClient:
         self.epoch = args.epoch
         self.eq_depth = depth
         self.model = model.to(self.device)
+        self.exits_num = len(self.exits)
         
         self.loss_func = nn.CrossEntropyLoss()
         param_optimizer = list(self.model.named_parameters())
@@ -45,26 +45,12 @@ class BaseClient:
             'loss': DataProcessor(),
         }
 
-        if self.dataset_train is not None:
-            self.loader_train = DataLoader(
-                dataset=self.dataset_train,
-                batch_size=self.batch_size,
-                shuffle=True,
-                collate_fn=None
-            )
-        if self.dataset_valid is not None:
-            self.loader_valid = DataLoader(
-                dataset=self.dataset_valid,
-                batch_size=self.batch_size,
-                shuffle=True,
-                collate_fn=None
-            )
-
         self.training_time = None
         self.lag_level = args.lag_level
         self.weight = 1
         self.submodel_weights = {}
         self.policy = None
+        args.exits_num = self.exits_num
         if args.policy != 'none':
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
             self.policy = policy_module.Policy(args)
@@ -72,18 +58,35 @@ class BaseClient:
     def run(self):
         raise NotImplementedError()
 
+
+    def get_next_batch(self, dataloader) -> dict:
+        try:
+            batch:dict = dataloader
+        except StopIteration :
+            dataloader = iter(dataloader)
+            batch:dict = next(dataloader)
+        for key in batch.keys():
+            batch[key] = batch[key].to(self.device)
+        return batch
+
+
     def train(self):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
-            for idx, (image, label) in enumerate(self.loader_train):
+            for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                image, label = image.to(self.device), label.to(self.device)
-                predict_label = self.model(image)
-                loss = self.loss_func(predict_label, label)
-                loss.backward()
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels']
+
+                ce_loss = torch.zeros(1).to(self.device)
+                exits_logits = self.model(**batch)
+                ce_loss = self.policy(self.args, exits_logits, label.view(-1))
+                ce_loss.backward()
                 self.optim.step()
-                batch_loss.append(loss.item())
+                batch_loss.append(ce_loss.item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
@@ -100,10 +103,14 @@ class BaseClient:
 
         with torch.no_grad():
             for data in self.loader_valid:
-                images, labels = data
-                images = images.to(self.device)
-                labels = labels.to(self.device)
-                exits_logits = self.model(images)
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                labels = batch['labels'].view(-1)
+                
+                exits_logits = self.model(**batch)
+                exits_logits = self.policy.eval(exits_logits)
+                
                 for exit_logits in exits_logits:
                     _, predicted = torch.max(exit_logits, 1)
                     total += labels.size(0)

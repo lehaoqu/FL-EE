@@ -24,13 +24,14 @@ import torch.utils
 import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
-from utils.dataset_utils import check, separate_data, split_data, save_file, save_origin_file
-
+from dataset.utils.dataset_utils import check, separate_data, split_data, save_file, save_origin_file, load_pkl
+from dataset.cifar100_dataset import CIFARClassificationDataset
+from sklearn.model_selection import train_test_split
 
 random.seed(1)
 np.random.seed(1)
 num_clients = 120
-dir_path = "dataset/cifar100-224-d03/"
+dir_path = "cifar100-224-d03/"
 train_ratio = 0.8
 
 # Allocate data to users
@@ -58,34 +59,42 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
                                     ),
                                     ])
 
-    trainset = torchvision.datasets.CIFAR100(
-        root=dir_path+"rawdata", train=True, download=True, transform=transform)
+    # trainset = torchvision.datasets.CIFAR100(
+    #     root=dir_path+"rawdata", train=True, download=True)
     
-    origin_train_len = len(trainset)
+    global_train_path = dir_path + "rawdata/cifar-100-python/train"
+    global_trainset = load_pkl(global_train_path)
+    
+    origin_train_len = len(global_trainset)
     train_len = int(origin_train_len * train_ratio)
     valid_len = origin_train_len - train_len
     
-    validset = torch.utils.data.Subset(trainset, list(range(train_len, origin_train_len)))
-    trainset = torch.utils.data.Subset(trainset, list(range(train_len)))
+    train_dataset = CIFARClassificationDataset(path=global_train_path)
+
     
-    trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=train_len, shuffle=False)
-    validloader = torch.utils.data.DataLoader(
-        validset, batch_size=valid_len, shuffle=False)
+    
+    
+    # validset = torch.utils.data.Subset(trainset, list(range(train_len, origin_train_len)))
+    # trainset = torch.utils.data.Subset(trainset, list(range(train_len)))
+    
+    # trainloader = torch.utils.data.DataLoader(
+    #     trainset, batch_size=train_len, shuffle=False)
+    # validloader = torch.utils.data.DataLoader(
+    #     validset, batch_size=valid_len, shuffle=False)
     
 
-    for idx, train_data in enumerate(trainloader, 0):
-        trainset.data, trainset.targets = train_data
-    for idx, valid_data in enumerate(validloader, 0):
-        validset.data, validset.targets = valid_data
+    # for idx, train_data in enumerate(trainloader, 0):
+    #     trainset.data, trainset.targets = train_data
+    # for idx, valid_data in enumerate(validloader, 0):
+    #     validset.data, validset.targets = valid_data
 
     dataset_image = []
     dataset_label = []
 
-    dataset_image.extend(trainset.data.cpu().detach().numpy())
-    dataset_image.extend(validset.data.cpu().detach().numpy())
-    dataset_label.extend(trainset.targets.cpu().detach().numpy())
-    dataset_label.extend(validset.targets.cpu().detach().numpy())
+    dataset_image.extend(train_dataset.pixel_values)
+    # dataset_image.extend(validset.data.cpu().detach().numpy())
+    dataset_label.extend(train_dataset.labels)
+    # dataset_label.extend(validset.targets.cpu().detach().numpy())
     dataset_image = np.array(dataset_image)
     dataset_label = np.array(dataset_label)
     
@@ -95,7 +104,22 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
 
     X, y, statistic = separate_data((dataset_image, dataset_label), num_clients, num_classes,  
                                     niid, balance, partition, class_per_client=2)
-    train_data, valid_data = split_data(X, y)
+    
+    train_data, valid_data = [], []
+    num_samples = {'train':[], 'valid':[]}
+
+    for i in range(len(y)):
+        X_train, X_valid, y_train, y_valid = train_test_split(
+            X[i], y[i], train_size=train_ratio, shuffle=True)
+
+        train_data.append({b'data': X_train, b'fine_labels': y_train})
+        valid_data.append({b'data': X_valid, b'fine_labels': y_valid})
+
+    # print("Total number of samples:", sum(num_samples['train'] + num_samples['valid']))
+    # print("The number of train samples:", num_samples['train'])
+    # print("The number of valid samples:", num_samples['valid'])
+    # print()
+    del X, y
     
     print("save train valid sets for clients")
     save_file(config_path, train_path, valid_path, train_data, valid_data, num_clients, num_classes, 

@@ -11,8 +11,8 @@ import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer
 
-from utils.dataset_utils import load_tsv, separate_data, save_file, check
-from glue_dataset import GLUEClassificationDataset
+from dataset.utils.dataset_utils import load_tsv, separate_data, save_file, check
+from dataset.glue_dataset import GLUEClassificationDataset
 
 random.seed(1)
 np.random.seed(1)
@@ -41,11 +41,11 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     global_trainset = load_tsv(global_train_path)
     train_len = int(len(global_trainset) * train_ratio)
     valid_len = len(global_trainset) - train_len
-    train_set = global_trainset[:train_len]
-    valid_set = global_trainset[:train_len]
+    # train_set = global_trainset[:train_len]
+    # valid_set = global_trainset[:train_len]
     
-    train_dataset = GLUEClassificationDataset(ann=train_set, tokenizer=tokenizer)
-    valid_dataset = GLUEClassificationDataset(ann=valid_set, tokenizer=tokenizer)
+    train_dataset = GLUEClassificationDataset(path=global_train_path, tokenizer=tokenizer)
+
     
     num_classes = 2
     print(f'Number of classes: {num_classes}')
@@ -55,11 +55,11 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     dataset_mask = []
     
     dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in train_dataset.input_ids]))
-    dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.input_ids]))
+    # dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.input_ids]))
     dataset_label.extend(np.vstack([t.cpu().numpy() for t in train_dataset.labels]))
-    dataset_label.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.labels]))
+    # dataset_label.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.labels]))
     dataset_mask.extend(np.vstack([t.cpu().numpy() for t in train_dataset.attention_mask]))
-    dataset_mask.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.attention_mask]))
+    # dataset_mask.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.attention_mask]))
     dataset_input_id = np.array(dataset_input_id)
     dataset_label = np.array(dataset_label)
     dataset_mask = np.array(dataset_mask)
@@ -70,13 +70,15 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     # == split train and valid ==
     train_data, valid_data = [], []
     for i in range(len(labels)):
-        train_input_ids, train_labels, valid_input_ids, valid_labels = train_test_split(
-            input_ids[i], labels[i], train_size=train_ratio, shuffle=True
+        
+        
+        train_input_ids, valid_input_ids, train_attention_mask, valid_attention_mask, train_labels, valid_labels = train_test_split(
+            input_ids[i], attention_mask[i], labels[i], train_size=train_ratio, shuffle=True
         )
         
-        train_attention_mask, _, valid_attention_mask, _ = train_test_split(
-            attention_mask[i], labels[i], train_size=train_ratio, shuffle=True
-        )
+        # train_attention_mask, valid_attention_mask, _, _ = train_test_split(
+        #     attention_mask[i], labels[i], train_size=train_ratio, shuffle=True
+        # )
         
         train_data.append({'input_ids': train_input_ids, 'attention_mask': train_attention_mask, 'labels': train_labels})
         valid_data.append({'input_ids': valid_input_ids, 'attention_mask': valid_attention_mask, 'labels': valid_labels})
@@ -102,5 +104,6 @@ if __name__ == "__main__":
             model_max_length=128,
             use_fast=False,
         )
-    for task in ['mrpc', 'sst2', 'qqp', 'qnli']:
+    for task in ['sst2']:
+    # for task in ['mrpc', 'sst2', 'qqp', 'qnli']:
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)

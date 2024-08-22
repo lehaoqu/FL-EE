@@ -23,18 +23,19 @@ class Client(BaseClient):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
-            for idx, (image, label) in enumerate(self.loader_train):
+            for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                image, label = image.to(self.device), label.to(self.device)
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels']
                 
                 # == ce loss ==
                 ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(image)
-                for logits in exit_logits:
-                    ce_loss += self.loss_func(logits, label)
-                
-                # == kd loss ==    
+                exit_logits = self.model(**batch)
+                ce_loss = self.policy(self.args, exit_logits, label.view(-1))
 
+                # == kd loss ==    
                 kd_loss = torch.zeros(1).to(self.device)
                 for i, teacher_logits in enumerate(exit_logits):
                     for j, student_logits in enumerate(exit_logits):

@@ -17,14 +17,14 @@ class Eval():
         self.if_mode = args.if_mode
         self.device = args.device
         args.valid_ratio = 0.2
-        self.valid_dataloader = load_dataset_loader(args=args, is_valid=True)
-        self.test_dataloader = load_dataset_loader(args=args, is_valid=False)
+        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
+        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, need_process=True)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
 
         
     def eval(self, model_path, config_path):
-        self.eval_output.write((f'eval model:{os.path.basename(model_path)}'+'\n').center(80, '='))
+        self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
         self.n_exits = len(self.model.config.exits)
         self.args.n_exits = self.n_exits
@@ -53,7 +53,7 @@ class Eval():
             crt_list[i] += (predicted == self.test_targets).sum().item()
         
         acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.n_exits)]
-        self.eval_output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, [acc/sum(acc_list) for acc in acc_list]))
+        self.eval_output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, sum(acc_list) / len(acc_list)))
         self.eval_output.flush()
         
     
@@ -69,7 +69,7 @@ class Eval():
             
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
             acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
-            self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}'.format(p, acc_val, acc_test, exp_flops))
+            self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
             
@@ -90,7 +90,7 @@ class Tester(object):
             batch = {}
             for key in data.keys():
                batch[key] = data[key].to(self.device)
-            y = batch['labels']
+            y = batch['labels'].view(-1)
             all_sample_targets.append(y)
             with torch.no_grad():
                 exits_logits = self.model(**batch)

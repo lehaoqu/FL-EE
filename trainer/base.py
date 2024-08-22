@@ -3,7 +3,7 @@ import torch.nn as nn
 import time
 import random
 
-from utils.data_utils import read_client_data
+from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.modelloader import load_model
 from utils.dataprocess import DataProcessor
 from torch.utils.data import DataLoader
@@ -13,8 +13,8 @@ class BaseClient:
     def __init__(self, id, args, dataset):
         self.id = id
         self.args = args
-        self.dataset_train = read_client_data(args.dataset, self.id, is_train=True)
-        self.dataset_test = read_client_data(args.dataset, self.id, is_train=False)
+        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', need_process=False)
+        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', need_process=False)
         self.device = args.device
         self.server = None
 
@@ -29,21 +29,6 @@ class BaseClient:
             'acc': DataProcessor(),
             'loss': DataProcessor(),
         }
-
-        if self.dataset_train is not None:
-            self.loader_train = DataLoader(
-                dataset=self.dataset_train,
-                batch_size=self.batch_size,
-                shuffle=True,
-                collate_fn=None
-            )
-        if self.dataset_test is not None:
-            self.loader_test = DataLoader(
-                dataset=self.dataset_test,
-                batch_size=self.batch_size,
-                shuffle=True,
-                collate_fn=None
-            )
 
         self.local_params = None
         self.training_time = None
@@ -61,7 +46,7 @@ class BaseClient:
                 self.optim.zero_grad()
                 image, label = image.to(self.device), label.to(self.device)
                 predict_label = self.model(image)
-                loss = self.loss_func(predict_label, label)
+                loss = self.loss_func(predict_label, label.view(-1))
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.item())

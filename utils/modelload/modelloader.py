@@ -73,10 +73,15 @@ def load_model(args, model_depth=None, is_scalefl=False):
             # print(len(tensors))
             # for tensor in tensors:
             #     print(tensor.shape)
-                
+            
             # print(model.parameters_to_tensor().shape)
             # for name, param in model.named_parameters():
             #     print(name, param.shape)
+            
+            # exit(0)
+        
+        # if model_arg == 'bert':
+        #     model = model.half()
 
     else:
         exit('Error: unrecognized model')
@@ -86,7 +91,7 @@ def load_model_eval(args, model_path, config_path=None):
     model_arg = args.model
     dataset_arg = args.dataset
     if CIFAR100 in dataset_arg or dataset_arg in GLUE:
-        based_model = importlib.import_module(f'utils.modelloader.{model_arg}')
+        based_model = importlib.import_module(f'utils.modelload.{model_arg}')
            
         exit_config = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)
         model = based_model.ExitModel(config=exit_config)

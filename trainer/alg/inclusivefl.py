@@ -23,19 +23,20 @@ class Client(BaseClient):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
-            for idx, (image, label) in enumerate(self.loader_train):
+            for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                image, label = image.to(self.device), label.to(self.device)
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels']
                 
-                # == ce loss ==
-                loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(image)
-                for logits in exit_logits:
-                    loss += self.loss_func(logits, label)
-                # loss = self.loss_func(self.model(image)[-1], label)
-                loss.backward()
+                ce_loss = torch.zeros(1).to(self.device)
+                exit_logits = self.model(**batch)
+                ce_loss = self.policy(self.args, exit_logits)
+
+                ce_loss.backward()
                 self.optim.step()
-                batch_loss.append(loss.item())
+                batch_loss.append(ce_loss.item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))

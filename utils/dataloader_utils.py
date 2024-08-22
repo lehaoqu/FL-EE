@@ -5,16 +5,36 @@ from dataset import (
     get_glue_dataset
 )
 
-GLUE_TASKS = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 'wnli']
-GLUE_DATASETS = [f"{task}_dataset" for task in GLUE_TASKS]
+GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 'wnli']
 
-CIFAR_TASKS = ['cifar100-224-d03']
-CIFAR_DATASETS = [f"{task}_dataset" for task in CIFAR_TASKS]
 
-def load_dataset_loader(args, is_valid=True):
-    if args.dataset in CIFAR_TASKS:
-        file_name = 'train' if is_valid else 'test'
-        
-        dataset = get_cifar_dataset(args=args, path=f'dataset/{args.dataset}/rawdata/cifar-100-python/{file_name}', is_valid=is_valid)
+CIFAR = ['cifar100-224-d03']
+
+
+def load_dataset_loader(args, file_name=None, id=None, need_process=True, eval_valids=False):
+    if args.dataset in CIFAR:
+        if eval_valids:
+            dataset = get_cifar_dataset(args=args, path=f'dataset/{args.dataset}/valid/', eval_valids=eval_valids)
+        else:
+            if need_process:
+                file_name = 'test'
+                dataset = get_cifar_dataset(args=args, path=f'dataset/{args.dataset}/rawdata/cifar-100-python/{file_name}')
+            else:
+                dataset = get_cifar_dataset(args=args, path=f'dataset/{args.dataset}/{file_name}/{id}.npz', need_process=need_process)
+            
         dataset_loader = torch.utils.data.DataLoader(dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
-        return dataset_loader
+        return dataset, dataset_loader
+    
+    if args.dataset in GLUE:
+        if eval_valids:
+            dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/valid/', eval_valids=eval_valids)
+        else:
+            if need_process:
+                file_name = 'train'
+                dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/{file_name}.tsv')
+            else:
+                dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/{file_name}/{id}.npz', need_process=need_process)        
+        
+        dataset_loader = torch.utils.data.DataLoader(dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
+        return dataset, dataset_loader
+        
