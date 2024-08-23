@@ -272,15 +272,31 @@ class ViTExitEncoder(nn.Module):
         self,
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
-    ) -> Union[tuple, BaseModelOutput]:
+        latent: Optional[torch.Tensor] = None,
+        exit_idxs: Optional[Tuple[int]] = None
+    ) -> Union[tuple, BaseModelOutput, torch.Tensor]:
         exits_logits = ()
-        for i, layer_module in enumerate(self.layer):
-            layer_head_mask = head_mask[i] if head_mask is not None else None
-            layer_outputs = layer_module(hidden_states, layer_head_mask)
-            hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
-            if layer_module.exit:
-                exits_logits += (exit_logits,)
-        return exits_logits
+        
+        if latent is None:
+            for i, layer_module in enumerate(self.layer):
+                layer_head_mask = head_mask[i] if head_mask is not None else None
+                layer_outputs = layer_module(hidden_states, layer_head_mask)
+                hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+                if layer_module.exit:
+                    exits_logits += (exit_logits,)
+        else:
+            # == only return end_exit's logits
+            begin_exit = exit_idxs[0]
+            end_exit = exit_idxs[1]
+            begin_layer = self.config.exits[begin_exit]+1 if begin_exit is not None else 0
+            end_layer = self.config.exits[end_exit]
+            layers = self.layer[begin_layer:end_layer+1]
+            hidden_states = latent
+            for layer_module in layers:
+                layer_outputs = layer_module(hidden_states, None)
+                hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+            
+        return exit_logits
 
 
 class ViTExitModel(ViTPreTrainedModel):
@@ -303,22 +319,32 @@ class ViTExitModel(ViTPreTrainedModel):
         bool_masked_pos: Optional[torch.BoolTensor] = None,
         head_mask: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPooling]:
+        latent: Optional[torch.Tensor] = None,
+        exit_idxs: Optional[Tuple[int]] = None
+    ) -> Union[Tuple, BaseModelOutputWithPooling, torch.Tensor]:
         
-        head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
+        if latent is None:
+        
+            head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
-        expected_dtype = self.embeddings.patch_embeddings.projection.weight.dtype
-        if pixel_values.dtype != expected_dtype:
-            pixel_values = pixel_values.to(expected_dtype)
-        embedding_output = self.embeddings(
-            pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding
-        )
-        encoder_outputs = self.encoder(
-            embedding_output,
-            head_mask=head_mask
-        )
-        return encoder_outputs
-
+            expected_dtype = self.embeddings.patch_embeddings.projection.weight.dtype
+            if pixel_values.dtype != expected_dtype:
+                pixel_values = pixel_values.to(expected_dtype)
+            embedding_output = self.embeddings(
+                pixel_values, bool_masked_pos=bool_masked_pos, interpolate_pos_encoding=interpolate_pos_encoding
+            )
+            encoder_outputs = self.encoder(
+                embedding_output,
+                head_mask=head_mask
+            )
+            return encoder_outputs
+        else:
+            encoder_output = self.encoder(
+                latent,
+                exit_idxs=exit_idxs,
+                head_mask=None
+            )
+            return encoder_output
 
 class ExitModel(ViTPreTrainedModel, BaseModule):
     
@@ -342,13 +368,23 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         head_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
+        latent: Optional[torch.Tensor] = None,
+        exit_idxs: Optional[Tuple[int]] = None
 
-    ) -> Union[tuple, ImageClassifierOutput]:
-        outputs = self.vit(
-            pixel_values,
-            head_mask=head_mask,
-            interpolate_pos_encoding=interpolate_pos_encoding
-        )
+    ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
+        if latent is None:
+            outputs = self.vit(
+                pixel_values,
+                head_mask=head_mask,
+                interpolate_pos_encoding=interpolate_pos_encoding
+            )
+            return outputs
+        else:
+            output = self.vit(
+                latent=latent,
+                exit_idxs=exit_idxs
+            )
+            return output
 
         # sequence_output = outputs[0]
         # logits = self.classifier(sequence_output[:, 0, :])
@@ -366,6 +402,4 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         #         classifier = getattr(self, f"classifier_{exit}")
         #         all_logits += (classifier(self.layernorm(hidden_states[exit + 1])[:, 0, :]), )
 
-        return outputs
-
-
+        

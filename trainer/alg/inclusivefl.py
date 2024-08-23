@@ -32,7 +32,7 @@ class Client(BaseClient):
                 
                 ce_loss = torch.zeros(1).to(self.device)
                 exit_logits = self.model(**batch)
-                ce_loss = self.policy(self.args, exit_logits)
+                ce_loss = self.policy(exit_logits, label.view(-1))
 
                 ce_loss.backward()
                 self.optim.step()
@@ -45,8 +45,8 @@ class Client(BaseClient):
 
 
 class Server(BaseServer):
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
         
         # == global model is largest eq model ==
         self.global_model = self.eq_model[max(self.eq_depths)]

@@ -12,6 +12,7 @@ from utils.dataprocess import DataProcessor
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
+CLASSES = {'cifar100-224-d03': 100, 'sst2': 2}
 
 class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -23,6 +24,7 @@ class BaseClient:
         self.exits = exits
         self.server = None
 
+        self.y_distribute = [0 for _ in range(CLASSES[args.dataset])]
         self.lr = args.lr
         self.batch_size = args.bs
         self.epoch = args.epoch
@@ -39,6 +41,7 @@ class BaseClient:
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
         ]
         self.optim = AdamW(params=optimizer_grouped_parameters, lr=self.lr, correct_bias=False)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
             'acc': DataProcessor(),
@@ -49,25 +52,22 @@ class BaseClient:
         self.lag_level = args.lag_level
         self.weight = 1
         self.submodel_weights = {}
+        
         self.policy = None
         args.exits_num = self.exits_num
         if args.policy != 'none':
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
             self.policy = policy_module.Policy(args)
+            
+        for idx, data in enumerate(self.loader_train):
+            labels = data['labels'].cpu().tolist()
+            for y in labels:
+                self.y_distribute[y] += 1
+        print(self.y_distribute)
+                        
         
     def run(self):
         raise NotImplementedError()
-
-
-    def get_next_batch(self, dataloader) -> dict:
-        try:
-            batch:dict = dataloader
-        except StopIteration :
-            dataloader = iter(dataloader)
-            batch:dict = next(dataloader)
-        for key in batch.keys():
-            batch[key] = batch[key].to(self.device)
-        return batch
 
 
     def train(self):
@@ -83,7 +83,7 @@ class BaseClient:
 
                 ce_loss = torch.zeros(1).to(self.device)
                 exits_logits = self.model(**batch)
-                ce_loss = self.policy(self.args, exits_logits, label.view(-1))
+                ce_loss = self.policy(exits_logits, label.view(-1))
                 ce_loss.backward()
                 self.optim.step()
                 batch_loss.append(ce_loss.item())
@@ -122,13 +122,15 @@ class BaseClient:
     def reset_optimizer(self, decay=True):
         if not decay:
             return
-        self.optim = torch.optim.SGD(params=self.model.parameters(),
-                                     lr=(self.lr * (self.args.gamma ** self.server.round)))
+        self.scheduler.step()
+        # self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)))
 
 
 class BaseServer:
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
         # super().__init__(id, args, dataset)
+        self.args = args
+        self.eqs_exits = eqs_exits
         self.client_num = args.total_num
         self.sample_rate = args.sr
         self.clients = clients

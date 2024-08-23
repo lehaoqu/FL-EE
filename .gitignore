@@ -3,6 +3,7 @@
 .idea
 .vscode/
 dataset/cifar*/
+cifar*/
 models/
 script/08*/
 exps/

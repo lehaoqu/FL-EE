@@ -11,10 +11,10 @@ class Policy():
         self.exits_num = self.args.exits_num
         self.loss_func = nn.CrossEntropyLoss()
     
-    def __call__(self, args, exits_logits, label, ws=None) -> torch.tensor:
+    def __call__(self, exits_logits, label, ws=None) -> torch.tensor:
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
         
-        ws = [i+1 for i in range(self.exits_num)] if ws is None else ws
+        ws = [1 for _ in range(self.exits_num)] if ws is None else ws
                     
         loss = torch.zeros(1).to(self.device)
         for i, exit_logits in enumerate(exits_logits):

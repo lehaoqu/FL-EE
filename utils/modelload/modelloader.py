@@ -21,7 +21,7 @@ def check_class_num(dataset):
         else 10 if MNIST in dataset \
         else -1
 
-def load_model(args, model_depth=None, is_scalefl=False):
+def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     model_arg = args.model
     dataset_arg = args.dataset
     class_num = check_class_num(dataset_arg)
@@ -50,7 +50,7 @@ def load_model(args, model_depth=None, is_scalefl=False):
             eq_config.num_hidden_layers = depth
             eq_config.hidden_size = int(eq_config.hidden_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
             eq_config.intermediate_size = int(eq_config.intermediate_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
-            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=(3,6,9,11)) 
+            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits) 
             model = based_model.ExitModel(eq_exit_config)
             
             origin_target = {pre_model.config.hidden_size: eq_config.hidden_size, pre_model.config.intermediate_size: eq_config.intermediate_size}
@@ -63,9 +63,12 @@ def load_model(args, model_depth=None, is_scalefl=False):
                     param = prune_tensor.clone()
                 new_state_dict[name] = param
             model.load_state_dict(new_state_dict)
+            
         else:
             eq_config.num_hidden_layers = model_depth
-            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=(2,5,8,11)) 
+            exits = (2,5,8,11)
+            
+            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits) 
             model = based_model.ExitModel(eq_exit_config)
             model.load_state_dict(pre_model.state_dict(), strict=False)
 

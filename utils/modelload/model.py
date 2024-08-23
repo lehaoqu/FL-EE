@@ -36,7 +36,7 @@ class BaseModule(nn.Module):
             named_grads[name] = param.grad.detach()
         return named_grads
             
-    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False, is_scalefl=False):
+    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False, is_scalefl=False, layers=None):
         if is_inclusivefl: blocks = (1,4,7,11)
         if is_scalefl: blocks = (3,6,9,11)
         if is_split:
@@ -55,9 +55,16 @@ class BaseModule(nn.Module):
             return tensors
         else:
             params = []
-            for idx, (name, param) in enumerate(self.named_parameters()):
-                params.append(param.view(-1))
-            return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
+            if layers is None:
+                for idx, (name, param) in enumerate(self.named_parameters()):
+                    params.append(param.view(-1))
+                return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
+            else:
+                for idx, (name, param) in enumerate(self.named_parameters()):
+                    if get_layer_idx(name) not in layers: continue
+                    params.append(param.view(-1))
+                return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
+        
         
     def split_state_dict(self, blocks=(2,5,8,11)):
         state_dict_tuple = ()
@@ -75,19 +82,30 @@ class BaseModule(nn.Module):
         return state_dict_tuple
                 
 
-    def tensor_to_parameters(self, tensor, local_params=None):
+    def tensor_to_parameters(self, tensor, local_params=None, layers=None):
         param_index = 0
-        for idx, (name, param) in enumerate(self.named_parameters()):
-            # === get shape & total size ===
-            shape = param.shape
-            param_size = 1
-            for s in shape:
-                param_size *= s
+        if layers is None:
+            for idx, (name, param) in enumerate(self.named_parameters()):
+                # === get shape & total size ===
+                shape = param.shape
+                param_size = 1
+                for s in shape:
+                    param_size *= s
 
-            # === put value into param ===
-            # .clone() is a deep copy here
-            param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
-            param_index += param_size
+                # === put value into param ===
+                # .clone() is a deep copy here
+                param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
+                param_index += param_size
+        else:
+            for idx, (name, param) in enumerate(self.named_parameters()):
+                if get_layer_idx(name) not in layers: continue
+                shape = param.shape
+                param_size = 1
+                for s in shape:
+                    param_size *= s
+                param.data = tensor[param_index: param_index+param_size].view(shape).detach().clone()
+                param_index += param_size
+    
     
     def model_lora(self):
         params_with_grad = {name: param for name, param in self.named_parameters() if param.requires_grad}

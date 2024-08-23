@@ -33,7 +33,7 @@ class Client(BaseClient):
                 # == ce loss ==
                 ce_loss = torch.zeros(1).to(self.device)
                 exit_logits = self.model(**batch)
-                ce_loss = self.policy(self.args, exit_logits, label.view(-1))
+                ce_loss = self.policy(exit_logits, label.view(-1))
 
                 # == kd loss ==    
                 kd_loss = torch.zeros(1).to(self.device)
