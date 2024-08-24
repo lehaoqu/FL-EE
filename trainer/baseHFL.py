@@ -63,7 +63,6 @@ class BaseClient:
             labels = data['labels'].cpu().tolist()
             for y in labels:
                 self.y_distribute[y] += 1
-        print(self.y_distribute)
                         
         
     def run(self):
@@ -86,7 +85,7 @@ class BaseClient:
                 ce_loss = self.policy(exits_logits, label.view(-1))
                 ce_loss.backward()
                 self.optim.step()
-                batch_loss.append(ce_loss.item())
+                batch_loss.append(ce_loss.detach().cpu().item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))

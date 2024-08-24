@@ -11,28 +11,6 @@ def add_args(parser):
 class Client(BaseClient):
     def run(self):
         self.train()
-    
-    # def train(self):
-    #     # === train ===
-    #     batch_loss = []
-    #     for epoch in range(self.epoch):
-    #         for idx, data in enumerate(self.loader_train):
-    #             self.optim.zero_grad()
-    #             batch = {}
-    #             for key in data.keys():
-    #                 batch[key] = data[key].to(self.device)
-    #             label = batch['labels']
-                
-    #             loss = torch.zeros(1).to(self.device)
-    #             exit_logits = self.model(**batch)
-    #             for logits in exit_logits:
-    #                 loss += self.loss_func(logits, label.view(-1))
-    #             loss.backward()
-    #             self.optim.step()
-    #             batch_loss.append(loss.item())
-
-    #     # === record loss ===
-    #     self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
 
 
 class Server(BaseServer):
@@ -43,8 +21,8 @@ class Server(BaseServer):
         self.uplink()
         self.aggregate()
     
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
         self.eq_depths = [12]
         largest_num = int(args.eq_ratios[-1] * len(self.clients))
         sample_rate = self.sample_rate / (args.eq_ratios[-1])

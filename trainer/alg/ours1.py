@@ -8,18 +8,23 @@ from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
+    parser.add_argument('--kd_gap', default=5, type=int)
+    parser.add_argument('--kd_begin', default=10, type=int)
     parser.add_argument('--kd_lr', default=3e-4, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
-    parser.add_argument('--kd_epochs', default=10, type=int)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
+    parser.add_argument('--kd_n_iters', default=5, type=int)
+    parser.add_argument('--kd_epochs', default=10, type=int)
+    
+    parser.add_argument('--g_gap', default=5, type=int)
+    parser.add_argument('--g_begin', default=10, type=int)
     parser.add_argument('--g_alpha', default=1, type=float)
-    parser.add_argument('--g_beta', default=0, type=float)
-    parser.add_argument('--g_eta', default=0, type=float)
-    parser.add_argument('--g_lr', default=1e-2, type=float)
-    parser.add_argument('--g_n_iters', default=5, type=int)
-    parser.add_argument('--g_epochs', default=30, type=int)
+    parser.add_argument('--g_beta', default=1, type=float)
+    parser.add_argument('--g_eta', default=1, type=float)
+    parser.add_argument('--g_lr', default=3e-4, type=float)
+    parser.add_argument('--g_n_iters', default=10, type=int)
+    parser.add_argument('--g_epochs', default=10, type=int)
 
     
     
@@ -31,18 +36,23 @@ class Client(BaseClient):
     
 class Server(BaseServer):
     def run(self):
-        if self.crt_epoch % 20 == 0 and self.crt_epoch > 0:
-            self.sample()
-            self.downlink()
-            self.client_update()
-            self.uplink()
-            self.aggregate_train()
-        else:
-            BaseServer.sample(self)
-            BaseServer.downlink(self)
-            BaseServer.client_update(self)
-            BaseServer.uplink(self)
-            BaseServer.aggregate(self)
+        self.sample()
+        self.downlink()
+        self.client_update()
+        self.uplink()
+        self.aggregate_train()
+        # if self.crt_epoch % 20 == 0 and self.crt_epoch > 0:
+        #     self.sample()
+        #     self.downlink()
+        #     self.client_update()
+        #     self.uplink()
+        #     self.aggregate_train()
+        # else:
+        #     BaseServer.sample(self)
+        #     BaseServer.downlink(self)
+        #     BaseServer.client_update(self)
+        #     BaseServer.uplink(self)
+        #     BaseServer.aggregate(self)
 
         self.crt_epoch += 1 
     
@@ -94,8 +104,8 @@ class Server(BaseServer):
             self.eq_y[eq_depth] = y_distribute
         
         # == args ==
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta = args.g_lr, args.g_alpha, args.g_beta, args.g_eta
-        self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio = args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
+        self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         
         self.g_epochs, self.g_n_iters = args.g_epochs, args.g_n_iters
         self.kd_epochs, self.kd_n_iters = args.kd_epochs, args.kd_n_iters
@@ -111,7 +121,7 @@ class Server(BaseServer):
                     # generator = Generator(args)
                     generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
-                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.98)
+                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j]  = (generator, optimizer, lr_scheduler)
                 self.sl_generators[eq_depth] = generators
         # ls generators    
@@ -123,7 +133,7 @@ class Server(BaseServer):
                 for j in range(len(self.eqs_exits[smaller_eq_depth])-1, len(self.eqs_exits[eq_depth])):
                     generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
-                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.98)
+                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j] = (generator, optimizer, lr_scheduler)
                 self.ls_generators[eq_depth] = generators
     
@@ -156,12 +166,18 @@ class Server(BaseServer):
                 s = self.eq_model_train[self.eq_depths[i+1]]
                 
                 # == train generator for each arrow ==
-                for _ in range(self.g_epochs):
-                    self.update_generator(self.g_n_iters, g, eq_depth, t[0], s[0], s_exit)
+                if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+                    print("=================")
+                    print(eq_depth, s_exit)
+                    for _ in range(self.g_epochs):
+                        self.update_generator(self.g_n_iters, g, eq_depth, t[0], s[0], s_exit)
+                    g[2].step()
 
                 # == small eq's last exit teach larger eq's deeper exit == 
-                for _ in range(self.kd_epochs):
-                    self.teach_large_model(self.kd_n_iters, g, eq_depth, t, s, s_exit)
+                if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                    for _ in range(self.kd_epochs):
+                        self.teach_large_model(self.kd_n_iters, g, eq_depth, t, s, s_exit)
+                    s[2].step()
 
         # TODO== Third: large to small ==
 
@@ -231,7 +247,7 @@ class Server(BaseServer):
             DARK_LOSS += dark_loss
             
             s_optimizer.step()
-        s_scheduler.step()
+        # s_scheduler.step()
         print(f'dist_loss:{DIST_LOSS}, angle_loss: {ANGLE_LOSS}, dark_loss: {DARK_LOSS}')
         
     
@@ -293,8 +309,8 @@ class Server(BaseServer):
             KD_LOSS += kd_loss
             
             optimizer.step()
-        lr_scheduler.step()
-        print(f'ce_loss:{CE_LOSS}, div_loss: {DIV_LOSS}, kd_loss: {KD_LOSS}')
+        # lr_scheduler.step()
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
     
             
     def sample(self):

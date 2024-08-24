@@ -12,37 +12,13 @@ def add_args(parser):
     return parser.parse_args()
 
 class Client(BaseClient):
-    def __init__(self, id, args, dataset, model=None, depth=None):
-        super().__init__(id, args, dataset, model, depth)
+    def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
+        super().__init__(id, args, dataset, model, depth, exits)
         self.optim = self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
     
     def run(self):
         self.train()
     
-    def train(self):
-        # === train ===
-        batch_loss = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                self.optim.zero_grad()
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                label = batch['labels']
-                
-                ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(**batch)
-                ce_loss = self.policy(exit_logits, label.view(-1))
-
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.item())
-
-        # === record loss ===
-        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
-    
-
-
 
 class Server(BaseServer):
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):

@@ -45,7 +45,7 @@ class Client(BaseClient):
                 loss = ce_loss + kd_loss
                 loss.backward()
                 self.optim.step()
-                batch_loss.append(loss.item())
+                batch_loss.append(loss.detach().cpu().item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))

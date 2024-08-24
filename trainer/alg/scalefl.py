@@ -11,8 +11,8 @@ def add_args(parser):
     return parser.parse_args()
 
 class Client(BaseClient):
-    def __init__(self, id, args, dataset, model=None, depth=None):
-        super().__init__(id, args, dataset, model, depth)
+    def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
+        super().__init__(id, args, dataset, model, depth, exits)
         # self.scale_width = args.scale_width
         depth = min(12, self.eq_depth+1)
         self.width_scale = self.eq_depth / depth
@@ -66,7 +66,7 @@ class Client(BaseClient):
                 # loss = ce_loss
                 loss.backward()
                 self.optim.step()
-                batch_loss.append(loss.item())
+                batch_loss.append(loss.detach().cpu().item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
