@@ -1,12 +1,9 @@
+import torch
 import argparse
-import importlib
-import sys
+import random
+from trainer.generator.generator import Generator_CIFAR
 
-class Test():
-    def __init__(self, args) -> None:
-        self.alg = args.alg
-    def p(self):
-        print(self.alg)
+
 
 def args_parser():
     parser = argparse.ArgumentParser()
@@ -16,7 +13,8 @@ def args_parser():
     return parser.parse_args()
 
 args = args_parser()
-t1 = Test(args)
-t1.p()
-args.alg = 'ff'
-t1.p()
+args.device = 0
+
+y_distribute = [0.1, 0.2, 0.3, 0.4]
+y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=32), dtype=torch.float)
+print(y_input.shape)

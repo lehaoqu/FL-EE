@@ -177,7 +177,6 @@ class RKdAngle(nn.Module):
         sd = (student.unsqueeze(0) - student.unsqueeze(1))
         norm_sd = F.normalize(sd, p=2, dim=2)
         s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
-        print(torch.sum(s_angle-t_angle)/s_angle.shape[0])
         loss = F.smooth_l1_loss(s_angle, t_angle, reduction='mean')
         return loss
 

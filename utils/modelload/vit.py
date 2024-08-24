@@ -284,6 +284,8 @@ class ViTExitEncoder(nn.Module):
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
                 if layer_module.exit:
                     exits_logits += (exit_logits,)
+            return exits_logits
+        
         else:
             # == only return end_exit's logits
             begin_exit = exit_idxs[0]
@@ -296,7 +298,7 @@ class ViTExitEncoder(nn.Module):
                 layer_outputs = layer_module(hidden_states, None)
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             
-        return exit_logits
+            return exit_logits
 
 
 class ViTExitModel(ViTPreTrainedModel):

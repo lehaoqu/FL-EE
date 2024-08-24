@@ -3,12 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from dataset.cifar100_dataset import CIFARClassificationDataset
+
 
 class Generator(nn.Module):
-    def __init__(self, embedding=False):
+    def __init__(self, args, embedding=True):
         super(Generator, self).__init__()
+        self.device = args.device
         self.embedding = embedding
-        self.hidden_dim, self.latent_dim, self.n_class, self.noise_dim = 500, 384, 100, 100
+        # TODO latent_dim n_class will change in glue and cifar
+        self.hidden_dim, self.latent_dim, self.n_class, self.noise_dim = 500, 197*384, 100, 100
         input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
@@ -36,7 +40,7 @@ class Generator(nn.Module):
         
     def forward(self, labels):
         batch_size = labels.shape[0]
-        eps = torch.rand((batch_size, self.noise_dim))
+        eps = torch.rand((batch_size, self.noise_dim)).to(self.device)
         if self.embedding:
             y_input = self.embedding_layer(labels)
         else:
@@ -92,3 +96,52 @@ class DiversityLoss(nn.Module):
         layer_dist = self.pairwise_distance(layer, how=self.metric)
         noise_dist = self.pairwise_distance(noises, how='l2')
         return torch.exp(torch.mean(-noise_dist * layer_dist))
+
+
+
+class Generator_CIFAR(nn.Module):
+    def __init__(self, args, dataset='cifar100_dataset'):
+        hidden_channel, output_channel, img_size, n_class, noise_dim= 64, 3, 32, 100, 100
+        super(Generator_CIFAR, self).__init__()
+        
+        self.noise_dim = noise_dim
+        self.diversity_loss = DiversityLoss(metric='l1')
+        
+        self.device = args.device
+
+        self.init_size = img_size//4
+        
+        self.embedding_layer = nn.Embedding(n_class, noise_dim)
+        self.l1 = nn.Sequential(nn.Linear(noise_dim*2, hidden_channel*2*self.init_size**2))
+
+        self.conv_blocks0 = nn.Sequential(
+            nn.BatchNorm2d(hidden_channel*2),
+        )
+        self.conv_blocks1 = nn.Sequential(
+            nn.Conv2d(hidden_channel*2, hidden_channel*2, 3, stride=1, padding=1),
+            nn.BatchNorm2d(hidden_channel*2),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+        self.conv_blocks2 = nn.Sequential(
+            nn.Conv2d(hidden_channel*2, hidden_channel, 3, stride=1, padding=1),
+            nn.BatchNorm2d(hidden_channel),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(hidden_channel, output_channel, 3, stride=1, padding=1),
+            nn.Tanh(),
+            nn.BatchNorm2d(output_channel, affine=False) 
+        )
+
+    def forward(self, labels):
+        batch_size = labels.shape[0]
+        noise = torch.rand((batch_size, self.noise_dim)).to(self.device)
+        y_embedding = self.embedding_layer(labels)
+        
+        z = torch.cat((noise, y_embedding), dim=-1)
+        out = self.l1(z.view(z.shape[0],-1))
+        out = out.view(out.shape[0], -1, self.init_size, self.init_size)
+        img = self.conv_blocks0(out)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks1(img)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks2(img)
+        return CIFARClassificationDataset.generator_transform_tensor(images=img), noise

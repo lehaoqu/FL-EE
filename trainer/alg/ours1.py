@@ -4,21 +4,22 @@ import random
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient
-from trainer.generator.generator import Generator
+from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
+    parser.add_argument('--kd_lr', default=3e-4, type=float)
     parser.add_argument('--kd_n_iters', default=5, type=int)
     parser.add_argument('--kd_epochs', default=10, type=int)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
     parser.add_argument('--g_alpha', default=1, type=float)
-    parser.add_argument('--g_beta', default=1, type=float)
-    parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_lr', default=3e-4, type=float)
+    parser.add_argument('--g_beta', default=0, type=float)
+    parser.add_argument('--g_eta', default=0, type=float)
+    parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=5, type=int)
-    parser.add_argument('--g_epochs', default=10, type=int)
+    parser.add_argument('--g_epochs', default=30, type=int)
 
     
     
@@ -30,17 +31,20 @@ class Client(BaseClient):
     
 class Server(BaseServer):
     def run(self):
-        self.sample()
-        # print('sample')
-        self.downlink()
-        # print('downlink')
-        self.client_update()
-        # print('client_update')
-        self.uplink()
-        # print('unlink')
-        self.aggregate_train()
-        # self.aggregate()
-        # print('aggregate')
+        if self.crt_epoch % 20 == 0 and self.crt_epoch > 0:
+            self.sample()
+            self.downlink()
+            self.client_update()
+            self.uplink()
+            self.aggregate_train()
+        else:
+            BaseServer.sample(self)
+            BaseServer.downlink(self)
+            BaseServer.client_update(self)
+            BaseServer.uplink(self)
+            BaseServer.aggregate(self)
+
+        self.crt_epoch += 1 
     
     
     def kd_criterion(self, pred, teacher):
@@ -56,6 +60,7 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
         
         self.global_model = self.eq_model[max(self.eq_depths)]
+        self.crt_epoch = 0
         
         # == init eq_models' optimizer, lr_scheduler
         self.eq_model_train = {}
@@ -67,7 +72,7 @@ class Server(BaseServer):
                 'weight_decay_rate': 0.01},
                 {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
             ]
-            optimizer = AdamW(params=optimizer_grouped_parameters, lr=self.lr, correct_bias=False)
+            optimizer = AdamW(params=optimizer_grouped_parameters, lr=args.kd_lr, correct_bias=False)
             scheduler = lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
             self.eq_model_train[eq_depth] = (eq_model, optimizer, scheduler)
         
@@ -81,7 +86,15 @@ class Server(BaseServer):
         
         # == ratio of each classes for each eq ==
         self.eq_y = {}
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta = args.g_lr, args.alpha, args.beta, args.eta
+        for client in self.clients:
+            self.eq_y.setdefault(client.eq_depth, []).append(client.y_distribute)
+        for eq_depth in self.eq_depths:
+            y_distribute = [sum(column) for column in zip(*self.eq_y[eq_depth])]
+            y_distribute = [y/sum(y_distribute) for y in y_distribute]
+            self.eq_y[eq_depth] = y_distribute
+        
+        # == args ==
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta = args.g_lr, args.g_alpha, args.g_beta, args.g_eta
         self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio = args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio
         
         self.g_epochs, self.g_n_iters = args.g_epochs, args.g_n_iters
@@ -93,28 +106,32 @@ class Server(BaseServer):
         for i, eq_depth in enumerate(self.eq_depths):
             if eq_depth != max(self.eq_depths):
                 generators = {}
-                larger_eq_depth = self.eq_depths[eq_depth]
+                larger_eq_depth = self.eq_depths[i+1]
                 for j in range(len(self.eqs_exits[eq_depth])-1, len(self.eqs_exits[larger_eq_depth])):
-                    generator = Generator(embedding=True)
+                    # generator = Generator(args)
+                    generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.98)
                     generators[j]  = (generator, optimizer, lr_scheduler)
                 self.sl_generators[eq_depth] = generators
-        # TODO ls generators    
-    
+        # ls generators    
+        self.ls_generators = {}
+        for i, eq_depth in enumerate(reversed(self.eq_depths)):
+            if eq_depth != min(self.eq_depths):
+                generators = {}
+                smaller_eq_depth = self.eq_depths[i-1]
+                for j in range(len(self.eqs_exits[smaller_eq_depth])-1, len(self.eqs_exits[eq_depth])):
+                    generator = Generator_CIFAR(args)
+                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
+                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.98)
+                    generators[j] = (generator, optimizer, lr_scheduler)
+                self.ls_generators[eq_depth] = generators
     
     def uplink(self):
         assert (len(self.sampled_clients) > 0)
         self.received_params = {}
         for idx, eq_depth in enumerate(self.eq_depths):
-            self.received_params[eq_depth] = [client.weight * client.model.parameters_to_tensors() for client in self.sampled_eq_clients[eq_depth]]
-        
-        for client in self.clients:
-            self.eq_y.setdefault(client.eq_depth, []).append(client.y_distribute)
-        for eq_depth in self.eq_depths:
-            y_distribute = [sum(column) for column in zip(self.eq_y[eq_depth])]
-            y_distribute = [y/sum(y_distribute) for y in y_distribute]
-            self.eq_y[eq_depth] = y_distribute
+            self.received_params[eq_depth] = [client.weight * client.model.parameters_to_tensor() for client in self.sampled_eq_clients[eq_depth]]
     
     
     def aggregate_train(self,):
@@ -166,7 +183,7 @@ class Server(BaseServer):
         attend_eqs = self.eq_depths[self.eq_depths.index(eq_depth):]
         total_num = sum([self.eq_num[eq_depth] for eq_depth in attend_eqs])
         for depth in attend_eqs:
-            tensors.append(self.eq_model[depth].parameters_to_tensor(layers=aligned_layers)*self.eq_depths[depth]/total_num)
+            tensors.append(self.eq_model[depth].parameters_to_tensor(layers=aligned_layers)*self.eq_num[depth]/total_num)
         tensor = sum(tensors)
         for depth in attend_eqs:
             self.eq_model[depth].tensor_to_parameters(tensor, layers=aligned_layers)
@@ -189,15 +206,18 @@ class Server(BaseServer):
             s_optimizer.zero_grad()
             
             y_distribute = self.eq_y[t_eq]
-            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs)).to(self.device)
+            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             
             # == data ==
             gen_latent, eps = generator(y_input, )
             
             begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
             
-            t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, t_model.config.exits[-1]))
-            s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
+            # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
+            # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
+            
+            t_logits = t_model(gen_latent)[-1]
+            s_logits = s_model(gen_latent)[s_exit]
             
             dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
             angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
@@ -233,7 +253,7 @@ class Server(BaseServer):
             optimizer.zero_grad()
             # == new y based y_distribute ==
             y_distribute = self.eq_y[t_eq]
-            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs)).to(self.device)
+            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             
             # == data ==
             gen_latent, eps = generator(y_input, )
@@ -245,17 +265,19 @@ class Server(BaseServer):
             begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
             
             # besides s_exit, all_logits len is (s_exits - t_exits + 1) - 1
-            all_logits = ()
+            all_other_logits = ()
             for end_exit in self.sl_generators[t_eq].keys():
                 if end_exit == s_exit: continue
-                logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                all_logits += (logits, )
+                # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
+                logits = s_model(gen_latent)[end_exit]
+                all_other_logits += (logits, )
                 
             # == ensemble_logits for student exits [batch * hidden_size]
-            ensemble_logits = torch.mean(all_logits, dim=1)
+            ensemble_logits = torch.mean(torch.stack(all_other_logits), dim=0)
             
             # == teacher's logits ==
-            t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, t_model.config.exits[-1]))
+            # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
+            t_logits = t_model(gen_latent)[-1]
             
             # == kd_loss for G ==
             kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
