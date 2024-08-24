@@ -23,6 +23,26 @@ from transformers.models.bert.modeling_bert import *
 from utils.modelload.model import BaseModule
 
 
+class GradientRescaleFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input, weight):
+        ctx.save_for_backward(input)
+        ctx.gd_scale_weight = weight
+        output = input
+        return output
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        input = ctx.saved_tensors
+        grad_input = grad_weight = None
+        if ctx.needs_input_grad[0]:
+            grad_input = ctx.gd_scale_weight * grad_output
+        return grad_input, grad_weight
+
+
+gradient_rescale = GradientRescaleFunction.apply
+
+
 class ExitConfig(ViTConfig):
     
     model_type = "vit"
@@ -220,6 +240,8 @@ class ViTExitLayer(nn.Module):
 
     def __init__(self, config: ExitConfig, index: int) -> None:
         super().__init__()
+        self.config = config
+        self.layer_index = index
         self.exit = True if index in config.exits else False
         if self.exit:
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
@@ -235,7 +257,8 @@ class ViTExitLayer(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        head_mask: Optional[torch.Tensor] = None
+        head_mask: Optional[torch.Tensor] = None,
+        policy: Optional[str]='base'
     ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor]]:
         self_attention_outputs = self.attention(
             self.layernorm_before(hidden_states),  # in ViT, layernorm is applied before self-attention
@@ -255,8 +278,19 @@ class ViTExitLayer(nn.Module):
         layer_output = self.output(layer_output, hidden_states)
         
         # exit
-        logits = self.classifier(self.layernorm(layer_output)[:, 0, :]) if self.exit else None
-        outputs = (layer_output, logits, outputs)
+        if self.exit is True:
+            exit_idx = self.config.exits.index(self.layer_index)
+            if policy == 'base':
+                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
+            elif policy == 'boosted':
+                layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
+                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
+                layer_output = gradient_rescale(layer_output, len(self.config.exits - exit_idx - 1))
+                
+            outputs = (layer_output, logits, outputs)   
+        else:
+            outputs = (layer_output, None, outputs)
+        
         return outputs
 
 
@@ -273,14 +307,15 @@ class ViTExitEncoder(nn.Module):
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
         latent: Optional[torch.Tensor] = None,
-        exit_idxs: Optional[Tuple[int]] = None
+        exit_idxs: Optional[Tuple[int]] = None,
+        policy:Optional[str]='base'
     ) -> Union[tuple, BaseModelOutput, torch.Tensor]:
         exits_logits = ()
         
         if latent is None:
             for i, layer_module in enumerate(self.layer):
                 layer_head_mask = head_mask[i] if head_mask is not None else None
-                layer_outputs = layer_module(hidden_states, layer_head_mask)
+                layer_outputs = layer_module(hidden_states, layer_head_mask, policy)
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
                 if layer_module.exit:
                     exits_logits += (exit_logits,)
@@ -295,7 +330,7 @@ class ViTExitEncoder(nn.Module):
             layers = self.layer[begin_layer:end_layer+1]
             hidden_states = latent
             for layer_module in layers:
-                layer_outputs = layer_module(hidden_states, None)
+                layer_outputs = layer_module(hidden_states, None, policy)
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             
             return exit_logits
@@ -322,7 +357,8 @@ class ViTExitModel(ViTPreTrainedModel):
         head_mask: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
         latent: Optional[torch.Tensor] = None,
-        exit_idxs: Optional[Tuple[int]] = None
+        exit_idxs: Optional[Tuple[int]] = None,
+        policy:Optional[str]='base'
     ) -> Union[Tuple, BaseModelOutputWithPooling, torch.Tensor]:
         
         if latent is None:
@@ -337,14 +373,16 @@ class ViTExitModel(ViTPreTrainedModel):
             )
             encoder_outputs = self.encoder(
                 embedding_output,
-                head_mask=head_mask
+                head_mask=head_mask,
+                policy=policy
             )
             return encoder_outputs
         else:
             encoder_output = self.encoder(
                 latent,
                 exit_idxs=exit_idxs,
-                head_mask=None
+                head_mask=None,
+                policy=policy
             )
             return encoder_output
 
@@ -371,20 +409,22 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         labels: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
         latent: Optional[torch.Tensor] = None,
-        exit_idxs: Optional[Tuple[int]] = None
-
+        exit_idxs: Optional[Tuple[int]] = None,
+        policy:Optional[str]='base'
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         if latent is None:
             outputs = self.vit(
                 pixel_values,
                 head_mask=head_mask,
-                interpolate_pos_encoding=interpolate_pos_encoding
+                interpolate_pos_encoding=interpolate_pos_encoding,
+                policy=policy
             )
             return outputs
         else:
             output = self.vit(
                 latent=latent,
-                exit_idxs=exit_idxs
+                exit_idxs=exit_idxs,
+                policy=policy
             )
             return output
 

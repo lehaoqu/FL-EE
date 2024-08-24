@@ -155,6 +155,16 @@ class BaseServer:
             'acc': DataProcessor(),
             'loss': DataProcessor(),
         }
+        
+        # == ratio of each classes for each eq ==  
+        self.eq_y = {}
+        for client in self.clients:
+            self.eq_y.setdefault(client.eq_depth, []).append(client.y_distribute)
+        for eq_depth in self.eq_depths:
+            y_distribute = [sum(column) for column in zip(*self.eq_y[eq_depth])]
+            y_distribute = [y/sum(y_distribute) for y in y_distribute]
+            self.eq_y[eq_depth] = y_distribute
+        
 
     def run(self):
         raise NotImplementedError()
