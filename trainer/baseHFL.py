@@ -41,9 +41,9 @@ class BaseClient:
              'weight_decay_rate': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
         ]
-        self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+        # self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
         
-        # self.optim = torch.optim.SGD(params=self.model.parameters())
+        self.optim = torch.optim.SGD(params=self.model.parameters())
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
@@ -75,19 +75,37 @@ class BaseClient:
     def train(self):
         # === train ===
         batch_loss = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                self.optim.zero_grad()
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                label = batch['labels']
+        if self.policy.name != 'l2w':
+            for epoch in range(self.epoch):
+                for idx, data in enumerate(self.loader_train):
+                    self.optim.zero_grad()
+                    batch = {}
+                    for key in data.keys():
+                        batch[key] = data[key].to(self.device)
+                    label = batch['labels'].view(-1)
 
-                ce_loss = torch.zeros(1).to(self.device)
-                ce_loss = self.policy.train(self.model, batch, label.view(-1))
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item())
+                    ce_loss = torch.zeros(1).to(self.device)
+                    ce_loss = self.policy.train(self.model, batch, label)
+                    ce_loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
+        else:
+            for epoch in range(self.epoch):
+                for idx, data in enumerate(self.loader_train):
+                    batch = {}
+                    for key in data.keys():
+                        batch[key] = data[key].to(self.device)
+                    label = batch['labels'].view(-1)
+                    # TODO 1  
+                    if epoch % 1 == 0:
+                        self.policy.train_meta(self.model, batch, label, self.optim)
+                    else:
+                        self.optim.zero_grad()
+                        ce_loss = self.policy.train(self.model, batch, label)
+                        ce_loss.backward()
+                        self.optim.step()
+                        batch_loss.append(ce_loss.detach().cpu().item())
+                
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
@@ -123,8 +141,8 @@ class BaseClient:
     def reset_optimizer(self, decay=True):
         if not decay:
             return
-        self.scheduler.step()
-        # self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)))
+        # self.scheduler.step()
+        self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)))
 
 
 class BaseServer:

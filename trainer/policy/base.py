@@ -6,6 +6,7 @@ from typing import *
 
 class Policy():
     def __init__(self, args):
+        self.name = 'base'
         self.args = args
         self.device = self.args.device
         self.exits_num = self.args.exits_num
