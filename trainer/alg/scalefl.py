@@ -48,7 +48,7 @@ class Client(BaseClient):
                 ce_loss = torch.zeros(1).to(self.device)
                 exit_logits = self.model(**batch)
                 exit_num = len(exit_logits)
-                ce_loss = self.policy(self.model, batch, label.view(-1), ws=[i+1 for i in range(exit_num)])
+                ce_loss = self.policy.train(self.model, batch, label.view(-1), ws=[i+1 for i in range(exit_num)])
                 
                 # == kd loss ==    
                 kd_loss = torch.zeros(1).to(self.device)

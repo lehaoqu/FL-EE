@@ -3,6 +3,7 @@ import torch.nn as nn
 import time
 import random
 import importlib
+import copy
 
 from typing import *
 
@@ -53,12 +54,12 @@ class BaseClient:
         self.weight = 1
         self.submodel_weights = {}
         
-        self.policy = None
+        # == policy ==
         args.exits_num = self.exits_num
-        if args.policy != 'none':
-            policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
-            self.policy = policy_module.Policy(args)
+        policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
+        self.policy = policy_module.Policy(args)
             
+        # == y_distribute ==
         for idx, data in enumerate(self.loader_train):
             labels = data['labels'].cpu().tolist()
             for y in labels:
@@ -81,8 +82,7 @@ class BaseClient:
                 label = batch['labels']
 
                 ce_loss = torch.zeros(1).to(self.device)
-                exits_logits = self.model(**batch)
-                ce_loss = self.policy(exits_logits, label.view(-1))
+                ce_loss = self.policy.train(self.model, batch, label.view(-1))
                 ce_loss.backward()
                 self.optim.step()
                 batch_loss.append(ce_loss.detach().cpu().item())
@@ -108,7 +108,7 @@ class BaseClient:
                 labels = batch['labels'].view(-1)
                 
                 exits_logits = self.model(**batch)
-                exits_logits = self.policy.eval(exits_logits)
+                exits_logits = self.policy(exits_logits)
                 
                 for exit_logits in exits_logits:
                     _, predicted = torch.max(exit_logits, 1)
@@ -126,7 +126,7 @@ class BaseClient:
 
 
 class BaseServer:
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
+    def __init__(self, id, args, dataset, clients:List[BaseClient], eq_model=None, global_model=None, eqs_exits=None):
         # super().__init__(id, args, dataset)
         self.args = args
         self.eqs_exits = eqs_exits
@@ -164,6 +164,16 @@ class BaseServer:
             y_distribute = [sum(column) for column in zip(*self.eq_y[eq_depth])]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
             self.eq_y[eq_depth] = y_distribute
+            
+        self.crt_epoch = 0
+        
+        self.eq_policy = {}
+        
+        for eq_depth in self.eq_depths:
+            args.exits_num = self.eqs_exits[eq_depth]
+            policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
+            policy = policy_module.Policy(args)
+            self.eq_policy[eq_depth] = policy
         
 
     def run(self):

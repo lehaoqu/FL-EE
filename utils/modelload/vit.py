@@ -285,7 +285,7 @@ class ViTExitLayer(nn.Module):
             elif policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
                 logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
-                layer_output = gradient_rescale(layer_output, len(self.config.exits - exit_idx - 1))
+                layer_output = gradient_rescale(layer_output, len(self.config.exits) - exit_idx - 1)
                 
             outputs = (layer_output, logits, outputs)   
         else:

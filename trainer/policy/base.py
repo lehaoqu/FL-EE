@@ -11,7 +11,7 @@ class Policy():
         self.exits_num = self.args.exits_num
         self.loss_func = nn.CrossEntropyLoss()
     
-    def __call__(self, model, batch, label, ws=None) -> torch.tensor:
+    def train(self, model, batch, label, ws=None) -> torch.tensor:
         exits_logits = model(**batch)
         
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
@@ -23,5 +23,5 @@ class Policy():
             loss += self.loss_func(exit_logits, label) * ws[i]
         return loss
 
-    def eval(self, exits_logits:List[torch.tensor]):
+    def __call__(self, exits_logits):
         return exits_logits

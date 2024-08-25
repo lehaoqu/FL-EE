@@ -67,7 +67,6 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
         
         self.global_model = self.eq_model[max(self.eq_depths)]
-        self.crt_epoch = 0
         
         # == init eq_models' optimizer, lr_scheduler
         self.eq_model_train = {}

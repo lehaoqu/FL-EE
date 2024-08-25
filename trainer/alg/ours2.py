@@ -11,6 +11,7 @@ def add_args(parser):
     parser.add_argument('--kd_gap', default=5, type=int)
     parser.add_argument('--kd_begin', default=10, type=int)
     parser.add_argument('--kd_lr', default=3e-4, type=float)
+    parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
@@ -40,7 +41,10 @@ class Server(BaseServer):
         self.client_update()
         self.uplink()
         self.aggregate()
-        self.fintune()
+        if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+            self.train_generator()
+        if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+            self.fintune()
         self.crt_epoch += 1 
     
     def kd_criterion(self, pred, teacher):
@@ -50,6 +54,7 @@ class Server(BaseServer):
         T=3
         _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
         return _kld
+    
     
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits)
@@ -77,7 +82,7 @@ class Server(BaseServer):
         
         # == args ==
         self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
-        self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
+        self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         
         self.g_epochs, self.g_n_iters = args.g_epochs, args.g_n_iters
         self.kd_epochs, self.kd_n_iters = args.kd_epochs, args.kd_n_iters
@@ -90,8 +95,6 @@ class Server(BaseServer):
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
             self.generators[i]  = (generator, optimizer, lr_scheduler)
             
-        
-    
     
     def train_generator(self):
         for g in self.generators:
@@ -101,24 +104,58 @@ class Server(BaseServer):
             eq_model.to(self.device)
             eq_model.eval()
         
+        # == train generators ==
         for exit_idx, g in enumerate(self.generators):
             for i in range(self.g_epochs):
                 self.update_generator(g, exit_idx, self.g_n_iters)
                 g[2].step()
-                
+     
+        
+    def finetune(self,):
+        # == finetune global model , multi teacher to teach each exit ==
         for g in self.generators:
             g[0].eval()
         self.global_model.train()
+        
         for exit_idx in range(len(self.eqs_exits[max(self.eq_depths)])):
             for i in range(self.kd_epochs):
-                self.teach_global_model(g, exit_idx, self.kd_n_iters)
+                self.teach_global_model(self.generators, exit_idx, self.kd_n_iters)
                 self.global_scheduler.step()
     
     
-    # TODO
-    def teach_global_model(self, g, exit_idx, n_iters):
-        pass
+    def teach_global_model(self, g, s_exit, n_iters):
+        
+        generator = g[0]
+        t_exits = (s_exit-1, s_exit, s_exit+1)
+        
+        for _ in range(n_iters):
+            self.global_optimizer.zero_grad()
+            
+            s_logits = self.global_model(gen_latent)[s_exit]
+            loss = torch.zeros(1).to(self.device)
+            for t_exit in t_exits:
+                if t_exit >= 0 and t_exit < len(self.eqs_exits[max(self.eq_depths)]):
+                    # == new y based y_distribute ==
+                    attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eqs_exits[eq_depth])]
+                    y_distribute = [sum(column) for column in zip(*attend_eq)]
+                    y_distribute = [y/sum(y_distribute) for y in y_distribute]
+                    y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
                     
+                    # == data ==
+                    gen_latent, eps = generator(y_input, )
+
+                    attend_logits = torch.zeros(1).to(self.device)
+                    for eq_depth in attend_eq:
+                        attend_logits += self.eq_model[eq_depth](gen_latent)[t_exit] * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
+                    
+                    if t_exit >= s_exit:
+                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, attend_logits)
+                    else:
+                        loss += self.kd_dist_ratio*self.dist_criterion(s_logits, attend_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, attend_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, attend_logits)
+            
+            loss.backward()
+                            
+                        
     def update_generator(self, g, exit_idx, n_iters):
         
         CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
@@ -169,7 +206,6 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
                     
             
-  
     def sample(self):
         self.sampled_eq_clients = {}
         
