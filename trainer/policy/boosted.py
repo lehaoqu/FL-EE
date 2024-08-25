@@ -13,7 +13,6 @@ class Policy():
         self.loss_func = nn.CrossEntropyLoss()
     
     def train(self, model, batch, label, ws=None) -> torch.tensor:
-        batch['policy'] = 'boosted'
         exits_logits = model(**batch)
         
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'

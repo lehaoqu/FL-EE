@@ -28,6 +28,8 @@ class ExitConfig(BertConfig):
             num_labels=None,
             base_model=None,
             classifier_archi=None,
+            policy=None,
+            alg=None,
             **kwargs,
     ):
         super().__init__(
@@ -53,6 +55,7 @@ class ExitConfig(BertConfig):
         self.base_model = base_model
         self.num_labels = num_labels if num_labels is not None else 2
         self.classifier_atchi = classifier_archi
+        self.policy=policy
 
 
 class MultiHeadedAttention(nn.Module):
