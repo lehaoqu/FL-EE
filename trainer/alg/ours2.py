@@ -56,8 +56,8 @@ class Server(BaseServer):
         return _kld
     
     
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits)
         
         # == train for global model ==
         param_optimizer = list(self.global_model.named_parameters())
@@ -89,7 +89,7 @@ class Server(BaseServer):
         
         # == train for generators (each exit has a generator) ==
         self.generators = []
-        for i in range(len(self.eqs_exits[max(self.eq_depths)])):
+        for i in range(len(self.eq_exits[max(self.eq_depths)])):
             generator = Generator_CIFAR(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
@@ -117,7 +117,7 @@ class Server(BaseServer):
             g[0].eval()
         self.global_model.train()
         
-        for exit_idx in range(len(self.eqs_exits[max(self.eq_depths)])):
+        for exit_idx in range(len(self.eq_exits[max(self.eq_depths)])):
             for i in range(self.kd_epochs):
                 self.teach_global_model(self.generators, exit_idx, self.kd_n_iters)
                 self.global_scheduler.step()
@@ -134,9 +134,9 @@ class Server(BaseServer):
             s_logits = self.global_model(gen_latent)[s_exit]
             loss = torch.zeros(1).to(self.device)
             for t_exit in t_exits:
-                if t_exit >= 0 and t_exit < len(self.eqs_exits[max(self.eq_depths)]):
+                if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
                     # == new y based y_distribute ==
-                    attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eqs_exits[eq_depth])]
+                    attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
                     y_distribute = [sum(column) for column in zip(*attend_eq)]
                     y_distribute = [y/sum(y_distribute) for y in y_distribute]
                     y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
@@ -167,7 +167,7 @@ class Server(BaseServer):
             optimizer.zero_grad()
             
             # == new y based y_distribute ==
-            attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx < len(self.eqs_exits[eq_depth])]
+            attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx < len(self.eq_exits[eq_depth])]
             y_distribute = [sum(column) for column in zip(*attend_eq)]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
             y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
@@ -188,7 +188,7 @@ class Server(BaseServer):
             kd_loss = self.g_eta*torch.zeros(1).to(self.device)
             
             if exit_idx != 0:
-                former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eqs_exits[eq_depth])]
+                former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
                 former_attend_logits = torch.zeros(1).to(self.device)
                 for eq_depth in former_attend_eq:
                     former_attend_logits += self.eq_model[eq_depth](gen_latent)[exit_idx-1] * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq])

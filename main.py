@@ -48,9 +48,9 @@ class FedSim:
         # print(ranges_to_gropus)
         eq_model = {}
         exits = (2,5,8,11) if args.alg != 'scalfl' else (3,6,9,11)
-        eqs_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
+        eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
         for depth in args.eq_depths:
-            eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'), exits=eqs_exits[depth])
+            eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'), exits=eq_exits[depth])
         
         # == for scalefl ==
         largest_model = eq_model[max(args.eq_depths)]
@@ -63,10 +63,10 @@ class FedSim:
                 if idx <= end_of_range: 
                     depth = args.eq_depths[ranges_to_gropus[end_of_range]]
                     break
-            client_exits = eqs_exits[depth]
+            client_exits = eq_exits[depth]
             self.clients.append(trainer_module.Client(idx, args, None, copy.deepcopy(eq_model[depth]), depth, client_exits))
             # print(f'client {idx} compeleted')
-        self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]), eqs_exits)
+        self.server = trainer_module.Server(0, args, None, self.clients, copy.deepcopy(eq_model), copy.deepcopy(eq_model[max(args.eq_depths)]), eq_exits)
 
     def simulate(self):
         

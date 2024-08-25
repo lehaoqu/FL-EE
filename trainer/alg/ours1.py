@@ -63,8 +63,8 @@ class Server(BaseServer):
         return _kld
     
     
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         
         self.global_model = self.eq_model[max(self.eq_depths)]
         
@@ -104,7 +104,7 @@ class Server(BaseServer):
             if eq_depth != max(self.eq_depths):
                 generators = {}
                 larger_eq_depth = self.eq_depths[i+1]
-                for j in range(len(self.eqs_exits[eq_depth])-1, len(self.eqs_exits[larger_eq_depth])):
+                for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
                     generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
@@ -117,7 +117,7 @@ class Server(BaseServer):
             if eq_depth != min(self.eq_depths):
                 generators = {}
                 smaller_eq_depth = self.eq_depths[i-1]
-                for j in range(len(self.eqs_exits[smaller_eq_depth])-1, len(self.eqs_exits[eq_depth])):
+                for j in range(len(self.eq_exits[smaller_eq_depth])-1, len(self.eq_exits[eq_depth])):
                     generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
@@ -190,16 +190,16 @@ class Server(BaseServer):
             
 
     def aggregate_aligned_layers(self, eq_depth):
-        exits = self.eqs_exits[eq_depth]
+        exits = self.eq_exits[eq_depth]
         if eq_depth == min(self.eq_depths):
             begin_layer = 0
-            end_layer = self.eqs_exits[eq_depth][-2] if len(self.eqs_exits[eq_depth]) > 1 else 0
+            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
         elif eq_depth == max(self.eq_depths):
-            begin_layer = self.eqs_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
+            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
             end_layer = max(self.eq_depths)
         else:
-            begin_layer = self.eqs_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
-            end_layer = self.eqs_exits[eq_depth][-2] if len(self.eqs_exits[eq_depth]) > 1 else 0
+            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
+            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
     
         aligned_layers = [begin_layer, end_layer]
         
@@ -215,7 +215,9 @@ class Server(BaseServer):
     
     def teach_next_model(self, n_iters, g, t_eq, t, s, g_exit, direction='sl'):
         DIST_LOSS, ANGLE_LOSS, DARK_LOSS, KD_LOSS = 0, 0, 0, 0
-        
+
+        t_policy = self.eq_policy[t_eq]
+                
         generator, t_model, s_model, s_optimizer, s_scheduler = g[0], t[0], s[0], s[1], s[2]
 
         t_model.eval()
@@ -236,14 +238,15 @@ class Server(BaseServer):
             gen_latent, eps = generator(y_input, )
             
             if direction == 'sl':
-            
+                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)+1]]
+                
                 begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
                 
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
                 # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
                 
-                t_logits = t_model(gen_latent)[-1]
-                s_logits = s_model(gen_latent)[g_exit]
+                t_logits = t_policy(t_model(gen_latent))[-1]
+                s_logits = s_policy.train_all_logits(s_model(gen_latent))[g_exit]
                 
                 dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
@@ -256,9 +259,10 @@ class Server(BaseServer):
                 loss = dist_loss + angle_loss + dark_loss
             
             elif direction == 'ls':
+                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
-                t_logits = t_model(gen_latent)[g_exit]
-                s_logits = s_model(gen_latent)[-1]
+                t_logits = t_policy(t_model(gen_latent))[g_exit]
+                s_logits = s_policy(s_model(gen_latent))[-1]
                 
                 kd_loss = self.kd_criterion(s_logits, t_logits)
                 
@@ -278,6 +282,8 @@ class Server(BaseServer):
     def update_generator(self, n_iters, g, t_eq, t_model, s_model, g_exit, direction='sl'):        
         
         CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
+        
+        t_policy = self.eq_depths[t_eq]
         
         generator: Generator= g[0]
         optimizer:torch.optim.optimizer = g[1]
@@ -303,7 +309,8 @@ class Server(BaseServer):
             div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
             
             if direction == 'sl':
-            
+                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)+1]]
+                
                 begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
                 
                 # besides s_exit, all_logits len is (s_exits - t_exits + 1) - 1
@@ -311,7 +318,7 @@ class Server(BaseServer):
                 for end_exit in self.sl_generators[t_eq].keys():
                     if end_exit == g_exit: continue
                     # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_model(gen_latent)[end_exit]
+                    logits = s_policy(s_model(gen_latent))[end_exit]
                     all_other_logits += (logits, )
                     
                 # == ensemble_logits for student exits [batch * hidden_size]
@@ -319,7 +326,7 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_model(gen_latent)[-1]
+                t_logits = t_policy(t_model(gen_latent))[-1]
                 
                 # == kd_loss for G ==
                 kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
@@ -328,9 +335,10 @@ class Server(BaseServer):
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
             elif direction == 'ls':
+                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
-                t_logits = t_model[gen_latent][g_exit]
-                s_logits = s_model[gen_latent][-1]
+                t_logits = t_policy(t_model[gen_latent])[g_exit]
+                s_logits = s_policy(s_model[gen_latent])[-1]
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))

@@ -41,7 +41,9 @@ class BaseClient:
              'weight_decay_rate': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
         ]
-        self.optim = AdamW(params=optimizer_grouped_parameters, lr=self.lr, correct_bias=False)
+        self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+        
+        # self.optim = torch.optim.SGD(params=self.model.parameters())
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
@@ -126,10 +128,10 @@ class BaseClient:
 
 
 class BaseServer:
-    def __init__(self, id, args, dataset, clients:List[BaseClient], eq_model=None, global_model=None, eqs_exits=None):
+    def __init__(self, id, args, dataset, clients:List[BaseClient], eq_model=None, global_model=None, eq_exits=None):
         # super().__init__(id, args, dataset)
         self.args = args
-        self.eqs_exits = eqs_exits
+        self.eq_exits = eq_exits
         self.client_num = args.total_num
         self.sample_rate = args.sr
         self.clients = clients
@@ -167,10 +169,10 @@ class BaseServer:
             
         self.crt_epoch = 0
         
+        # == eq_policy ==
         self.eq_policy = {}
-        
         for eq_depth in self.eq_depths:
-            args.exits_num = self.eqs_exits[eq_depth]
+            args.exits_num = self.eq_exits[eq_depth]
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
             policy = policy_module.Policy(args)
             self.eq_policy[eq_depth] = policy

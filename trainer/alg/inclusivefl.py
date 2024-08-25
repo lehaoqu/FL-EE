@@ -21,8 +21,8 @@ class Client(BaseClient):
     
 
 class Server(BaseServer):
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         
         # == global model is largest eq model ==
         self.global_model = self.eq_model[max(self.eq_depths)]

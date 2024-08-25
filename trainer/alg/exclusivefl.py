@@ -21,8 +21,8 @@ class Server(BaseServer):
         self.uplink()
         self.aggregate()
     
-    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eqs_exits=None):
-        super().__init__(id, args, dataset, clients, eq_model, global_model, eqs_exits=eqs_exits)
+    def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
+        super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         self.eq_depths = [12]
         largest_num = int(args.eq_ratios[-1] * len(self.clients))
         sample_rate = self.sample_rate / (args.eq_ratios[-1])
