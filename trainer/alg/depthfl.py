@@ -22,30 +22,51 @@ class Client(BaseClient):
         
         # === train ===
         batch_loss = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                self.optim.zero_grad()
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                label = batch['labels']
-                
-                # == ce loss ==
-                ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(**batch)
-                ce_loss = self.policy(self.model, batch, label.view(-1))
+        if self.policy.name != 'l2w':
+            for epoch in range(self.epoch):
+                for idx, data in enumerate(self.loader_train):
+                    self.optim.zero_grad()
+                    batch = {}
+                    for key in data.keys():
+                        batch[key] = data[key].to(self.device)
+                    label = batch['labels'].view(-1)
 
-                # == kd loss ==    
-                kd_loss = torch.zeros(1).to(self.device)
-                for i, teacher_logits in enumerate(exit_logits):
-                    for j, student_logits in enumerate(exit_logits):
-                        if i == j: continue
-                        else: 
-                            kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exit_logits)-1)
-                loss = ce_loss + kd_loss
-                loss.backward()
-                self.optim.step()
-                batch_loss.append(loss.detach().cpu().item())
+                    ce_loss = torch.zeros(1).to(self.device)
+                    ce_loss, exits_logtis = self.policy.train(self.model, batch, label)
+                    kd_loss = torch.zeros(1).to(self.device)
+                    for i, teacher_logits in enumerate(exits_logits):
+                        for j, student_logits in enumerate(exits_logits):
+                            if i == j: continue
+                            else: 
+                                kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exits_logits)-1)
+                    loss = ce_loss + kd_loss
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(loss.detach().cpu().item())
+        else:
+            for epoch in range(self.epoch):
+                for idx, data in enumerate(self.loader_train):
+                    print(f'{idx}'.center(80, '='))
+                    batch = {}
+                    for key in data.keys():
+                        batch[key] = data[key].to(self.device)
+                    label = batch['labels'].view(-1)
+                    # TODO 1  
+                    if idx % 1 == 0:
+                        self.policy.train_meta(self.model, batch, label, self.optim)
+
+                    self.optim.zero_grad()
+                    ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                    kd_loss = torch.zeros(1).to(self.device)
+                    for i, teacher_logits in enumerate(exits_logits):
+                        for j, student_logits in enumerate(exits_logits):
+                            if i == j: continue
+                            else: 
+                                kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exits_logits)-1)
+                    loss = ce_loss + kd_loss
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(loss.detach().cpu().item())
 
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))

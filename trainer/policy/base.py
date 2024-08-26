@@ -22,7 +22,7 @@ class Policy():
         loss = torch.zeros(1).to(self.device)
         for i, exit_logits in enumerate(exits_logits):
             loss += self.loss_func(exit_logits, label) * ws[i]
-        return loss
+        return loss, exits_logits
 
     def train_all_logits(self, exits_logits):
         return exits_logits

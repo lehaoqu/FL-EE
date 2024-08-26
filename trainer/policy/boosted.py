@@ -31,7 +31,7 @@ class Policy():
             pred_final = pred_ensembel + logits
             
             loss += self.loss_func(pred_final, label) * ws[i]
-        return loss
+        return loss, exits_logits
 
     def train_all_logtis(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]

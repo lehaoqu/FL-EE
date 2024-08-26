@@ -16,6 +16,8 @@ from transformers.modeling_outputs import (
 
 from transformers.models.vit import ViTPreTrainedModel
 from transformers.models.vit.modeling_vit import *
+from transformers.models.vit.modeling_vit import ViTForImageClassification as Model
+from transformers.models.vit.modeling_vit import ViTConfig as Config
 
 from transformers.models.bert.modeling_bert import *
 from utils.modelload.model import BaseModule, Ree
@@ -96,7 +98,7 @@ class ViTExitLayer(nn.Module):
         self.output = ViTOutput(config)
         self.layernorm_before = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.layernorm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) if self.exit else None
 
     def forward(
         self,
@@ -123,7 +125,7 @@ class ViTExitLayer(nn.Module):
         # exit
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
-            if self.config.policy == 'base':
+            if self.config.policy == 'base' or self.config.policy == 'l2w':
                 logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
             elif self.config.policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
@@ -301,21 +303,18 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         interpolate_pos_encoding: Optional[bool] = None,
         latent: Optional[torch.Tensor] = None,
         exit_idxs: Optional[Tuple[int]] = None,
-        policy:Optional[str]='base'
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         if latent is None:
             outputs = self.vit(
                 pixel_values,
                 head_mask=head_mask,
                 interpolate_pos_encoding=interpolate_pos_encoding,
-                policy=policy
             )
             return outputs
         else:
             output = self.vit(
                 latent=latent,
                 exit_idxs=exit_idxs,
-                policy=policy
             )
             return output
 

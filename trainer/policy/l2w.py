@@ -29,7 +29,8 @@ class MetaSGD(torch.optim.SGD):
         nesterov = group['nesterov']
         lr = group['lr']
 
-        for (name, parameter), grad in zip(self.net.named_parameters(), grads):
+        for name, parameter in self.net.named_parameters():
+            grad = grads[name]
             parameter.detach_()
             if weight_decay != 0:
                 grad_wd = grad.add(parameter, alpha=weight_decay)
@@ -96,6 +97,8 @@ class Policy():
         
         self.loss_func = nn.CrossEntropyLoss()
         self.meta_optimizer = torch.optim.Adam(self.meta_net.parameters(), lr=1e-4, weight_decay=1e-4)
+        # TODO 15
+        self.target_probs = self.calc_target_probs()[15-1]
         
 
     def calc_target_probs(self,):
@@ -115,7 +118,7 @@ class Policy():
         exits_logits = model(**batch)
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
 
-        for i, exit_logits in enumerate(exit_logits):
+        for i, exit_logits in enumerate(exits_logits):
             loss_vector = F.cross_entropy(exit_logits, label, reduction='none')
             if i==0:
                 losses = loss_vector.unsqueeze(1)
@@ -128,7 +131,7 @@ class Policy():
             # TODO 0.8
             weight = torch.ones(weight.shape).to(weight.device) + 0.8 * weight
         loss = torch.sum(torch.mean(weight*losses, 0))
-        return loss
+        return loss, exits_logits
     
     
     def train_meta(self, model, batch, label, optimizer):
@@ -146,13 +149,14 @@ class Policy():
     
     def train_meta_part(self, model, optimizer, data):
         # TODO p = 15
-        target_probs = self.calc_target_probs[15-1]
+        
         
         pseudo_net = copy.deepcopy(model).to(self.device)
         pseudo_net.train()
         batch_pseudo, batch_meta, label_pseudo, label_meta = data
-        
+        # print(batch_pseudo)
         exits_logits = pseudo_net(**batch_pseudo)
+        # print(exits_logits)
         for i, exit_logits in enumerate(exits_logits):
             pseudo_loss_vector = F.cross_entropy(exit_logits, label_pseudo, reduction='none')
             if i==0:
@@ -165,15 +169,29 @@ class Policy():
         # TODO 0.8
         pseudo_weight = torch.ones(pseudo_weight.shape).to(pseudo_weight.device) + 0.8 * pseudo_weight
         pseudo_loss_multi_exits = torch.sum(torch.mean(pseudo_weight * pseudo_losses, 0))
-        pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True)
+        # print(pseudo_loss_multi_exits)
+        pseudo_loss_multi_exits.backward(retain_graph=True)
+        # pseudo_grads = {n: p.grad for n, p in pseudo_net.named_parameters()}
+        
+        # pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True, allow_unused=True)
 
-        pseudo_optimizer = MetaSGD(pseudo_net, pseudo_net.parameters())
-        pseudo_optimizer.load_state_dict(optimizer.state_dict())
-        pseudo_optimizer.meta_step(pseudo_grads)
+        # for n, p in pseudo_net.named_parameters():
+        #     if p.grad is None:
+        #         print(n)
         
-        del pseudo_grads
+        # pseudo_optimizer = MetaSGD(pseudo_net, pseudo_net.parameters())
+        # pseudo_optimizer.load_state_dict(optimizer.state_dict())
+        # pseudo_optimizer.meta_step(pseudo_grads)
+        pseudo_optimizer = copy.deepcopy(optimizer)
+        pseudo_optimizer.step()
         
+        # del pseudo_grads
+        
+        for n, p in pseudo_net.named_parameters():
+            if p.requires_grad is False:
+                print(n)
         meta_outputs = pseudo_net(**batch_meta)
+        # print(meta_outputs)
         used_index = []
         meta_loss = 0.0
         for j in range(self.exits_num):
@@ -184,13 +202,13 @@ class Policy():
                 n_target = sorted_idx.shape[0]
                 
                 if j == 0:
-                    selected_index = sorted_idx[: math.floor(n_target * target_probs[j])]
+                    selected_index = sorted_idx[: math.floor(n_target * self.target_probs[j])]
                     selected_index = selected_index.tolist()
                     used_index.extend(selected_index)
                 elif j < self.exits_num - 1:
                     filter_set = set(used_index)
                     unused_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
-                    selected_index = unused_index[: math.floor(n_target * target_probs[j])]  
+                    selected_index = unused_index[: math.floor(n_target * self.target_probs[j])]  
                     used_index.extend(selected_index)
                 else:
                     filter_set = set(used_index)
@@ -199,8 +217,10 @@ class Policy():
                 meta_loss += F.cross_entropy(meta_outputs[j][selected_index], label_meta[selected_index].long(), reduction='mean')
 
         self.meta_optimizer.zero_grad()
+        # print(meta_loss)
         meta_loss.backward()
-        self.meta_optimizer.step()    
+        self.meta_optimizer.step()
+        # print(meta_loss)
     
     def __call__(self, exits_logits):
         return exits_logits

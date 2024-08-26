@@ -85,23 +85,24 @@ class BaseClient:
                     label = batch['labels'].view(-1)
 
                     ce_loss = torch.zeros(1).to(self.device)
-                    ce_loss = self.policy.train(self.model, batch, label)
+                    ce_loss, _ = self.policy.train(self.model, batch, label)
                     ce_loss.backward()
                     self.optim.step()
                     batch_loss.append(ce_loss.detach().cpu().item())
         else:
             for epoch in range(self.epoch):
                 for idx, data in enumerate(self.loader_train):
+                    print(f'{idx}'.center(80, '='))
                     batch = {}
                     for key in data.keys():
                         batch[key] = data[key].to(self.device)
                     label = batch['labels'].view(-1)
                     # TODO 1  
-                    if epoch % 1 == 0:
+                    if idx % 1 == 0:
                         self.policy.train_meta(self.model, batch, label, self.optim)
-                    else:
+
                         self.optim.zero_grad()
-                        ce_loss = self.policy.train(self.model, batch, label)
+                        ce_loss, _ = self.policy.train(self.model, batch, label)
                         ce_loss.backward()
                         self.optim.step()
                         batch_loss.append(ce_loss.detach().cpu().item())
@@ -190,7 +191,7 @@ class BaseServer:
         # == eq_policy ==
         self.eq_policy = {}
         for eq_depth in self.eq_depths:
-            args.exits_num = self.eq_exits[eq_depth]
+            args.exits_num = len(self.eq_exits[eq_depth])
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
             policy = policy_module.Policy(args)
             self.eq_policy[eq_depth] = policy

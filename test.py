@@ -50,22 +50,87 @@
 # print("Concatenated Tensor:\n", cat_tensor)
 # print(s)
 
-import torch.optim as optim
+# import torch.optim as optim
+# import torch
+
+# # 假设我们有一个模型
+# model = torch.nn.Linear(20, 50)
+
+# # 创建第一个优化器
+# optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+# # 执行一些训练步骤...
+
+# # 现在创建第二个优化器，可能与第一个优化器有不同的参数
+# pseudo_optimizer = optim.SGD(model.parameters(), momentum=0.99)
+
+# # 将第一个优化器的状态复制到第二个优化器
+# pseudo_optimizer.load_state_dict(optimizer.state_dict())
+
+# # 此时，pseudo_optimizer 将具有与 optimizer 相同的学习率和其他设置
+# print("Learning rate:", pseudo_optimizer.param_groups[0]['lr'])
+
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-# 假设我们有一个模型
-model = torch.nn.Linear(20, 50)
+# 定义一个简单的模型
+class SimpleModel(nn.Module):
+    def __init__(self):
+        super(SimpleModel, self).__init__()
+        self.fc1 = nn.Linear(10, 5)
+        self.fc2 = nn.Linear(5, 2)
 
-# 创建第一个优化器
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
-# 执行一些训练步骤...
+# 创建模型实例
+model = SimpleModel()
 
-# 现在创建第二个优化器，可能与第一个优化器有不同的参数
-pseudo_optimizer = optim.SGD(model.parameters(), momentum=0.99)
+# 创建数据和目标
+x = torch.randn(1, 10, requires_grad=True)
+y = torch.tensor([1], dtype=torch.long)
 
-# 将第一个优化器的状态复制到第二个优化器
-pseudo_optimizer.load_state_dict(optimizer.state_dict())
+# 前向传播
+output = model(x)
 
-# 此时，pseudo_optimizer 将具有与 optimizer 相同的学习率和其他设置
-print("Learning rate:", pseudo_optimizer.param_groups[0]['lr'])
+# 计算损失
+criterion = nn.CrossEntropyLoss()
+loss = criterion(output, y)
+
+# 第一次反向传播，保留计算图
+loss.backward(retain_graph=True)
+
+# 打印第一次梯度
+print("First-order gradients:")
+for name, param in model.named_parameters():
+    if param.grad is not None:
+        print(f"{name}: {param.grad}")
+
+# 假设我们需要计算Hessian矩阵的近似，进行第二次反向传播
+# 这里只是一个示例，实际上计算Hessian需要更复杂的步骤
+hessian_vector_product = torch.autograd.grad(
+    outputs=output,
+    inputs=x,
+    grad_outputs=torch.ones_like(output),
+    create_graph=True,
+    retain_graph=True
+)[0]
+
+# 打印Hessian向量乘积的结果
+print("\nHessian-vector product:")
+print(hessian_vector_product)
+
+# 清理不再需要的计算图
+del hessian_vector_product
+
+# 进行第二次反向传播，如果需要
+loss.backward()
+
+# 打印第二次梯度
+print("Second-order gradients:")
+for name, param in model.named_parameters():
+    if param.grad is not None:
+        print(f"{name}: {param.grad}")
