@@ -23,17 +23,14 @@ class Policy():
             tmp = logits + pred_ensembels[-1]
             pred_ensembels.append(tmp)
             
-        loss = torch.zeros(1).to(self.device)
+        exits_loss = ()
         for i, logits in enumerate(exits_logits):
-
             pred_ensembel = pred_ensembels[i].detach()
-            
             pred_final = pred_ensembel + logits
-            
-            loss += self.loss_func(pred_final, label) * ws[i]
-        return loss, exits_logits
+            exits_loss += (self.loss_func(pred_final, label) * ws[i],)
+        return exits_loss, exits_logits
 
-    def train_all_logtis(self, exits_logits):
+    def train_all_logits(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]
         for i, logits in enumerate(exits_logits):
             tmp = logits + pred_ensembels[-1]
@@ -48,8 +45,8 @@ class Policy():
 
     def __call__(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]
-        for i in range(self.exits_num):
-            tmp = pred_ensembels[-1] + exits_logits[i]
+        for i, logits in enumerate(exits_logits):
+            tmp = logits + pred_ensembels[-1]
             pred_ensembels.append(tmp)
         ensemble_exits_logits = [pred_ensembels[i+1] for i in range(len(exits_logits))]
         return ensemble_exits_logits

@@ -19,10 +19,10 @@ class Policy():
         
         ws = [1 for _ in range(self.exits_num)] if ws is None else ws
                     
-        loss = torch.zeros(1).to(self.device)
+        exits_loss = ()
         for i, exit_logits in enumerate(exits_logits):
-            loss += self.loss_func(exit_logits, label) * ws[i]
-        return loss, exits_logits
+            exits_loss += (self.loss_func(exit_logits, label) * ws[i],)
+        return exits_loss, exits_logits
 
     def train_all_logits(self, exits_logits):
         return exits_logits

@@ -74,63 +74,99 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# 定义一个简单的模型
-class SimpleModel(nn.Module):
-    def __init__(self):
-        super(SimpleModel, self).__init__()
-        self.fc1 = nn.Linear(10, 5)
-        self.fc2 = nn.Linear(5, 2)
+# # 定义一个简单的模型
+# class SimpleModel(nn.Module):
+#     def __init__(self):
+#         super(SimpleModel, self).__init__()
+#         self.fc1 = nn.Linear(10, 5)
+#         self.fc2 = nn.Linear(5, 2)
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+#     def forward(self, x):
+#         x = F.relu(self.fc1(x))
+#         x = self.fc2(x)
+#         return x
 
-# 创建模型实例
-model = SimpleModel()
+# # 创建模型实例
+# model = SimpleModel()
 
-# 创建数据和目标
-x = torch.randn(1, 10, requires_grad=True)
-y = torch.tensor([1], dtype=torch.long)
+# # 创建数据和目标
+# x = torch.randn(1, 10, requires_grad=True)
+# y = torch.tensor([1], dtype=torch.long)
 
-# 前向传播
-output = model(x)
+# # 前向传播
+# output = model(x)
 
-# 计算损失
-criterion = nn.CrossEntropyLoss()
-loss = criterion(output, y)
+# # 计算损失
+# criterion = nn.CrossEntropyLoss()
+# loss = criterion(output, y)
 
-# 第一次反向传播，保留计算图
-loss.backward(retain_graph=True)
+# # 第一次反向传播，保留计算图
+# loss.backward(retain_graph=True)
 
-# 打印第一次梯度
-print("First-order gradients:")
-for name, param in model.named_parameters():
-    if param.grad is not None:
-        print(f"{name}: {param.grad}")
+# # 打印第一次梯度
+# print("First-order gradients:")
+# for name, param in model.named_parameters():
+#     if param.grad is not None:
+#         print(f"{name}: {param.grad}")
 
-# 假设我们需要计算Hessian矩阵的近似，进行第二次反向传播
-# 这里只是一个示例，实际上计算Hessian需要更复杂的步骤
-hessian_vector_product = torch.autograd.grad(
-    outputs=output,
-    inputs=x,
-    grad_outputs=torch.ones_like(output),
-    create_graph=True,
-    retain_graph=True
-)[0]
+# # 假设我们需要计算Hessian矩阵的近似，进行第二次反向传播
+# # 这里只是一个示例，实际上计算Hessian需要更复杂的步骤
+# hessian_vector_product = torch.autograd.grad(
+#     outputs=output,
+#     inputs=x,
+#     grad_outputs=torch.ones_like(output),
+#     create_graph=True,
+#     retain_graph=True
+# )[0]
 
-# 打印Hessian向量乘积的结果
-print("\nHessian-vector product:")
-print(hessian_vector_product)
+# # 打印Hessian向量乘积的结果
+# print("\nHessian-vector product:")
+# print(hessian_vector_product)
 
-# 清理不再需要的计算图
-del hessian_vector_product
+# # 清理不再需要的计算图
+# del hessian_vector_product
 
-# 进行第二次反向传播，如果需要
-loss.backward()
+# # 进行第二次反向传播，如果需要
+# loss.backward()
 
-# 打印第二次梯度
-print("Second-order gradients:")
-for name, param in model.named_parameters():
-    if param.grad is not None:
-        print(f"{name}: {param.grad}")
+# # 打印第二次梯度
+# print("Second-order gradients:")
+# for name, param in model.named_parameters():
+#     if param.grad is not None:
+#         print(f"{name}: {param.grad}")
+
+# class GradientRescaleFunction(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, input, weight):
+#         ctx.save_for_backward(input)
+#         ctx.gd_scale_weight = weight
+#         output = input
+#         return output
+    
+#     @staticmethod
+#     def backward(ctx, grad_output):
+#         input = ctx.saved_tensors
+#         grad_input = grad_weight = None
+#         if ctx.needs_input_grad[0]:
+#             grad_input = ctx.gd_scale_weight * grad_output
+#         return grad_input, grad_weight
+
+
+# gradient_rescale = GradientRescaleFunction.apply
+
+# x = torch.tensor([1,2,3], dtype=torch.float, requires_grad=True)
+# z = x*x
+# # z = gradient_rescale(z, 0.5)
+# l = torch.sum(z)
+# l.backward()
+# print(x.grad)
+
+import torch
+
+# 一个包含PyTorch张量的元组
+tensors = (torch.tensor(1), torch.tensor(2), torch.tensor(3), torch.tensor(4))
+
+# 求和
+total = sum(tensors)  # 直接使用sum，因为PyTorch重载了sum函数
+
+print(total)  # 输出: tensor(10)

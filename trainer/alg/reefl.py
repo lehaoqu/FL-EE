@@ -28,20 +28,23 @@ class Client(BaseClient):
                 batch = {}
                 for key in data.keys():
                     batch[key] = data[key].to(self.device)
-                label = batch['labels']
+                label = batch['labels'].view(-1)
                 
-                # == ce loss ==
-                ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(**batch)
-                ce_loss = self.policy.train(self.model, batch, label.view(-1))
+                # TODO 1  
+                if idx % 1 == 0 and self.policy.name == 'l2w':
+                    self.policy.train_meta(self.model, batch, label, self.optim)
 
-                # == kd loss ==    
+                exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                ce_loss = sum(exits_ce_loss)
+                
+                teacher_index = torch.argmin(torch.stack(exits_ce_loss))
+                teacher_logits = exits_logits[teacher_index]
+                
                 kd_loss = torch.zeros(1).to(self.device)
-                for i, teacher_logits in enumerate(exit_logits):
-                    for j, student_logits in enumerate(exit_logits):
-                        if i == j: continue
-                        else: 
-                            kd_loss += kd_loss_func(student_logits, teacher_logits) / (len(exit_logits)-1)
+                for i, student_logits in enumerate(exits_logits):
+                    if i == teacher_index: continue
+                    else: 
+                        kd_loss += kd_loss_func(student_logits, teacher_logits.detach())
                 loss = ce_loss + kd_loss
                 loss.backward()
                 self.optim.step()

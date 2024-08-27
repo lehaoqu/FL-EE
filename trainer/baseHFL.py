@@ -41,9 +41,9 @@ class BaseClient:
              'weight_decay_rate': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
         ]
-        # self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
+        self.optim = torch.optim.AdamW(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08)
         
-        self.optim = torch.optim.SGD(params=self.model.parameters())
+        # self.optim = torch.optim.SGD(params=self.model.parameters(), momentum=0.9, weight_decay=1e-4)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
@@ -75,39 +75,23 @@ class BaseClient:
     def train(self):
         # === train ===
         batch_loss = []
-        if self.policy.name != 'l2w':
-            for epoch in range(self.epoch):
-                for idx, data in enumerate(self.loader_train):
-                    self.optim.zero_grad()
-                    batch = {}
-                    for key in data.keys():
-                        batch[key] = data[key].to(self.device)
-                    label = batch['labels'].view(-1)
-
-                    ce_loss = torch.zeros(1).to(self.device)
-                    ce_loss, _ = self.policy.train(self.model, batch, label)
-                    ce_loss.backward()
-                    self.optim.step()
-                    batch_loss.append(ce_loss.detach().cpu().item())
-        else:
-            for epoch in range(self.epoch):
-                for idx, data in enumerate(self.loader_train):
-                    print(f'{idx}'.center(80, '='))
-                    batch = {}
-                    for key in data.keys():
-                        batch[key] = data[key].to(self.device)
-                    label = batch['labels'].view(-1)
-                    # TODO 1  
-                    if idx % 1 == 0:
-                        self.policy.train_meta(self.model, batch, label, self.optim)
-
-                        self.optim.zero_grad()
-                        ce_loss, _ = self.policy.train(self.model, batch, label)
-                        ce_loss.backward()
-                        self.optim.step()
-                        batch_loss.append(ce_loss.detach().cpu().item())
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                self.optim.zero_grad()
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                label = batch['labels'].view(-1)
                 
+                if idx % 2 == 0 and self.policy.name == 'l2w':
+                    self.policy.train_meta(self.model, batch, label, self.optim)
 
+                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
+                ce_loss = sum(exits_ce_loss)
+                ce_loss.backward()
+                self.optim.step()
+                batch_loss.append(ce_loss.detach().cpu().item())
+        
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
 
@@ -120,6 +104,7 @@ class BaseClient:
         self.model.eval()
         correct = 0
         total = 0
+        corrects = [0 for _ in range(self.exits_num)]
 
         with torch.no_grad():
             for data in self.loader_valid:
@@ -131,19 +116,21 @@ class BaseClient:
                 exits_logits = self.model(**batch)
                 exits_logits = self.policy(exits_logits)
                 
-                for exit_logits in exits_logits:
+                for i, exit_logits in enumerate(exits_logits):
                     _, predicted = torch.max(exit_logits, 1)
                     total += labels.size(0)
                     correct += (predicted == labels).sum().item()
+                    corrects[i] += (predicted == labels).sum().item()
         acc = 100.00 * correct / total
-
+        acc_exits = [100 * c / (total/len(self.exits_num)) for c in corrects]
+        self.metric['acc_exits'] = acc_exits
         self.metric['acc'].append(acc)
 
     def reset_optimizer(self, decay=True):
         if not decay:
             return
-        # self.scheduler.step()
-        self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)))
+        self.scheduler.step()
+        # self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)), momentum=0.9, weight_decay=1e-4)
 
 
 class BaseServer:
@@ -175,6 +162,7 @@ class BaseServer:
         self.metric = {
             'acc': DataProcessor(),
             'loss': DataProcessor(),
+            'acc_exits': []
         }
         
         # == ratio of each classes for each eq ==  
@@ -261,16 +249,20 @@ class BaseServer:
             client.local_valid()
 
             self.metric['acc'].append(c_metric['acc'].last())
+            self.metric['acc_exits'].append(c_metric['acc_exits'])
         return self.analyse_metric()
 
     def analyse_metric(self):
         acc = self.metric['acc'].avg()
         loss = self.metric['loss'].avg()
         std = self.metric['acc'].std()
+        acc_exits = [sum(col) / len(col) for col in zip(*self.metric['acc_exits'])]
 
         self.metric['acc'].clear()
         self.metric['loss'].clear()
+        self.metric['acc_exits'].clear()
 
         return {'loss': loss,
                 'acc': acc,
-                'std': std}
+                'std': std,
+                'acc_exits': acc_exits}

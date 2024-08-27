@@ -130,8 +130,13 @@ class Policy():
             weight = weight - torch.mean(weight, 1 ,keepdim=True) 
             # TODO 0.8
             weight = torch.ones(weight.shape).to(weight.device) + 0.8 * weight
-        loss = torch.sum(torch.mean(weight*losses, 0))
-        return loss, exits_logits
+        
+        losses_tensor = torch.mean(weight*losses, 0)
+        losses_tuple = tuple(losses_tensor)
+        exits_loss = ()
+        for i, exit_loss in enumerate(losses_tuple) :
+            exits_loss += (exit_loss * ws[i],)
+        return exits_loss, exits_logits
     
     
     def train_meta(self, model, batch, label, optimizer):
@@ -220,7 +225,7 @@ class Policy():
         # print(meta_loss)
         meta_loss.backward()
         self.meta_optimizer.step()
-        # print(meta_loss)
+        print(meta_loss)
     
     def __call__(self, exits_logits):
         return exits_logits

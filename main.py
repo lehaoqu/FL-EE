@@ -28,17 +28,17 @@ class FedSim:
             os.makedirs(f'./{args.suffix}')
 
         output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.txt'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'
         self.output = open(output_path, 'a')
         result_path = f'./{args.suffix}/result_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.txt'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'
         # self.res_output = open(result_path, 'a')
         args.output = self.output
 
         self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.json'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.json'
         self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
 
         # === init pre-trainde model ===
         ratios = ()
@@ -92,11 +92,11 @@ class FedSim:
                 if ret_dict['acc'] > best_acc:
                     best_acc = ret_dict['acc']
                     best_rnd = rnd
-                    self.server.global_model.save_model(self.model_save_path)
+                self.server.global_model.save_model(self.model_save_path)
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')
-                self.output.write('server, accuracy: %.2f, ' % ret_dict['acc'])
+                self.output.write(f"server, accuracy: {ret_dict['acc']}, acc_exits: {ret_dict['acc_exits']}")
                 self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()
 
@@ -105,7 +105,7 @@ class FedSim:
         finally:
             acc_list = self.acc_processor.data
             np.save(f'./{self.args.suffix}/{self.args.alg}_{self.args.dataset}'
-                    f'_{self.args.model}_{self.args.total_num}c_{self.args.epoch}E_lr{args.lr}.npy',
+                    f'_{self.args.model}_{self.args.total_num}c_{self.args.epoch}E_lr{args.lr}_{args.policy}.npy',
                     np.array(acc_list))
             avg_count = 2
             acc_avg = np.mean(acc_list[-avg_count:]).item()

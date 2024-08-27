@@ -45,25 +45,20 @@ class Client(BaseClient):
                 label = batch['labels']
                 
                 # == ce loss ==
-                ce_loss = torch.zeros(1).to(self.device)
-                exit_logits = self.model(**batch)
-                exit_num = len(exit_logits)
-                ce_loss = self.policy.train(self.model, batch, label.view(-1), ws=[i+1 for i in range(exit_num)])
+                exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label.view(-1), ws=[i+1 for i in range(self.exits_num)])
+                ce_loss = sum(exits_ce_loss)
                 
                 # == kd loss ==    
                 kd_loss = torch.zeros(1).to(self.device)
-                teacher_logits = exit_logits[-1]
-                teacher_idx = exit_num-1
-                for student_idx, student_logits in enumerate(exit_logits):
+                teacher_logits = exits_logits[-1]
+                teacher_idx = self.exits_num-1
+                for student_idx, student_logits in enumerate(exits_logits):
                     if student_idx < teacher_idx:
-                        kd_loss += kd_loss_func(student_logits, teacher_logits) * (student_idx+1)
+                        kd_loss += kd_loss_func(student_logits, teacher_logits.detach()) * (student_idx+1)
                         
-                loss = 2*(ce_loss + kd_loss)/(exit_num*(exit_num+1))
+                loss = (ce_loss + kd_loss)/(self.exits_num*(self.exits_num+1))
                 
-                # for i, logits in enumerate(exit_logits):
-                #     ce_loss += self.loss_func(logits, label)
-                
-                # loss = ce_loss
+
                 loss.backward()
                 self.optim.step()
                 batch_loss.append(loss.detach().cpu().item())
