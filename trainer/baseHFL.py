@@ -209,6 +209,17 @@ class BaseServer:
             total_samples = sum(len(client.dataset_train) for client in clients)
             for client in clients:
                 client.submodel_weights[submodel_depth] = len(client.dataset_train) / total_samples
+                
+        self.sampled_eq_clients = {}
+        for eq_depth in self.eq_depths:
+            for client in self.sampled_clients:
+                if client.eq_depth == eq_depth:
+                    self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
+        
+        self.eq_num = {}
+        for eq_depth, clients in self.sampled_eq_clients.items():
+            total_samples = sum(len(client.dataset_train) for client in clients)
+            self.eq_num[eq_depth] = total_samples
         
     def downlink(self):
         assert (len(self.sampled_clients) > 0)

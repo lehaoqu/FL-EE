@@ -172,13 +172,16 @@ import time
 
 # print(total)  # 输出: tensor(10)
 
-class A(nn.Module):
-    def __init__(self,):
-        super(A, self).__init__()
-        self.l1 = nn.Linear(100, 384*128)
+# class A(nn.Module):
+#     def __init__(self,):
+#         super(A, self).__init__()
+#         self.l1 = nn.Linear(100, 384*128)
 
     
-a = A()
-a.to(0)
-time.sleep(100)
-        
+# a = A()
+# a.to(0)
+# time.sleep(100)
+t = torch.tensor([1, 2])
+q = torch.tensor([3, 4])
+a = (t, q)
+print(sum(a))

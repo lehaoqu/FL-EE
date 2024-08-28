@@ -249,6 +249,11 @@ class Policy():
         self.meta_optimizer.step()
         print(meta_loss)
     
+    
+    def train_all_logits(self, exits_logits):
+        return exits_logits
+
+
     def __call__(self, exits_logits):
         return exits_logits
         

@@ -8,8 +8,11 @@ from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
+    parser.add_argument('--sl', default=1, type=int)
+    parser.add_argument('--ls', default=0, type=int)
+    
     parser.add_argument('--kd_gap', default=5, type=int)
-    parser.add_argument('--kd_begin', default=10, type=int)
+    parser.add_argument('--kd_begin', default=40, type=int)
     parser.add_argument('--kd_lr', default=3e-4, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
@@ -19,10 +22,10 @@ def add_args(parser):
     
     parser.add_argument('--g_gap', default=5, type=int)
     parser.add_argument('--g_begin', default=10, type=int)
-    parser.add_argument('--g_alpha', default=1, type=float)
+    parser.add_argument('--g_alpha', default=3, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_lr', default=3e-4, type=float)
+    parser.add_argument('--g_lr', default=1e-4, type=float)
     parser.add_argument('--g_n_iters', default=10, type=int)
     parser.add_argument('--g_epochs', default=10, type=int)
     return parser
@@ -38,18 +41,6 @@ class Server(BaseServer):
         self.client_update()
         self.uplink()
         self.aggregate_train()
-        # if self.crt_epoch % 20 == 0 and self.crt_epoch > 0:
-        #     self.sample()
-        #     self.downlink()
-        #     self.client_update()
-        #     self.uplink()
-        #     self.aggregate_train()
-        # else:
-        #     BaseServer.sample(self)
-        #     BaseServer.downlink(self)
-        #     BaseServer.client_update(self)
-        #     BaseServer.uplink(self)
-        #     BaseServer.aggregate(self)
 
         self.crt_epoch += 1 
     
@@ -66,19 +57,25 @@ class Server(BaseServer):
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         
+        # == args ==
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
+        self.kd_lr, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
+        self.g_epochs, self.g_n_iters = args.g_epochs, args.g_n_iters
+        self.kd_epochs, self.kd_n_iters = args.kd_epochs, args.kd_n_iters
+        
         self.global_model = self.eq_model[max(self.eq_depths)]
         
         # == init eq_models' optimizer, lr_scheduler
         self.eq_model_train = {}
         for eq_depth, eq_model in self.eq_model.items():
-            param_optimizer = list(eq_model.named_parameters())
-            no_decay = ['bias', 'gamma', 'beta']
-            optimizer_grouped_parameters = [
-                {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
-                'weight_decay_rate': 0.01},
-                {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
-            ]
-            optimizer = AdamW(params=optimizer_grouped_parameters, lr=args.kd_lr, correct_bias=False)
+            # param_optimizer = list(eq_model.named_parameters())
+            # no_decay = ['bias', 'gamma', 'beta']
+            # optimizer_grouped_parameters = [
+            #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+            #     'weight_decay_rate': 0.01},
+            #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+            # ]
+            optimizer = torch.optim.Adam(params=eq_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
             self.eq_model_train[eq_depth] = (eq_model, optimizer, scheduler)
         
@@ -89,13 +86,6 @@ class Server(BaseServer):
         
         # == ce&kd loss for generator train ==
         self.ce_criterion = nn.CrossEntropyLoss()
-              
-        # == args ==
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
-        self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
-        
-        self.g_epochs, self.g_n_iters = args.g_epochs, args.g_n_iters
-        self.kd_epochs, self.kd_n_iters = args.kd_epochs, args.kd_n_iters
         
         # == generators ==
         # sl_generators[eq_depth][exit_indx] generate data for eq_depth's last exit to teach larger eq's exit_index-th exit
@@ -107,7 +97,7 @@ class Server(BaseServer):
                 for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
                     generator = Generator_CIFAR(args)
-                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
+                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j]  = (generator, optimizer, lr_scheduler)
                 self.sl_generators[eq_depth] = generators
@@ -146,6 +136,7 @@ class Server(BaseServer):
             # == aggregate for eq ==
             self.aggregate_aligned_layers(eq_depth)
             
+            if self.args.sl == 0: continue
             # == each KD arrow for specific eq ==
             # == small eq's last exit teach larger eq's deeper exits == 
             for s_exit, g in self.sl_generators[eq_depth].items():
@@ -166,15 +157,17 @@ class Server(BaseServer):
                         self.teach_next_model(self.kd_n_iters, g, eq_depth, t, s, s_exit, direction='sl')
                     s[2].step()
 
+        
         # == Third: large to small ==
         for i, eq_depth in enumerate(reversed(self.eq_depths)):
             if eq_depth == min(self.eq_depths): break
 
+            if self.args.ls == 0: continue
             # == each KD arrow for specific eq ==
             # == larger eq's deeper exits teach smaller eq's last exits ==
             for t_exit, g in self.ls_generators[eq_depth].items():
-                t = self.eq_model_train[reversed(self.eq_depths)[i]]
-                s = self.eq_model_train[reversed(self.eq_depths)[i+1]]
+                t = self.eq_model_train[list(reversed(self.eq_depths))[i]]
+                s = self.eq_model_train[list(reversed(self.eq_depths))[i+1]]
                  
                  # == train generator for each arrow ==
                 if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
@@ -283,7 +276,7 @@ class Server(BaseServer):
         
         CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
         
-        t_policy = self.eq_depths[t_eq]
+        t_policy = self.eq_policy[t_eq]
         
         generator: Generator= g[0]
         optimizer:torch.optim.optimizer = g[1]
@@ -337,8 +330,9 @@ class Server(BaseServer):
             elif direction == 'ls':
                 s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
-                t_logits = t_policy(t_model[gen_latent])[g_exit]
-                s_logits = s_policy(s_model[gen_latent])[-1]
+                
+                t_logits = t_policy(t_model(gen_latent))[g_exit]
+                s_logits = s_policy(s_model(gen_latent))[-1]
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
