@@ -3,7 +3,7 @@ import torch
 from trainer.baseHFL import BaseServer, BaseClient
 
 def add_args(parser):
-    return parser.parse_args()
+    return parser
 
 class Client(BaseClient):
     def run(self):

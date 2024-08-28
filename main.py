@@ -47,7 +47,7 @@ class FedSim:
         ranges_to_gropus = {int(args.total_num * ratio)-1 : group for (group, ratio) in enumerate(ratios)}
         # print(ranges_to_gropus)
         eq_model = {}
-        exits = (2,5,8,11) if args.alg != 'scalfl' else (3,6,9,11)
+        exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
         eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
         for depth in args.eq_depths:
             eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'), exits=eq_exits[depth])
@@ -92,11 +92,12 @@ class FedSim:
                 if ret_dict['acc'] > best_acc:
                     best_acc = ret_dict['acc']
                     best_rnd = rnd
-                self.server.global_model.save_model(self.model_save_path)
+                    self.server.global_model.save_model(self.model_save_path)
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')
-                self.output.write(f"server, accuracy: {ret_dict['acc']}, acc_exits: {ret_dict['acc_exits']}")
+                # acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
+                self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, loss: {ret_dict['loss']:.2f}, ")
                 self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()
 

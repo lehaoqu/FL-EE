@@ -66,7 +66,6 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             
         else:
             eq_config.num_hidden_layers = model_depth
-            exits = (2,5,8,11)
             
             eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=args.policy, alg=args.alg) 
             model = based_model.ExitModel(eq_exit_config)

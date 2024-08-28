@@ -4,6 +4,13 @@ import torch.nn.functional as F
 import copy
 import math
 
+def add_args(parser):
+    parser.add_argument('--meta_gap', type=int, default=5, help="meta gap")
+    parser.add_argument('--meta_lr', type=float, default=1e-4, help="meta lr")
+    parser.add_argument('--meta_weight_decay', type=float, default=1e-4, help="meta weight_decay")
+    parser.add_argument('--meta_p', type=int, default=15, help="meta valid p")
+    return parser
+
 class MetaSGD(torch.optim.SGD):
     def __init__(self, net, *args, **kwargs):
         super(MetaSGD, self).__init__(*args, **kwargs)
@@ -96,9 +103,8 @@ class Policy():
         self.meta_net = MLP_tanh(input_size=self.exits_num, output_size=self.exits_num).to(self.device)
         
         self.loss_func = nn.CrossEntropyLoss()
-        self.meta_optimizer = torch.optim.Adam(self.meta_net.parameters(), lr=1e-4, weight_decay=1e-4)
-        # TODO 15
-        self.target_probs = self.calc_target_probs()[15-1]
+        self.meta_optimizer = torch.optim.Adam(self.meta_net.parameters(), lr=args.meta_lr, weight_decay=args.meta_weight_decay)
+        self.target_probs = self.calc_target_probs()[args.meta_p-1]
         
 
     def calc_target_probs(self,):
@@ -118,6 +124,8 @@ class Policy():
         exits_logits = model(**batch)
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
 
+        ws = [1 for i in range(self.exits_num)] if ws is None else ws
+        
         for i, exit_logits in enumerate(exits_logits):
             loss_vector = F.cross_entropy(exit_logits, label, reduction='none')
             if i==0:
@@ -127,10 +135,11 @@ class Policy():
                 
         with torch.no_grad():
             weight = self.meta_net(losses)
-            weight = weight - torch.mean(weight, 1 ,keepdim=True) 
+            weight = weight - torch.mean(weight, 1, keepdim=True) 
             # TODO 0.8
             weight = torch.ones(weight.shape).to(weight.device) + 0.8 * weight
         
+        print(f'weight for exits: {weight[0]}')
         losses_tensor = torch.mean(weight*losses, 0)
         losses_tuple = tuple(losses_tensor)
         exits_loss = ()
@@ -170,7 +179,7 @@ class Policy():
                 pseudo_losses = torch.cat((pseudo_losses, pseudo_loss_vector.unsqueeze(1)), dim=1)
   
         pseudo_weight = self.meta_net(pseudo_losses.detach())
-        pseudo_weight = pseudo_weight - torch.mean(pseudo_weight, 1 ,keepdim=True) 
+        pseudo_weight = pseudo_weight - torch.mean(pseudo_weight, 1, keepdim=True) 
         # TODO 0.8
         pseudo_weight = torch.ones(pseudo_weight.shape).to(pseudo_weight.device) + 0.8 * pseudo_weight
         pseudo_loss_multi_exits = torch.sum(torch.mean(pseudo_weight * pseudo_losses, 0))
@@ -199,6 +208,10 @@ class Policy():
         # print(meta_outputs)
         used_index = []
         meta_loss = 0.0
+        
+        total = 0
+        correct = 0
+        
         for j in range(self.exits_num):
             with torch.no_grad():
                 confidence_target = F.softmax(meta_outputs[j], dim=1)  
@@ -219,8 +232,17 @@ class Policy():
                     filter_set = set(used_index)
                     selected_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
             if len(selected_index) > 0:
+                
+                exit_logits = meta_outputs[j][selected_index]
+                labels = label_meta[selected_index].long()
+                _, predicted = torch.max(exit_logits, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                
                 meta_loss += F.cross_entropy(meta_outputs[j][selected_index], label_meta[selected_index].long(), reduction='mean')
 
+        print(f'{100*correct/(total):.2f}, {correct}, {total}')
+        
         self.meta_optimizer.zero_grad()
         # print(meta_loss)
         meta_loss.backward()

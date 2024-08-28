@@ -41,10 +41,10 @@ class BaseClient:
              'weight_decay_rate': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
         ]
-        self.optim = torch.optim.AdamW(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08)
+        # self.optim = torch.optim.AdamW(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08)
         
-        # self.optim = torch.optim.SGD(params=self.model.parameters(), momentum=0.9, weight_decay=1e-4)
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
+        self.optim = torch.optim.SGD(params=self.model.parameters(), momentum=0.9, weight_decay=1e-4, lr=self.lr)
+        # self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
             'acc': DataProcessor(),
@@ -83,7 +83,7 @@ class BaseClient:
                     batch[key] = data[key].to(self.device)
                 label = batch['labels'].view(-1)
                 
-                if idx % 2 == 0 and self.policy.name == 'l2w':
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                     self.policy.train_meta(self.model, batch, label, self.optim)
 
                 exits_ce_loss, _ = self.policy.train(self.model, batch, label)
@@ -122,15 +122,15 @@ class BaseClient:
                     correct += (predicted == labels).sum().item()
                     corrects[i] += (predicted == labels).sum().item()
         acc = 100.00 * correct / total
-        acc_exits = [100 * c / (total/len(self.exits_num)) for c in corrects]
+        acc_exits = [100 * c / (total/self.exits_num) for c in corrects]
         self.metric['acc_exits'] = acc_exits
         self.metric['acc'].append(acc)
 
     def reset_optimizer(self, decay=True):
         if not decay:
             return
-        self.scheduler.step()
-        # self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)), momentum=0.9, weight_decay=1e-4)
+        # self.scheduler.step()
+        self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)), momentum=0.9, weight_decay=1e-4)
 
 
 class BaseServer:

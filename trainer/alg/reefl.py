@@ -4,7 +4,7 @@ import torch.nn as nn
 from trainer.baseHFL import BaseServer, BaseClient
 
 def add_args(parser):
-    return parser.parse_args()
+    return parser
 
 class Client(BaseClient):
     def run(self):
@@ -30,8 +30,7 @@ class Client(BaseClient):
                     batch[key] = data[key].to(self.device)
                 label = batch['labels'].view(-1)
                 
-                # TODO 1  
-                if idx % 1 == 0 and self.policy.name == 'l2w':
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                     self.policy.train_meta(self.model, batch, label, self.optim)
 
                 exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)

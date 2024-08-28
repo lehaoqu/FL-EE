@@ -162,11 +162,23 @@ import torch.nn.functional as F
 # print(x.grad)
 
 import torch
+import time
 
-# 一个包含PyTorch张量的元组
-tensors = (torch.tensor(1), torch.tensor(2), torch.tensor(3), torch.tensor(4))
+# # 一个包含PyTorch张量的元组
+# tensors = (torch.tensor(1), torch.tensor(2), torch.tensor(3), torch.tensor(4))
 
-# 求和
-total = sum(tensors)  # 直接使用sum，因为PyTorch重载了sum函数
+# # 求和
+# total = sum(tensors)  # 直接使用sum，因为PyTorch重载了sum函数
 
-print(total)  # 输出: tensor(10)
+# print(total)  # 输出: tensor(10)
+
+class A(nn.Module):
+    def __init__(self,):
+        super(A, self).__init__()
+        self.l1 = nn.Linear(100, 384*128)
+
+    
+a = A()
+a.to(0)
+time.sleep(100)
+        

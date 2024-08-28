@@ -8,7 +8,7 @@ from trainer.baseHFL import BaseServer, BaseClient
 from utils.train_utils import crop_tensor_dimensions
 
 def add_args(parser):
-    return parser.parse_args()
+    return parser
 
 class Client(BaseClient):
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -43,6 +43,9 @@ class Client(BaseClient):
                 for key in data.keys():
                     batch[key] = data[key].to(self.device)
                 label = batch['labels']
+                
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                    self.policy.train_meta(self.model, batch, label, self.optim)
                 
                 # == ce loss ==
                 exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label.view(-1), ws=[i+1 for i in range(self.exits_num)])

@@ -9,7 +9,7 @@ from utils.modelload.model import BaseModule
 from utils.train_utils import get_layer_idx
 
 def add_args(parser):
-    return parser.parse_args()
+    return parser
 
 class Client(BaseClient):
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):

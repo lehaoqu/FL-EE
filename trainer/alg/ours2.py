@@ -26,7 +26,7 @@ def add_args(parser):
     parser.add_argument('--g_lr', default=3e-4, type=float)
     parser.add_argument('--g_n_iters', default=10, type=int)
     parser.add_argument('--g_epochs', default=10, type=int)
-    return parser.parse_args()
+    return parser
 
 class Client(BaseClient):
     def run(self):

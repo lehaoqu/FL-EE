@@ -6,7 +6,9 @@ md=bert
 cp=models/google-bert/bert-base-uncased
 
 
-python main.py depthfl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 --config_path $cp
-python main.py scalefl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 --config_path $cp
-python main.py inclusivefl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 --config_path $cp
-python main.py exclusivefl --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 --config_path $cp
+python main.py reefl $4 --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 
+python main.py depthfl $4 --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 
+python main.py scalefl $4 --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 
+python main.py inclusivefl $4 --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 
+python main.py exclusivefl $4 --suffix $1 --device $2 --dataset $dts --model $md --sr $sr --total_num $total_num --lr $3 
+

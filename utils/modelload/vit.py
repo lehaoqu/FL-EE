@@ -98,7 +98,7 @@ class ViTExitLayer(nn.Module):
         self.output = ViTOutput(config)
         self.layernorm_before = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.layernorm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) if self.exit else None
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
     def forward(
         self,
@@ -184,8 +184,6 @@ class ViTExitEncoderRee(nn.Module):
     def __init__(self, config: ExitConfig) -> None:
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([ViTLayer(config) for _ in range(config.num_hidden_layers)])
-        self.gradient_checkpointing = False
         # TODO more accurate ree config
         self.accumulator = Ree(
             recurrent_steps=1,
@@ -195,6 +193,9 @@ class ViTExitEncoderRee(nn.Module):
             num_classes=100,
             adapter=None,
         )
+        self.layer = nn.ModuleList([ViTLayer(config) for _ in range(config.num_hidden_layers)])
+        self.gradient_checkpointing = False
+
 
     def forward(
         self,
@@ -221,7 +222,8 @@ class ViTExitEncoderRee(nn.Module):
             mod_tokens = self.accumulator(exit_cls_tokens)
             _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
             # 记录每个exit的logits  exits_num * (batch*label_nums)
-            all_ree_exit_outputs += (_outputs, )
+            if i in self.config.exits:
+                all_ree_exit_outputs += (_outputs, )
             # transformer hidden_status更新
             layer_outputs = layer_module(hidden_states, layer_head_mask, output_attentions)
 

@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from typing import *
 
+def add_args(parser):
+    return parser
 
 class Policy():
     def __init__(self, args):

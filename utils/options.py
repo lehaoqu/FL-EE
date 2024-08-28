@@ -8,6 +8,9 @@ def args_parser():
 
     # ===== Method Setting ======
     parser.add_argument('alg', type=str, default='fedavg')
+    # ===== train-test mismatch Policy =====
+    parser.add_argument('policy', type=str, default='base', help="early exit train-test mismatch policy")
+    
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--config_path', type=str, default='models/facebook/deit-small-patch16-224')
@@ -32,8 +35,6 @@ def args_parser():
     parser.add_argument('--lag_level', type=int, default=3, help="Lag level used to simulate latency of device")
     parser.add_argument('--lag_rate', type=float, default=0.3, help="Proportion of stale device")
 
-    # ===== train-test mismatch Policy =====
-    parser.add_argument('--policy', type=str, default='base', help="early exit train-test mismatch policy")
 
     # ===== Other Setting =====
     # Asynchronous aggregation
@@ -46,5 +47,9 @@ def args_parser():
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]
+    spec_policy = sys.argv[2]
     trainer_module = importlib.import_module(f'trainer.alg.{spec_alg}')
-    return trainer_module.add_args(parser)
+    policy_module = importlib.import_module(f'trainer.policy.{spec_policy}')
+    parser = trainer_module.add_args(parser)
+    parser = policy_module.add_args(parser)
+    return parser.parse_args()

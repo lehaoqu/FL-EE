@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import math
+import importlib
 
 from tqdm import tqdm
 
@@ -21,7 +22,7 @@ class Eval():
         self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, need_process=True)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
-
+        
         
     def eval(self, model_path, config_path):
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
@@ -81,6 +82,11 @@ class Tester(object):
         self.model = model
         self.softmax = nn.Softmax(dim=-1).to(self.device)
         self.n_exits = args.n_exits
+        
+        args.exits_num = self.n_exits
+        args.policy = self.model.config.policy
+        policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
+        self.policy = policy_module.Policy(args)
     
     def calc_logtis(self, dataloader):
         self.model.eval()
@@ -93,7 +99,7 @@ class Tester(object):
             y = batch['labels'].view(-1)
             all_sample_targets.append(y)
             with torch.no_grad():
-                exits_logits = self.model(**batch)
+                exits_logits = self.policy(self.model(**batch))
                 for i, exit_logits in enumerate(exits_logits):
                     _t = self.softmax(exit_logits)
                     all_sample_exits_logits[i].append(_t)
@@ -187,4 +193,5 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        eval.eval(model_path+'.pth', model_path+'.json')
+        if 'l2w' in model_path:
+            eval.eval(model_path+'.pth', model_path+'.json')
