@@ -280,7 +280,6 @@ class Server(BaseServer):
         
         generator: Generator= g[0]
         optimizer:torch.optim.optimizer = g[1]
-        lr_scheduler = g[2]
 
         generator.train()
         t_model.eval()
