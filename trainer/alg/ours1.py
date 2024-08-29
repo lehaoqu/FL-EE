@@ -9,25 +9,25 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
     parser.add_argument('--sl', default=1, type=int)
-    parser.add_argument('--ls', default=0, type=int)
+    parser.add_argument('--ls', default=1, type=int)
     
-    parser.add_argument('--kd_gap', default=5, type=int)
-    parser.add_argument('--kd_begin', default=40, type=int)
+    parser.add_argument('--kd_gap', default=1, type=int)
+    parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=3e-4, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
-    parser.add_argument('--kd_epochs', default=10, type=int)
+    parser.add_argument('--kd_n_iters', default=10, type=int)
+    parser.add_argument('--kd_epochs', default=1, type=int)
     
-    parser.add_argument('--g_gap', default=5, type=int)
-    parser.add_argument('--g_begin', default=10, type=int)
-    parser.add_argument('--g_alpha', default=3, type=float)
+    parser.add_argument('--g_gap', default=1, type=int)
+    parser.add_argument('--g_begin', default=0, type=int)
+    parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-4, type=float)
     parser.add_argument('--g_n_iters', default=10, type=int)
-    parser.add_argument('--g_epochs', default=10, type=int)
+    parser.add_argument('--g_epochs', default=1, type=int)
     return parser
 
 class Client(BaseClient):
@@ -106,7 +106,7 @@ class Server(BaseServer):
         for i, eq_depth in enumerate(reversed(self.eq_depths)):
             if eq_depth != min(self.eq_depths):
                 generators = {}
-                smaller_eq_depth = self.eq_depths[i-1]
+                smaller_eq_depth = list(reversed(self.eq_depths))[i+1]
                 for j in range(len(self.eq_exits[smaller_eq_depth])-1, len(self.eq_exits[eq_depth])):
                     generator = Generator_CIFAR(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
@@ -238,8 +238,8 @@ class Server(BaseServer):
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
                 # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
                 
-                t_logits = t_policy(t_model(gen_latent))[-1]
-                s_logits = s_policy.train_all_logits(s_model(gen_latent))[g_exit]
+                t_logits = t_model(gen_latent)[-1]
+                s_logits = s_model(gen_latent, stop_exit=g_exit)
                 
                 dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
@@ -254,8 +254,8 @@ class Server(BaseServer):
             elif direction == 'ls':
                 s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
-                t_logits = t_policy(t_model(gen_latent))[g_exit]
-                s_logits = s_policy(s_model(gen_latent))[-1]
+                t_logits = t_model(gen_latent, stop_exit=g_exit)
+                s_logits = s_model(gen_latent)[-1]
                 
                 kd_loss = self.kd_criterion(s_logits, t_logits)
                 
@@ -310,7 +310,7 @@ class Server(BaseServer):
                 for end_exit in self.sl_generators[t_eq].keys():
                     if end_exit == g_exit: continue
                     # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_policy(s_model(gen_latent))[end_exit]
+                    logits = s_model(gen_latent, stop_exit=end_exit)
                     all_other_logits += (logits, )
                     
                 # == ensemble_logits for student exits [batch * hidden_size]
@@ -318,7 +318,7 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy(t_model(gen_latent))[-1]
+                t_logits = t_model(gen_latent)[-1]
                 
                 # == kd_loss for G ==
                 kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
@@ -330,8 +330,8 @@ class Server(BaseServer):
                 s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
                 
-                t_logits = t_policy(t_model(gen_latent))[g_exit]
-                s_logits = s_policy(s_model(gen_latent))[-1]
+                t_logits = t_model(gen_latent, stop_exit=g_exit)
+                s_logits = s_model(gen_latent)[-1]
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
@@ -348,29 +348,29 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
     
             
-    def sample(self):
-        self.sampled_eq_clients = {}
+    # def sample(self):
+    #     self.sampled_eq_clients = {}
         
-        sample_num = int(self.sample_rate * self.client_num)
+    #     sample_num = int(self.sample_rate * self.client_num)
         
-        check_all_depths_sampled = {}
-        while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
-            check_all_depths_sampled.clear()
-            self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
-            for client in self.sampled_clients:
-                check_all_depths_sampled[client.eq_depth] = 1
+    #     check_all_depths_sampled = {}
+    #     while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
+    #         check_all_depths_sampled.clear()
+    #         self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
+    #         for client in self.sampled_clients:
+    #             check_all_depths_sampled[client.eq_depth] = 1
 
-        for eq_depth in self.eq_depths:
-            for client in self.sampled_clients:
-                if client.eq_depth == eq_depth:
-                    self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
+    #     for eq_depth in self.eq_depths:
+    #         for client in self.sampled_clients:
+    #             if client.eq_depth == eq_depth:
+    #                 self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
         
-        self.eq_num = {}
-        for eq_depth, clients in self.sampled_eq_clients.items():
-            total_samples = sum(len(client.dataset_train) for client in clients)
-            self.eq_num[eq_depth] = total_samples
-            for client in clients:
-                client.weight = len(client.dataset_train) / total_samples
+    #     self.eq_num = {}
+    #     for eq_depth, clients in self.sampled_eq_clients.items():
+    #         total_samples = sum(len(client.dataset_train) for client in clients)
+    #         self.eq_num[eq_depth] = total_samples
+    #         for client in clients:
+    #             client.weight = len(client.dataset_train) / total_samples
    
                 
     def downlink(self):

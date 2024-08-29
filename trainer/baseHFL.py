@@ -220,6 +220,9 @@ class BaseServer:
         for eq_depth, clients in self.sampled_eq_clients.items():
             total_samples = sum(len(client.dataset_train) for client in clients)
             self.eq_num[eq_depth] = total_samples
+            for client in clients:
+                client.weight = len(client.dataset_train) / total_samples
+   
         
     def downlink(self):
         assert (len(self.sampled_clients) > 0)

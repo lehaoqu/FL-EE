@@ -8,24 +8,24 @@ from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
-    parser.add_argument('--kd_gap', default=5, type=int)
-    parser.add_argument('--kd_begin', default=30, type=int)
-    parser.add_argument('--kd_lr', default=3e-4, type=float)
+    parser.add_argument('--kd_gap', default=1, type=int)
+    parser.add_argument('--kd_begin', default=0, type=int)
+    parser.add_argument('--kd_lr', default=1e-4, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
     parser.add_argument('--kd_n_iters', default=10, type=int)
-    parser.add_argument('--kd_epochs', default=10, type=int)
+    parser.add_argument('--kd_epochs', default=1, type=int)
     
-    parser.add_argument('--g_gap', default=5, type=int)
+    parser.add_argument('--g_gap', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_alpha', default=3, type=float)
+    parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-4, type=float)
     parser.add_argument('--g_n_iters', default=10, type=int)
-    parser.add_argument('--g_epochs', default=10, type=int)
+    parser.add_argument('--g_epochs', default=1, type=int)
     return parser
 
 class Client(BaseClient):
@@ -108,7 +108,6 @@ class Server(BaseServer):
         # == train generators ==
         for exit_idx, g in enumerate(self.generators):
             print(f'============{exit_idx}============')
-            if exit_idx != 0: continue
             for i in range(self.g_epochs):
                 self.update_generator(g, exit_idx, self.g_n_iters)
             g[2].step()
@@ -140,9 +139,8 @@ class Server(BaseServer):
 
             # == ensemble logits for attend eq's
             attend_logits = ()
-            attend_eq = [3]
             for eq_depth in attend_eq:
-                attend_logits += (self.eq_policy[eq_depth](self.eq_model[eq_depth](gen_latent))[exit_idx] * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
             attend_logits = sum(attend_logits)
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
@@ -152,7 +150,7 @@ class Server(BaseServer):
                 former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
                 former_attend_logits = ()
                 for eq_depth in former_attend_eq:
-                    former_attend_logits += (self.eq_policy[eq_depth](self.eq_model[eq_depth](gen_latent))[exit_idx-1] * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
+                    former_attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
                 kd_loss = self.g_eta*self.kd_criterion(attend_logits, former_attend_logits.detach())
@@ -203,11 +201,11 @@ class Server(BaseServer):
                     # == data ==
                     gen_latent, eps = gs[t_exit][0](y_input, )
 
-                    s_logits = self.eq_policy[max(self.eq_depths)].train_all_logits(self.global_model(gen_latent))[s_exit]
+                    s_logits = self.global_model(gen_latent, stop_exit=s_exit)
                     
                     attend_logits = ()
                     for eq_depth in attend_eq:
-                        attend_logits += (self.eq_policy[eq_depth](self.eq_model[eq_depth](gen_latent))[t_exit] * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                        attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=t_exit) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
                     attend_logits = sum(attend_logits)
                     
                     if t_exit >= s_exit:
@@ -220,3 +218,26 @@ class Server(BaseServer):
             self.global_optimizers[s_exit].step()
         
         print(f'Loss: {Loss/n_iters}')
+
+
+    def uplink(self):
+        assert (len(self.sampled_clients) > 0)
+        self.received_params_eq = {}
+        for idx, eq_depth in enumerate(self.eq_depths):
+            self.received_params_eq[eq_depth] = [client.weight * client.model.parameters_to_tensor() for client in self.sampled_eq_clients[eq_depth]]
+
+        self.received_params = ()
+        for idx, submodel_depth in enumerate(self.eq_depths):
+            self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
+                                for client in self.sampled_submodel_clients[submodel_depth]],)
+        
+    def aggregate(self):
+        assert (len(self.sampled_clients) > 0)
+        
+        for eq_depth in self.eq_depths:
+            self.eq_model[eq_depth].tensor_to_parameters(sum(self.received_params_eq[eq_depth]))
+            
+        avg_eq_tensor = [sum(eq_tensors) for eq_tensors in self.received_params]
+        avg_tensor = torch.cat(avg_eq_tensor, 0)
+        self.global_model.tensor_to_parameters(avg_tensor)
+        

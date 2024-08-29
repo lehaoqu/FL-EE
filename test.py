@@ -181,7 +181,13 @@ import time
 # a = A()
 # a.to(0)
 # time.sleep(100)
-t = torch.tensor([1, 2])
-q = torch.tensor([3, 4])
-a = (t, q)
-print(sum(a))
+# t = torch.tensor([1, 2])
+# q = torch.tensor([3, 4])
+# a = (t, q)
+# print(sum(a))
+
+hidden_states = torch.rand(12,13,14)
+a = torch.rand(12,13,14)
+print(hidden_states)
+a[:, 0] = hidden_states[:, 0]
+print(a)
