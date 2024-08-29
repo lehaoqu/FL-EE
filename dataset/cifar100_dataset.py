@@ -59,7 +59,7 @@ class CIFARClassificationDataset(Dataset):
                 self.transform_for_vit()
             else:
                 # TODO data fine_labels
-                self.ann[b'data'] = [torch.tensor(row, dtype=torch.float64) for row in self.ann[b'data']]
+                self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
                 self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]
             
         self.pixel_values = self.ann[b'data']
