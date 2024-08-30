@@ -186,8 +186,23 @@ import time
 # a = (t, q)
 # print(sum(a))
 
-hidden_states = torch.rand(12,13,14)
-a = torch.rand(12,13,14)
-print(hidden_states)
-a[:, 0] = hidden_states[:, 0]
-print(a)
+# hidden_states = torch.rand(12,13,14)
+# a = torch.rand(12,13,14)
+# print(hidden_states)
+# a[:, 0] = hidden_states[:, 0]
+# print(a)
+
+class A(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.liner = nn.Linear(5, 1)
+    
+    def forward(self, x):
+        return self.liner(x)
+
+x = torch.tensor([1.,2.,3.,4.,5.], dtype=torch.float32)
+a = A()
+
+y = a(x)
+y.backward()
+print(x.grad)

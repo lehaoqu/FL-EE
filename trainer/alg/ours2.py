@@ -77,8 +77,8 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizers = [torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False) for _ in range(len(self.eq_exits[max(self.eq_depths)]))]
-        self.global_schedulers = [torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizers[exit_idx], gamma=args.gamma) for exit_idx in range(len(self.eq_exits[max(self.eq_depths)]))]
+        self.global_optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+        self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=args.gamma)
         
         # == relation KD loss for small to large ==
         self.dist_criterion = RkdDistance()
@@ -153,7 +153,7 @@ class Server(BaseServer):
                     former_attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
-                kd_loss = self.g_eta*self.kd_criterion(attend_logits, former_attend_logits.detach())
+                kd_loss = self.g_eta*self.kd_criterion(attend_logits, former_attend_logits)
             
             loss = ce_loss + div_loss - kd_loss
             loss.backward()
@@ -175,47 +175,44 @@ class Server(BaseServer):
             eq_model.eval() 
         self.global_model.train()
         
-        for exit_idx in range(len(self.eq_exits[max(self.eq_depths)])):
-            print(f'============{exit_idx}============')
-            for i in range(self.kd_epochs):
-                self.teach_global_model(self.generators, exit_idx, self.kd_n_iters)
-            self.global_schedulers[exit_idx].step()
+        self.teach_global_model(self.generators, self.kd_n_iters)
+        self.global_scheduler.step()
     
     
-    def teach_global_model(self, gs, s_exit, n_iters):
-        
-        t_exits = (s_exit-1, s_exit, s_exit+1)
+    def teach_global_model(self, gs, n_iters):
         Loss = 0.0
         for _ in range(n_iters):
-            self.global_optimizers[s_exit].zero_grad()
-            
-            loss = torch.zeros(1).to(self.device)
-            for t_exit in t_exits:
-                if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
-                    # == new y based y_distribute ==
-                    attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
-                    y_distribute = [sum(column) for column in zip(*[[y*self.eq_num[eq] for y in self.eq_y[eq]] for eq in attend_eq])]
-                    y_distribute = [y/sum(y_distribute) for y in y_distribute]
-                    y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
-                    
-                    # == data ==
-                    gen_latent, eps = gs[t_exit][0](y_input, )
+            for s_exit in range(len(self.eq_exits[max(self.eq_depths)])):
+                t_exits = (s_exit-1, s_exit, s_exit+1)
+                self.global_optimizer.zero_grad()
+                
+                loss = torch.zeros(1).to(self.device)
+                for t_exit in t_exits:
+                    if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
+                        # == new y based y_distribute ==
+                        attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
+                        y_distribute = [sum(column) for column in zip(*[[y*self.eq_num[eq] for y in self.eq_y[eq]] for eq in attend_eq])]
+                        y_distribute = [y/sum(y_distribute) for y in y_distribute]
+                        y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
+                        
+                        # == data ==
+                        gen_latent, eps = gs[t_exit][0](y_input, )
 
-                    s_logits = self.global_model(gen_latent, stop_exit=s_exit)
-                    
-                    attend_logits = ()
-                    for eq_depth in attend_eq:
-                        attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=t_exit) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
-                    attend_logits = sum(attend_logits)
-                    
-                    if t_exit >= s_exit:
-                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, attend_logits)
-                    else:
-                        loss += self.kd_dist_ratio*self.dist_criterion(s_logits, attend_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, attend_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, attend_logits)
-            
+                        s_logits = self.global_model(gen_latent, stop_exit=s_exit)
+                        
+                        attend_logits = ()
+                        for eq_depth in attend_eq:
+                            attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=t_exit) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                        attend_logits = sum(attend_logits)
+                        
+                        if t_exit >= s_exit:
+                            loss += self.kd_response_ratio*self.kd_criterion(s_logits, attend_logits)
+                        else:
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_logits, attend_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, attend_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, attend_logits)
+                
             loss.backward()
             Loss += loss.detach().cpu().item()
-            self.global_optimizers[s_exit].step()
+            self.global_optimizer.step()
         
         print(f'Loss: {Loss/n_iters}')
 

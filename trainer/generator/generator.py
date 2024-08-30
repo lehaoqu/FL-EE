@@ -53,6 +53,7 @@ class Generator(nn.Module):
         z = self.representation_layer(z)
         return z, eps
 
+
 class DiversityLoss(nn.Module):
     """
     Diversity loss for improving the performance.
