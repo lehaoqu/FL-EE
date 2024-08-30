@@ -161,11 +161,13 @@ class ViTExitEncoder(nn.Module):
                 layer_head_mask = head_mask[i] if head_mask is not None else None
                 layer_outputs = layer_module(hidden_states, layer_head_mask)
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+                if layer_module.exit:
+                    exits_logits += (exit_logits,)
                 if i == self.config.exits[stop_exit]: break
-            return exit_logits
+            return exits_logits
         
         
-        if latent is None:
+        elif latent is None:
             for i, layer_module in enumerate(self.layer):
                 layer_head_mask = head_mask[i] if head_mask is not None else None
                 layer_outputs = layer_module(hidden_states, layer_head_mask)
@@ -185,8 +187,9 @@ class ViTExitEncoder(nn.Module):
             for layer_module in layers:
                 layer_outputs = layer_module(hidden_states, None)
                 hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
-            
-            return exit_logits
+                if layer_module.exit:
+                    exits_logits += (exit_logits,)
+            return exits_logits
 
 
 class ViTExitEncoderRee(nn.Module):
@@ -286,7 +289,7 @@ class ViTExitModel(ViTPreTrainedModel):
             return encoder_outputs
         
         
-        if latent is None:
+        elif latent is None:
         
             head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
@@ -346,7 +349,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
             return outputs
         
         
-        if latent is None:
+        elif latent is None:
             outputs = self.vit(
                 pixel_values,
                 head_mask=head_mask,
