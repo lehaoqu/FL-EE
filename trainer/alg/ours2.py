@@ -8,6 +8,8 @@ from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
+    parser.add_argument('--is_latent', default=False, type=bool)
+    
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=1e-4, type=float)
@@ -88,10 +90,11 @@ class Server(BaseServer):
         # == ce&kd loss for generator train ==
         self.ce_criterion = nn.CrossEntropyLoss()
         
+        self.is_latent = args.is_latent
         # == train for generators (each exit has a generator) ==
         self.generators = []
         for i in range(len(self.eq_exits[max(self.eq_depths)])):
-            generator = Generator_CIFAR(args)
+            generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
             self.generators.append((generator, optimizer, lr_scheduler))
@@ -140,7 +143,7 @@ class Server(BaseServer):
             # == ensemble logits for attend eq's
             attend_logits = ()
             for eq_depth in attend_eq:
-                attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
             attend_logits = sum(attend_logits)
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
@@ -150,7 +153,7 @@ class Server(BaseServer):
                 former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
                 former_attend_logits = ()
                 for eq_depth in former_attend_eq:
-                    former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
+                    former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
                 kd_loss = self.g_eta*self.kd_criterion(attend_logits, former_attend_logits)
@@ -198,11 +201,11 @@ class Server(BaseServer):
                         # == data ==
                         gen_latent, eps = gs[t_exit][0](y_input, )
 
-                        s_logits = self.eq_policy[max(self.eq_depths)].sf(self.global_model(gen_latent, stop_exit=s_exit))
+                        s_logits = self.eq_policy[max(self.eq_depths)].sf(self.global_model(gen_latent, stop_exit=s_exit, is_latent=self.is_latent))
                         
                         attend_logits = ()
                         for eq_depth in attend_eq:
-                            attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=t_exit)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                            attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=t_exit, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
                         attend_logits = sum(attend_logits)
                         
                         if t_exit >= s_exit:

@@ -8,6 +8,8 @@ from trainer.generator.generator import Generator, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
+    parser.add_argument('--is_latent', default=False, type=bool)
+    
     parser.add_argument('--sl', default=1, type=int)
     parser.add_argument('--ls', default=1, type=int)
     
@@ -87,6 +89,7 @@ class Server(BaseServer):
         # == ce&kd loss for generator train ==
         self.ce_criterion = nn.CrossEntropyLoss()
         
+        self.is_latent = args.is_latent
         # == generators ==
         # sl_generators[eq_depth][exit_indx] generate data for eq_depth's last exit to teach larger eq's exit_index-th exit
         self.sl_generators = {}
@@ -96,7 +99,7 @@ class Server(BaseServer):
                 larger_eq_depth = self.eq_depths[i+1]
                 for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
-                    generator = Generator_CIFAR(args)
+                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j]  = (generator, optimizer, lr_scheduler)
@@ -243,8 +246,8 @@ class Server(BaseServer):
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
                 # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
                 
-                t_logits = t_policy.sf(t_model(gen_latent))
-                s_logits = s_policy.sf(s_model(gen_latent, stop_exit=g_exit))
+                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
+                s_logits = s_policy.sf(s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
                 
                 dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
@@ -257,8 +260,8 @@ class Server(BaseServer):
                 loss = dist_loss + angle_loss + dark_loss
             
             elif direction == 'ls':
-                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit))
-                s_logits = s_policy.sf(s_model(gen_latent))
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+                s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
                 
                 kd_loss = self.kd_criterion(s_logits, t_logits)
                 
@@ -314,7 +317,7 @@ class Server(BaseServer):
                 for end_exit in self.sl_generators[t_eq].keys():
                     if end_exit == g_exit: continue
                     # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit))
+                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit, is_latent=self.is_latent))
                     all_other_logits += (logits, )
                     
                 # == ensemble_logits for student exits [batch * hidden_size]
@@ -322,7 +325,7 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy.sf(t_model(gen_latent))
+                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
                 
                 # == kd_loss for G ==
                 kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
@@ -334,8 +337,8 @@ class Server(BaseServer):
                 s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
                 
-                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit))
-                s_logits = s_policy.sf(s_model(gen_latent))
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+                s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))

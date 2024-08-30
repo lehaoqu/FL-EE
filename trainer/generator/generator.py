@@ -12,7 +12,9 @@ class Generator(nn.Module):
         self.device = args.device
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
-        self.hidden_dim, self.latent_dim, self.n_class, self.noise_dim = 500, 197*384, 100, 100
+        self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 197, 384, 100, 100
+        self.latent_dim = self.token_num * self.hidden_rs
+        
         input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
@@ -51,7 +53,7 @@ class Generator(nn.Module):
         for layer in self.fc_layers:
             z = layer(z)
         z = self.representation_layer(z)
-        return z, eps
+        return z.view(batch_size, self.token_num, self.hidden_rs), eps
 
 
 class DiversityLoss(nn.Module):

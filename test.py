@@ -194,15 +194,18 @@ import time
 
 from trainer.generator.generator import Generator_CIFAR
 
-g = Generator_CIFAR()
-g.train()
-g.to(2)
-op = torch.optim.Adam(g.parameters(), lr=1e-4, betas=(0.9, 0.99))
+# g = Generator_CIFAR()
+# g.train()
+# g.to(2)
+# op = torch.optim.Adam(g.parameters(), lr=1e-4, betas=(0.9, 0.99))
 
-for _ in range(1000):
-    y = torch.randint(0, 100, (32,)).to(2)
-    gen_latent, eps = g(y, )
-    loss = g.diversity_loss(eps, gen_latent)
-    loss.backward()
-    print(loss.item())
-    op.step()
+# for _ in range(1000):
+#     y = torch.randint(0, 100, (32,)).to(2)
+#     gen_latent, eps = g(y, )
+#     loss = g.diversity_loss(eps, gen_latent)
+#     loss.backward()
+#     print(loss.item())
+#     op.step()
+
+a = (torch.tensor([10, 20]), )
+print(sum(a[:-1]))

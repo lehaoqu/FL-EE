@@ -43,6 +43,9 @@ class Policy():
     
     # == for finetune in server == 
     def sf(self, exits_logits):
-        former_ensemble = torch.sum(exits_logits[:-1])
-        pred_final = exits_logits[-1] + former_ensemble.detach()
+        if len(exits_logits) > 1:
+            former_ensemble = sum(exits_logits[:-1])
+            pred_final = exits_logits[-1] + former_ensemble.detach()
+        else:
+            pred_final = exits_logits[0]
         return pred_final
