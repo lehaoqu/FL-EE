@@ -140,7 +140,7 @@ class Server(BaseServer):
             # == ensemble logits for attend eq's
             attend_logits = ()
             for eq_depth in attend_eq:
-                attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
             attend_logits = sum(attend_logits)
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
@@ -150,7 +150,7 @@ class Server(BaseServer):
                 former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
                 former_attend_logits = ()
                 for eq_depth in former_attend_eq:
-                    former_attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
+                    former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
                 kd_loss = self.g_eta*self.kd_criterion(attend_logits, former_attend_logits)
@@ -198,11 +198,11 @@ class Server(BaseServer):
                         # == data ==
                         gen_latent, eps = gs[t_exit][0](y_input, )
 
-                        s_logits = self.global_model(gen_latent, stop_exit=s_exit)
+                        s_logits = self.eq_policy[max(self.eq_depths)].sf(self.global_model(gen_latent, stop_exit=s_exit))
                         
                         attend_logits = ()
                         for eq_depth in attend_eq:
-                            attend_logits += (self.eq_model[eq_depth](gen_latent, stop_exit=t_exit) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                            attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=t_exit)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
                         attend_logits = sum(attend_logits)
                         
                         if t_exit >= s_exit:

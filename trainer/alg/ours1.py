@@ -140,21 +140,23 @@ class Server(BaseServer):
             # == each KD arrow for specific eq ==
             # == small eq's last exit teach larger eq's deeper exits == 
             for s_exit, g in self.sl_generators[eq_depth].items():
-                t = self.eq_model_train[self.eq_depths[i]]
-                s = self.eq_model_train[self.eq_depths[i+1]]
                 
+                t_eq = self.eq_depths[i]
+                s_eq = self.eq_depths[i+1]
+                t = self.eq_model_train[t_eq]
+                s = self.eq_model_train[s_eq]
                 # == train generator for each arrow ==
                 if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
                     print("=================")
                     print(eq_depth, s_exit)
                     for _ in range(self.g_epochs):
-                        self.update_generator(self.g_n_iters, g, eq_depth, t[0], s[0], s_exit, direction='sl')
+                        self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], s_exit, direction='sl')
                     g[2].step()
 
                 # == small eq's last exit teach larger eq's deeper exit == 
                 if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                     for _ in range(self.kd_epochs):
-                        self.teach_next_model(self.kd_n_iters, g, eq_depth, t, s, s_exit, direction='sl')
+                        self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, s_exit, direction='sl')
                     s[2].step()
 
         
@@ -166,20 +168,22 @@ class Server(BaseServer):
             # == each KD arrow for specific eq ==
             # == larger eq's deeper exits teach smaller eq's last exits ==
             for t_exit, g in self.ls_generators[eq_depth].items():
-                t = self.eq_model_train[list(reversed(self.eq_depths))[i]]
-                s = self.eq_model_train[list(reversed(self.eq_depths))[i+1]]
+                t_eq = list(reversed(self.eq_depths))[i]
+                s_eq = list(reversed(self.eq_depths))[i+1]
+                t = self.eq_model_train[t_eq]
+                s = self.eq_model_train[s_eq]
                  
                  # == train generator for each arrow ==
                 if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
                      print("================")
                      print(eq_depth, t_exit)
                      for _ in range(self.g_epochs):
-                         self.update_generator(self.g_n_iters, g, eq_depth, t[0], s[0], t_exit, direction='ls')
+                         self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], t_exit, direction='ls')
                 
                 # == large eq's deeper exits teach smaller eq's last exit ==
                 if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                     for _ in range(self.kd_epochs):
-                        self.teach_next_model(self.kd_n_iters, g, eq_depth, t, s, t_exit, direction='ls')
+                        self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, t_exit, direction='ls')
             
 
     def aggregate_aligned_layers(self, eq_depth):
@@ -206,10 +210,11 @@ class Server(BaseServer):
             self.eq_model[depth].tensor_to_parameters(tensor, layers=aligned_layers)
     
     
-    def teach_next_model(self, n_iters, g, t_eq, t, s, g_exit, direction='sl'):
+    def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, direction='sl'):
         DIST_LOSS, ANGLE_LOSS, DARK_LOSS, KD_LOSS = 0, 0, 0, 0
 
         t_policy = self.eq_policy[t_eq]
+        s_policy = self.eq_policy[s_eq]
                 
         generator, t_model, s_model, s_optimizer, s_scheduler = g[0], t[0], s[0], s[1], s[2]
 
@@ -238,8 +243,8 @@ class Server(BaseServer):
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
                 # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
                 
-                t_logits = t_model(gen_latent)[-1]
-                s_logits = s_model(gen_latent, stop_exit=g_exit)
+                t_logits = t_policy.sf(t_model(gen_latent))
+                s_logits = s_policy.sf(s_model(gen_latent, stop_exit=g_exit))
                 
                 dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
@@ -252,10 +257,8 @@ class Server(BaseServer):
                 loss = dist_loss + angle_loss + dark_loss
             
             elif direction == 'ls':
-                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
-                
-                t_logits = t_model(gen_latent, stop_exit=g_exit)
-                s_logits = s_model(gen_latent)[-1]
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit))
+                s_logits = s_policy.sf(s_model(gen_latent))
                 
                 kd_loss = self.kd_criterion(s_logits, t_logits)
                 
@@ -272,11 +275,12 @@ class Server(BaseServer):
             print(f'kd_loss:{KD_LOSS/n_iters}')
         
     
-    def update_generator(self, n_iters, g, t_eq, t_model, s_model, g_exit, direction='sl'):        
+    def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, direction='sl'):        
         
         CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
         
         t_policy = self.eq_policy[t_eq]
+        s_policy = self.eq_policy[s_eq]
         
         generator: Generator= g[0]
         optimizer:torch.optim.optimizer = g[1]
@@ -310,7 +314,7 @@ class Server(BaseServer):
                 for end_exit in self.sl_generators[t_eq].keys():
                     if end_exit == g_exit: continue
                     # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_model(gen_latent, stop_exit=end_exit)
+                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit))
                     all_other_logits += (logits, )
                     
                 # == ensemble_logits for student exits [batch * hidden_size]
@@ -318,7 +322,7 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_model(gen_latent)[-1]
+                t_logits = t_policy.sf(t_model(gen_latent))
                 
                 # == kd_loss for G ==
                 kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
@@ -330,8 +334,8 @@ class Server(BaseServer):
                 s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
                 
                 
-                t_logits = t_model(gen_latent, stop_exit=g_exit)
-                s_logits = s_model(gen_latent)[-1]
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit))
+                s_logits = s_policy.sf(s_model(gen_latent))
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))

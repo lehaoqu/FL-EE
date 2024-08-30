@@ -32,4 +32,4 @@ class Policy():
     
     # == for finetune in server == 
     def sf(self, exits_logits):
-        return exits_logits
+        return exits_logits[-1]

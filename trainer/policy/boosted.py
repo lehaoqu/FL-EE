@@ -43,13 +43,6 @@ class Policy():
     
     # == for finetune in server == 
     def sf(self, exits_logits):
-        pred_ensembels = [torch.zeros(1).to(self.device)]
-        for i, logits in enumerate(exits_logits):
-            tmp = logits + pred_ensembels[-1]
-            pred_ensembels.append(tmp)
-        
-        preds_final = ()
-        for i, logits in enumerate(exits_logits):
-            pred_ensembel = pred_ensembels[i].detach()
-            preds_final += (pred_ensembel + logits,)
-        return preds_final
+        former_ensemble = torch.sum(exits_logits[:-1])
+        pred_final = exits_logits[-1] + former_ensemble.detach()
+        return pred_final
