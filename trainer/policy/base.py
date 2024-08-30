@@ -26,8 +26,10 @@ class Policy():
             exits_loss += (self.loss_func(exit_logits, label) * ws[i],)
         return exits_loss, exits_logits
 
-    def train_all_logits(self, exits_logits):
-        return exits_logits
 
     def __call__(self, exits_logits):
+        return exits_logits
+    
+    # == for finetune in server == 
+    def sf(self, exits_logits):
         return exits_logits

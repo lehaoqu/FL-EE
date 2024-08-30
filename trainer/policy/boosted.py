@@ -40,3 +40,16 @@ class Policy():
             pred_ensembels.append(tmp)
         ensemble_exits_logits = [pred_ensembels[i+1] for i in range(len(exits_logits))]
         return ensemble_exits_logits
+    
+    # == for finetune in server == 
+    def sf(self, exits_logits):
+        pred_ensembels = [torch.zeros(1).to(self.device)]
+        for i, logits in enumerate(exits_logits):
+            tmp = logits + pred_ensembels[-1]
+            pred_ensembels.append(tmp)
+        
+        preds_final = ()
+        for i, logits in enumerate(exits_logits):
+            pred_ensembel = pred_ensembels[i].detach()
+            preds_final += (pred_ensembel + logits,)
+        return preds_final

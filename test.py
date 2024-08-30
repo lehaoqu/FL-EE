@@ -192,17 +192,17 @@ import time
 # a[:, 0] = hidden_states[:, 0]
 # print(a)
 
-class A(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.liner = nn.Linear(5, 1)
-    
-    def forward(self, x):
-        return self.liner(x)
+from trainer.generator.generator import Generator_CIFAR
 
-x = torch.tensor([1.,2.,3.,4.,5.], dtype=torch.float32)
-a = A()
+g = Generator_CIFAR()
+g.train()
+g.to(2)
+op = torch.optim.Adam(g.parameters(), lr=1e-4, betas=(0.9, 0.99))
 
-y = a(x)
-y.backward()
-print(x.grad)
+for _ in range(1000):
+    y = torch.randint(0, 100, (32,)).to(2)
+    gen_latent, eps = g(y, )
+    loss = g.diversity_loss(eps, gen_latent)
+    loss.backward()
+    print(loss.item())
+    op.step()
