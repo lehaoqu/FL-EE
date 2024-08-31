@@ -353,35 +353,20 @@ class Server(BaseServer):
             optimizer.step()
         # lr_scheduler.step()
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
-    
-            
-    # def sample(self):
-    #     self.sampled_eq_clients = {}
-        
-    #     sample_num = int(self.sample_rate * self.client_num)
-        
-    #     check_all_depths_sampled = {}
-    #     while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
-    #         check_all_depths_sampled.clear()
-    #         self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
-    #         for client in self.sampled_clients:
-    #             check_all_depths_sampled[client.eq_depth] = 1
-
-    #     for eq_depth in self.eq_depths:
-    #         for client in self.sampled_clients:
-    #             if client.eq_depth == eq_depth:
-    #                 self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
-        
-    #     self.eq_num = {}
-    #     for eq_depth, clients in self.sampled_eq_clients.items():
-    #         total_samples = sum(len(client.dataset_train) for client in clients)
-    #         self.eq_num[eq_depth] = total_samples
-    #         for client in clients:
-    #             client.weight = len(client.dataset_train) / total_samples
-   
+       
                 
     def downlink(self):
         assert (len(self.sampled_clients) > 0)
         for client in self.sampled_clients:
             client.clone_model(self.eq_model[client.eq_depth])
     
+    def save_model(self, model_save_path, generator_save_path):
+        self.global_model.save_model(model_save_path)
+        
+        # TODO save sl & ls generators
+        # generator_save_path = '.'.join(generator_save_path.split('.')[:-1])
+        # for i, g in enumerate(self.generators):
+        #     g_model = g[0]
+        #     generator_save_path_i = f'{generator_save_path}_{i}.pth'
+        #     g_model.save_model(generator_save_path_i)
+        

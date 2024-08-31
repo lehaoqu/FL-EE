@@ -185,11 +185,11 @@ class Server(BaseServer):
     def teach_global_model(self, gs, n_iters):
         Loss = 0.0
         for _ in range(n_iters):
+            self.global_optimizer.zero_grad()
             for s_exit in range(len(self.eq_exits[max(self.eq_depths)])):
-                t_exits = (s_exit-1, s_exit, s_exit+1)
-                self.global_optimizer.zero_grad()
-                
                 loss = torch.zeros(1).to(self.device)
+                t_exits = (s_exit-1, s_exit, s_exit+1)
+                
                 for t_exit in t_exits:
                     if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
                         # == new y based y_distribute ==
@@ -213,8 +213,8 @@ class Server(BaseServer):
                         else:
                             loss += self.kd_dist_ratio*self.dist_criterion(s_logits, attend_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, attend_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, attend_logits)
                 
-            loss.backward()
-            Loss += loss.detach().cpu().item()
+                loss.backward()
+                Loss += loss.detach().cpu().item()
             self.global_optimizer.step()
         
         print(f'Loss: {Loss/n_iters}')
@@ -240,4 +240,13 @@ class Server(BaseServer):
         avg_eq_tensor = [sum(eq_tensors) for eq_tensors in self.received_params]
         avg_tensor = torch.cat(avg_eq_tensor, 0)
         self.global_model.tensor_to_parameters(avg_tensor)
+        
+    def save_model(self, model_save_path, generator_save_path):
+        self.global_model.save_model(model_save_path)
+        
+        generator_save_path = '.'.join(generator_save_path.split('.')[:-1])
+        for i, g in enumerate(self.generators):
+            g_model = g[0]
+            generator_save_path_i = f'{generator_save_path}_{i}.pth'
+            g_model.save_model(generator_save_path_i)
         

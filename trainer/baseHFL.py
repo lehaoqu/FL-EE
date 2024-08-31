@@ -280,3 +280,6 @@ class BaseServer:
                 'acc': acc,
                 'std': std,
                 'acc_exits': acc_exits}
+        
+    def save_model(self, model_save_path, generator_save_path):
+        self.global_model.save_model(model_save_path)

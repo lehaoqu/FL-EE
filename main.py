@@ -27,18 +27,30 @@ class FedSim:
         if not os.path.exists(f'./{args.suffix}'):
             os.makedirs(f'./{args.suffix}')
 
-        output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'
-        self.output = open(output_path, 'a')
         result_path = f'./{args.suffix}/result_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'
         # self.res_output = open(result_path, 'a')
-        args.output = self.output
+        
 
-        self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.json'
-        self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+        if 'ours' in args.alg:
+            self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.pth'
+            self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}_G.pth'
+            output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.txt'
+            self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.json'
+        else:
+            self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
+            output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'   
+            self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.json'    
+
+        self.output = open(output_path, 'a')
+        args.output = self.output
 
         # === init pre-trainde model ===
         ratios = ()
@@ -92,7 +104,9 @@ class FedSim:
                 if ret_dict['acc'] > best_acc:
                     best_acc = ret_dict['acc']
                     best_rnd = rnd
-                    self.server.global_model.save_model(self.model_save_path)
+                    self.server.save_model(self.model_save_path, self.generator_save_path)
+                    
+                    
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')

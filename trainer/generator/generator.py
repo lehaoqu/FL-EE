@@ -4,9 +4,10 @@ import torch.nn.functional as F
 import numpy as np
 
 from dataset.cifar100_dataset import CIFARClassificationDataset
+from utils.modelload.model import BaseModule
 
 
-class Generator(nn.Module):
+class Generator(BaseModule):
     def __init__(self, args, embedding=True):
         super(Generator, self).__init__()
         self.device = args.device
@@ -102,7 +103,7 @@ class DiversityLoss(nn.Module):
 
 
 
-class Generator_CIFAR(nn.Module):
+class Generator_CIFAR(BaseModule):
     def __init__(self, args, dataset='cifar100_dataset'):
         hidden_channel, output_channel, img_size, n_class, noise_dim= 64, 3, 32, 100, 100
         super(Generator_CIFAR, self).__init__()

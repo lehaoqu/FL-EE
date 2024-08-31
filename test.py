@@ -172,19 +172,26 @@ import time
 
 # print(total)  # 输出: tensor(10)
 
-# class A(nn.Module):
-#     def __init__(self,):
-#         super(A, self).__init__()
-#         self.l1 = nn.Linear(100, 384*128)
+class A(nn.Module):
+    def __init__(self,):
+        super(A, self).__init__()
+        self.l1 = nn.Linear(5,1)
 
+    def forward(self, x):
+        return self.l1(x)
     
-# a = A()
-# a.to(0)
-# time.sleep(100)
-# t = torch.tensor([1, 2])
-# q = torch.tensor([3, 4])
-# a = (t, q)
-# print(sum(a))
+a = A()
+t = torch.tensor([1, 2,3,4,5], dtype=torch.float32)
+y = a(t)
+y.backward()
+for n, p in a.named_parameters():
+    print(n, p.grad)
+q = torch.tensor([4,5,6,7,8], dtype=torch.float32)
+y = a(q)
+y.backward()
+for n, p in a.named_parameters():
+    print(n, p.grad)
+
 
 # hidden_states = torch.rand(12,13,14)
 # a = torch.rand(12,13,14)
@@ -207,5 +214,5 @@ from trainer.generator.generator import Generator_CIFAR
 #     print(loss.item())
 #     op.step()
 
-a = (torch.tensor([10, 20]), )
-print(sum(a[:-1]))
+# a = (torch.tensor([10, 20]), )
+# print(sum(a[:-1]))
