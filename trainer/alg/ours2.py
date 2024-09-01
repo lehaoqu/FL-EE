@@ -12,16 +12,16 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
     
-    parser.add_argument('--s_epoches', default=5, type=int)
+    parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
+    parser.add_argument('--kd_lr', default=1e-2, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
+    parser.add_argument('--kd_n_iters', default=10, type=int)
     
     
     parser.add_argument('--g_gap', default=1, type=int)

@@ -193,5 +193,5 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if 'depthfl' in model_path and 'base' in model_path:
+        if 'ours2' in model_path and 'base' in model_path and 'False' in model_path:
             eval.eval(model_path+'.pth', model_path+'.json')

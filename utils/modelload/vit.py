@@ -174,10 +174,16 @@ class ViTExitEncoderRee(nn.Module):
         self.accumulator = Ree(
             recurrent_steps=1,
             heads=8,
-            depth=1,
+            modulation=True,
+            exit_head='normlinear',
+            mode='add',
             base_model='small',
             num_classes=100,
             adapter=None,
+            depth=1,
+            attn_dim=16,
+            mlp_ratio=1.35,
+
         )
         self.layer = nn.ModuleList([ViTLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
@@ -188,6 +194,7 @@ class ViTExitEncoderRee(nn.Module):
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
+        stop_exit: Optional[int] = None
     ):
         
         cls_tokens = []
@@ -211,12 +218,14 @@ class ViTExitEncoderRee(nn.Module):
             if i in self.config.exits:
                 all_ree_exit_outputs += (_outputs, )
             
-            hidden_states[:, 0] = mod_tokens[:, 0]
+            hidden_states[:, 0] = mod_tokens[:, -1]
             
             # transformer hidden_status更新
             layer_outputs = layer_module(hidden_states, layer_head_mask, output_attentions)
 
             hidden_states = layer_outputs[0]
+            
+            if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
 
         return all_ree_exit_outputs
@@ -231,6 +240,7 @@ class ViTExitModel(ViTPreTrainedModel):
         self.embeddings = ViTEmbeddings(config, use_mask_token=use_mask_token)
         
         self.encoder = ViTExitEncoder(config) if self.config.alg != 'reefl' else ViTExitEncoderRee(config)
+        # self.encoder = ViTExitEncoder(config)
         # self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.pooler = ViTPooler(config) if add_pooling_layer else None
 
