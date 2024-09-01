@@ -137,6 +137,7 @@ class BaseServer:
     def __init__(self, id, args, dataset, clients:List[BaseClient], eq_model=None, global_model=None, eq_exits=None):
         # super().__init__(id, args, dataset)
         self.args = args
+        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
         self.eq_exits = eq_exits
         self.client_num = args.total_num
         self.sample_rate = args.sr
@@ -254,16 +255,37 @@ class BaseServer:
         self.global_model.tensor_to_parameters(avg_tensor)
 
     def valid_all(self):
+        self.global_model.eval()
+        correct = 0
+        total = 0
+        exit_num = len(self.eq_exits[max(self.eq_depths)])
+        corrects = [0 for _ in range(exit_num)]
+
+        with torch.no_grad():
+            for data in self.valid_dataloader:
+                batch = {}
+                for key in data.keys():
+                    batch[key] = data[key].to(self.device)
+                labels = batch['labels'].view(-1)
+                
+                exits_logits = self.global_model(**batch)
+                exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
+                
+                for i, exit_logits in enumerate(exits_logits):
+                    _, predicted = torch.max(exit_logits, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+                    corrects[i] += (predicted == labels).sum().item()
+        acc = 100.00 * correct / total
+        acc_exits = [100 * c / (total/exit_num) for c in corrects]
+        self.metric['acc'].append(acc)
+        self.metric['acc_exits'].append(acc_exits)
+        
         for client in self.clients:
             c_metric = client.metric
             if client in self.sampled_clients:
                 self.metric['loss'].append(c_metric['loss'].last())
 
-            client.clone_model(self.global_model)
-            client.local_valid()
-
-            self.metric['acc'].append(c_metric['acc'].last())
-            self.metric['acc_exits'].append(c_metric['acc_exits'])
         return self.analyse_metric()
 
     def analyse_metric(self):

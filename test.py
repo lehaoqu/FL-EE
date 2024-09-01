@@ -175,22 +175,29 @@ import time
 class A(nn.Module):
     def __init__(self,):
         super(A, self).__init__()
-        self.l1 = nn.Linear(5,1)
+        self.l1 = nn.Linear(5,2)
+        self.c1 = nn.Linear(2,1)
+        self.l2 = nn.Linear(2,2)
+        self.c2 = nn.Linear(2,1)
 
     def forward(self, x):
-        return self.l1(x)
+        z = self.l1(x)
+        c1 = self.c1(z)
+        z = self.l2(z)
+        c2 = self.c2(z)
+        return c1, c2
     
-a = A()
-t = torch.tensor([1, 2,3,4,5], dtype=torch.float32)
-y = a(t)
-y.backward()
-for n, p in a.named_parameters():
-    print(n, p.grad)
-q = torch.tensor([4,5,6,7,8], dtype=torch.float32)
-y = a(q)
-y.backward()
-for n, p in a.named_parameters():
-    print(n, p.grad)
+# a = A()
+# t = torch.tensor([1, 2,3,4,5], dtype=torch.float32)
+# y = a(t)
+# y.backward()
+# for n, p in a.named_parameters():
+#     print(n, p.grad)
+# q = torch.tensor([4,5,6,7,8], dtype=torch.float32)
+# y = a(q)
+# y.backward()
+# for n, p in a.named_parameters():
+#     print(n, p.grad)
 
 
 # hidden_states = torch.rand(12,13,14)
@@ -216,3 +223,16 @@ from trainer.generator.generator import Generator_CIFAR
 
 # a = (torch.tensor([10, 20]), )
 # print(sum(a[:-1]))
+
+x = torch.tensor([1,2,3,4,5], dtype=torch.float32)
+a = A()
+a.train()
+c1, c2 = a(x)
+
+c1.backward(retain_graph=True)
+for n, p in a.named_parameters():
+    print(n, p.grad)
+c2.backward()
+# print(x.grad)
+for n, p in a.named_parameters():
+    print(n, p.grad)

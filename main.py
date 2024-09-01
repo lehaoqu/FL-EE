@@ -44,6 +44,7 @@ class FedSim:
         else:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
+            self.generator_save_path = ''
             output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'   
             self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
