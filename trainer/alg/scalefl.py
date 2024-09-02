@@ -5,7 +5,7 @@ import copy
 from typing import *
 from functools import reduce
 from trainer.baseHFL import BaseServer, BaseClient
-from utils.train_utils import crop_tensor_dimensions
+from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 
 def add_args(parser):
     return parser
@@ -116,41 +116,7 @@ class Server(BaseServer):
                     
             # == horizontal ==
             for name, tensors in name_tensors.items():
-                aggregated_state_dict[name] = self.aggregate_scale_tensors(tensors, sample_list)
+                aggregated_state_dict[name] = aggregate_scale_tensors(tensors, sample_list, self.device)
                 
         self.global_model.load_state_dict(aggregated_state_dict)
     
-    def aggregate_scale_tensors(self, tensors, samples):
-        
-        def zero_pad(a, new_shape):
-            expanded_a = torch.zeros(new_shape, dtype=a.dtype).to(self.device)
-            start_indices = tuple(0 for _ in range(len(new_shape)))
-            end_indices = a.shape
-            index_tensor = tuple(slice(start, end) for start, end in zip(start_indices, end_indices))
-            expanded_a[index_tensor] = a
-            return expanded_a
-                
-        def get_size(tensor):
-            size = 1
-            for s in tensor.shape:
-                size *= s
-            return size
-        
-        weights = [torch.full(tensor.shape, sample).to(self.device) for (tensor, sample) in zip(tensors, samples)]
-        sizes = [get_size(tensor) for tensor in tensors]
-        max_shape = tensors[sizes.index(max(sizes))].shape
-        
-        global_tensor = torch.zeros(max_shape).to(self.device)
-        global_weight = torch.zeros(max_shape).to(self.device)
-        
-        for idx, tensor in enumerate(tensors):
-            weighted_tensor = tensor * weights[idx]
-            weighted_tensor = zero_pad(weighted_tensor, max_shape)
-            global_tensor += weighted_tensor
-            
-            weight = zero_pad(weights[idx], max_shape)
-            global_weight += weight
-        
-        global_tensor = global_tensor / global_weight
-        return global_tensor
-        

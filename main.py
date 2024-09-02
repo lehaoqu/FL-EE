@@ -60,12 +60,16 @@ class FedSim:
         ranges_to_gropus = {int(args.total_num * ratio)-1 : group for (group, ratio) in enumerate(ratios)}
         # print(ranges_to_gropus)
         eq_model = {}
-        exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
-        eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
-        for depth in args.eq_depths:
-            eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl'), exits=eq_exits[depth])
         
-        # == for scalefl ==
+        # == for scalefl & heterofl ==
+        exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
+        if args.alg != 'heterofl': eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
+        else: eq_exits = {eq_depth: exits for eq_depth in args.eq_depths}
+        
+        for depth in args.eq_depths:
+            eq_model[depth] = load_model(args, model_depth=depth, is_scalefl=(args.alg == 'scalefl' or args.alg == 'heterofl'), exits=eq_exits[depth])
+        
+        # == for scalefl & heterofl ==
         largest_model = eq_model[max(args.eq_depths)]
         args.origin_width = [largest_model.config.hidden_size, largest_model.config.intermediate_size]
         

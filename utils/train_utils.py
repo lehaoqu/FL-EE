@@ -118,6 +118,42 @@ def crop_tensor_dimensions(tensor, origin_target):
     return cropped_tensor
 
 
+def aggregate_scale_tensors(tensors, samples, device):
+        
+    def zero_pad(a, new_shape):
+        expanded_a = torch.zeros(new_shape, dtype=a.dtype).to(device)
+        start_indices = tuple(0 for _ in range(len(new_shape)))
+        end_indices = a.shape
+        index_tensor = tuple(slice(start, end) for start, end in zip(start_indices, end_indices))
+        expanded_a[index_tensor] = a
+        return expanded_a
+            
+    def get_size(tensor):
+        size = 1
+        for s in tensor.shape:
+            size *= s
+        return size
+    
+    weights = [torch.full(tensor.shape, sample).to(device) for (tensor, sample) in zip(tensors, samples)]
+    sizes = [get_size(tensor) for tensor in tensors]
+    max_shape = tensors[sizes.index(max(sizes))].shape
+    
+    global_tensor = torch.zeros(max_shape).to(device)
+    global_weight = torch.zeros(max_shape).to(device)
+    
+    for idx, tensor in enumerate(tensors):
+        weighted_tensor = tensor * weights[idx]
+        weighted_tensor = zero_pad(weighted_tensor, max_shape)
+        global_tensor += weighted_tensor
+        
+        weight = zero_pad(weights[idx], max_shape)
+        global_weight += weight
+    
+    global_tensor = global_tensor / global_weight
+    return global_tensor
+        
+
+
 # __all__ = ['L1Triplet', 'L2Triplet', 'ContrastiveLoss', 'RkdDistance', 'RKdAngle', 'HardDarkRank']
 
 

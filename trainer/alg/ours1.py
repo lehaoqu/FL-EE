@@ -17,11 +17,11 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-2, type=float)
+    parser.add_argument('--kd_lr', default=5e-2, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
-    parser.add_argument('--kd_angle_ratio', default=2, type=float)
+    parser.add_argument('--kd_angle_ratio', default=3, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=10, type=int)
+    parser.add_argument('--kd_n_iters', default=1, type=int)
     
     parser.add_argument('--g_gap', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
@@ -111,7 +111,7 @@ class Server(BaseServer):
                 generators = {}
                 smaller_eq_depth = list(reversed(self.eq_depths))[i+1]
                 for j in range(len(self.eq_exits[smaller_eq_depth])-1, len(self.eq_exits[eq_depth])):
-                    generator = Generator_CIFAR(args)
+                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j] = (generator, optimizer, lr_scheduler)
@@ -274,7 +274,7 @@ class Server(BaseServer):
                 
                 loss = kd_loss
             
-            loss.backward(retain_graph=True) if i < n_iters-1 else loss.backward()
+            loss.backward()
             s_optimizer.step()
         # s_scheduler.step()
         if direction == 'sl':

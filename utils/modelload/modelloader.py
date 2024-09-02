@@ -45,7 +45,11 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         num_labels = 100 if CIFAR100 in dataset_arg else 2
         
         if is_scalefl:
-            depth = min(12, model_depth+1)
+            if args.alg == 'heterofl':
+                depth = 12    
+            else:
+                depth = min(12, model_depth+1)
+            
             scale = math.sqrt(model_depth / depth)
             eq_config.num_hidden_layers = depth
             eq_config.hidden_size = int(eq_config.hidden_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
