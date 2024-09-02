@@ -236,24 +236,34 @@ from trainer.generator.generator import Generator_CIFAR
 # # print(x.grad)
 # for n, p in a.named_parameters():
 #     print(n, p.grad)
-
+import copy
 device = 'cpu'
-mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343]).to(device)
-std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404]).to(device)
-images = torch.randint(0, 256, (2, 3, 32, 32))
-images_reshaped = images.view(-1, 3, 32, 32) / 255
-a = torch.nn.functional.interpolate(images_reshaped, size=(224,224), mode='bilinear', align_corners=False)
+# mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343], dtype=torch.float32).to(device)
+# std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404], dtype=torch.float32).to(device)
+images = torch.randint(0, 256, (2, 3, 32, 32)).float()
+images = images.view(-1, 3, 32, 32) / 255
+clone = copy.deepcopy(images)
+# images_reshaped = images.view(-1, 3, 32, 32) / 255
+# a = torch.nn.functional.interpolate(images_reshaped, size=(224,224), mode='bilinear', align_corners=False)
 
 
-a = (a-mean.view(1,3,1,1))/std.view(1,3,1,1)
+# a = (a-mean.view(1,3,1,1))/std.view(1,3,1,1)
 
-print(a.shape)
+# print(a.shape)
 
 
 from torchvision import transforms
 import numpy as np
 
 transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.Normalize(
+            (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+            (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        ),
+    ])
+
+transform2 = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize((224, 224)),
         transforms.Normalize(
@@ -263,11 +273,18 @@ transform = transforms.Compose([
     ])
 
 
-images = images.numpy()
-images_reshaped = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)/255
-images_transformed = [transform(image_reshape) for image_reshape in images_reshaped]
-images_transformed = np.stack(images_transformed, axis=0, dtype=np.float32)
 
-print(a.numpy()-images_transformed)
-print(np.sum(a.numpy()-images_transformed))
+images_transformed = [transform(image) for image in images]
+images_transformed1 = np.stack(images_transformed, axis=0, dtype=np.float32)
+
+
+images = images.numpy()
+images = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)
+images_transformed = [transform2(image) for image in images]
+images_transformed2 = np.stack(images_transformed, axis=0, dtype=np.float32)
+
+
+# print(a.numpy()-images_transformed)
+# print(a.numpy())
+print(np.array_equal(images_transformed1, images_transformed2))
     

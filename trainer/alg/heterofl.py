@@ -13,8 +13,13 @@ class Client(BaseClient):
 class Server(BaseServer):
     def run(self):
         self.sample()
+        # print('sample')
         self.downlink()
+        # print('downlink')
         self.client_update()
+        # print('client_update')
         self.uplink()
+        # print('unlink')
         self.aggregate()
+        # print('aggregate')
         
