@@ -31,7 +31,7 @@ from sklearn.model_selection import train_test_split
 random.seed(1)
 np.random.seed(1)
 num_clients = 120
-dir_path = "cifar100-224-d03/"
+dir_path = "dataset/cifar100-224-d03/"
 train_ratio = 0.8
 
 # Allocate data to users
@@ -92,10 +92,13 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
     dataset_label = []
 
     dataset_image.extend(train_dataset.pixel_values)
-    # dataset_image.extend(validset.data.cpu().detach().numpy())
     dataset_label.extend(train_dataset.labels)
-    # dataset_label.extend(validset.targets.cpu().detach().numpy())
-    dataset_image = np.array(dataset_image)
+
+    first_shape = dataset_image[0].shape
+    all_same_shape = all(t.shape == first_shape for t in dataset_image[1:])
+    print("All tensors have the same shape:", all_same_shape)
+
+    dataset_image = np.array([t.numpy() for t in dataset_image])
     dataset_label = np.array(dataset_label)
     
 

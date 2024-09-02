@@ -194,11 +194,11 @@ def save_file(config_path, train_path, valid_path, train_data, valid_data, num_c
     print("Saving to disk.\n")
 
     for idx, train_dict in enumerate(train_data):
-        with open(train_path + str(idx) + '.npz', 'wb') as f:
-            np.savez_compressed(f, data=train_dict)
+        with open(train_path + str(idx) + '.pkl', 'wb') as f:
+            pickle.dump(train_dict, f)
     for idx, valid_dict in enumerate(valid_data):
-        with open(valid_path + str(idx) + '.npz', 'wb') as f:
-            np.savez_compressed(f, data=valid_dict)
+        with open(valid_path + str(idx) + '.pkl', 'wb') as f:
+            pickle.dump(valid_dict, f)
     with open(config_path, 'w') as f:
         ujson.dump(config, f)
 
@@ -215,7 +215,7 @@ def save_origin_file(path, set, set_len):
     
     dict = {'x': set.data.cpu().detach().numpy(), 'y': set.targets.cpu().detach().numpy()}
     
-    with open(path + '.npz', 'wb') as f:
+    with open(path + '.pkl', 'wb') as f:
         np.savez_compressed(f, data=dict)
         
 

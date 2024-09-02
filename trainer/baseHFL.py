@@ -8,6 +8,7 @@ import copy
 from typing import *
 
 from utils.dataloader_utils import load_dataset_loader
+from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.dataprocess import DataProcessor
 
 from utils.modelload.model import BaseModule
@@ -19,8 +20,8 @@ class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
         self.id = id
         self.args = args
-        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', id=id, need_process=False)
-        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', id=id, need_process=False)
+        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', id=id)
+        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', id=id)
         self.device = args.device
         self.exits = exits
         self.server = None
@@ -72,16 +73,23 @@ class BaseClient:
         raise NotImplementedError()
 
 
+    def adapt_batch(self, data):
+        batch = {}
+        for key in data.keys():
+            batch[key] = data[key].to(self.device)
+            if key == 'pixel_values':
+                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+        label = batch['labels'].view(-1)
+        return batch, label
+
     def train(self):
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                label = batch['labels'].view(-1)
+
+                batch, label = self.adapt_batch(data)
                 
                 if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                     self.policy.train_meta(self.model, batch, label, self.optim)
@@ -108,10 +116,7 @@ class BaseClient:
 
         with torch.no_grad():
             for data in self.loader_valid:
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                labels = batch['labels'].view(-1)
+                batch, labels = self.adapt_batch(data)
                 
                 exits_logits = self.model(**batch)
                 exits_logits = self.policy(exits_logits)
@@ -184,7 +189,15 @@ class BaseServer:
             policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
             policy = policy_module.Policy(args)
             self.eq_policy[eq_depth] = policy
-        
+    
+    def adapt_batch(self, data):
+        batch = {}
+        for key in data.keys():
+            batch[key] = data[key].to(self.device)
+            if key == 'pixel_values':
+                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+        label = batch['labels'].view(-1)
+        return batch, label
 
     def run(self):
         raise NotImplementedError()
@@ -263,10 +276,7 @@ class BaseServer:
 
         with torch.no_grad():
             for data in self.valid_dataloader:
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                labels = batch['labels'].view(-1)
+                batch, labels = self.adapt_batch(data)
                 
                 exits_logits = self.global_model(**batch)
                 exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)

@@ -15,7 +15,7 @@ class GLUEClassificationDataset(Dataset):
         self.path = path
         
         if eval_valids:
-            dict_all = [load_np(f'{path}{i}.npz') for i in range(args.total_num)]
+            dict_all = [load_np(f'{path}{i}.pkl') for i in range(args.total_num)]
             total_data = {}
             for key in dict_all[0].keys():
                 for dic in dict_all:

@@ -14,22 +14,38 @@ logger = logging.getLogger(__name__)
 
 class CIFARClassificationDataset(Dataset):
     
-    transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize((224, 224)),
-            transforms.Normalize(
-                (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
-                (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
-            ),
-        ])
+    # transform = transforms.Compose([
+    #         transforms.ToTensor(),
+    #         transforms.Resize((224, 224)),
+    #         transforms.Normalize(
+    #             (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+    #             (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+    #         ),
+    #     ])
     
 
-    def transform_for_vit(self):
-        images = self.ann[b'data']
-        images_reshaped = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)/255
-        images_transformed = [self.transform(image_reshape) for image_reshape in images_reshaped]
-        images_transformed = np.stack(images_transformed, axis=0, dtype=np.float32)
-        self.ann[b'data'] = images_transformed
+    # def transform_for_vit(self):
+    #     images = self.ann[b'data']
+    #     images_reshaped = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)/255
+    #     images_transformed = [self.transform(image_reshape) for image_reshape in images_reshaped]
+    #     images_transformed = np.stack(images_transformed, axis=0, dtype=np.float32)
+    #     self.ann[b'data'] = images_transformed
+        
+    
+
+
+    
+    
+    def transform_for_vit(images: torch.tensor):
+
+        device = images.device
+        mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343]).to(device)
+        std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404]).to(device)
+        
+        images_reshaped = images.view(-1, 3, 32, 32) / 255
+        imaged_transformed = torch.nn.functional.interpolate(images_reshaped, size=(224,224), mode='bilinear', align_corners=False)
+        return ((imaged_transformed-mean.view(1,3,1,1))/std.view(1,3,1,1)).float()
+    
     
     def generator_transform_tensor(images: torch.tensor):
         device = images.device
@@ -41,10 +57,10 @@ class CIFARClassificationDataset(Dataset):
         normalized_data = (upscaled_data - mean) / std
         return normalized_data
     
-    def __init__(self, args=None, path=None, valid_ratio=0.2, need_process=True, eval_valids=False):
+    def __init__(self, args=None, path=None, valid_ratio=0.2, eval_valids=False):
         self.path = path
         if eval_valids:
-            dict_all = [load_np(f'{path}{i}.npz') for i in range(args.total_num)]
+            dict_all = [load_pkl(f'{path}{i}.pkl') for i in range(args.total_num)]
             total_data = {}
             for key in dict_all[0].keys():
                 for dic in dict_all:
@@ -52,15 +68,11 @@ class CIFARClassificationDataset(Dataset):
             self.ann = total_data
             
         else:
-            self.ann = load_pkl(path) if need_process else load_np(path)
+            self.ann = load_pkl(path)
             valid_ratio = valid_ratio if args is None else args.valid_ratio
             
-            if need_process:    
-                self.transform_for_vit()
-            else:
-                # TODO data fine_labels
-                self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
-                self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]
+            self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
+            self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]
             
         self.pixel_values = self.ann[b'data']
         self.labels = self.ann[b'fine_labels']

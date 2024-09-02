@@ -13,8 +13,8 @@ class BaseClient:
     def __init__(self, id, args, dataset):
         self.id = id
         self.args = args
-        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', need_process=False)
-        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', need_process=False)
+        self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train')
+        self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid')
         self.device = args.device
         self.server = None
 

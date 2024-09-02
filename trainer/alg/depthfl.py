@@ -32,10 +32,7 @@ class Client(BaseClient):
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
-                batch = {}
-                for key in data.keys():
-                    batch[key] = data[key].to(self.device)
-                label = batch['labels'].view(-1)
+                batch, label = self.adapt_batch(data)
                 
                 # TODO 1  
                 if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:

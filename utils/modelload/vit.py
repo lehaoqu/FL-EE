@@ -203,27 +203,31 @@ class ViTExitEncoderRee(nn.Module):
         for i, layer_module in enumerate(self.layer):    
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
-
-            # TODO hidden_states需要修改，添加最开始的cls token
-            # 取出第位于0位置的 cls_tokens (batch*1*hidden_size)
+            
+            layer_outputs = layer_module(hidden_states, layer_head_mask, output_attentions)
+            hidden_states = layer_outputs[0]
             cls_token_batch = hidden_states[:, 0][:, None, :]
             cls_tokens.append(cls_token_batch)
-            # exit_cls_tokens是在1维上的cat (batch*exit_idx*hidden_size)
-            exit_cls_tokens = torch.cat((cls_tokens), 1)
+            mod_tokens = None
             
-            # print(f'exit_cls_tokens: {exit_cls_tokens.shape}')
-            mod_tokens = self.accumulator(exit_cls_tokens)
-            _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
-            # 记录每个exit的logits  exits_num * (batch*label_nums)
             if i in self.config.exits:
+                # TODO hidden_states需要修改，添加最开始的cls token
+                # 取出第位于0位置的 cls_tokens (batch*1*hidden_size)
+
+                # exit_cls_tokens是在1维上的cat (batch*exit_idx*hidden_size)
+                exit_cls_tokens = torch.cat((cls_tokens), 1)
+                
+                # print(f'exit_cls_tokens: {exit_cls_tokens.shape}')
+                mod_tokens = self.accumulator(exit_cls_tokens)
+                _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
+                # 记录每个exit的logits  exits_num * (batch*label_nums)
                 all_ree_exit_outputs += (_outputs, )
             
-            hidden_states[:, 0] = mod_tokens[:, -1]
-            
-            # transformer hidden_status更新
-            layer_outputs = layer_module(hidden_states, layer_head_mask, output_attentions)
-
-            hidden_states = layer_outputs[0]
+            if self.accumulator.modulation:
+                if mod_tokens is None:
+                    mod_tokens = self.accumulator(torch.cat((cls_tokens), 1))
+                    hidden_states[:, 0] = mod_tokens[:, -1]
+                        
             
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 

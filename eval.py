@@ -9,6 +9,7 @@ from tqdm import tqdm
 from utils.options import args_parser
 from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.modelloader import load_model_eval
+from dataset.cifar100_dataset import CIFARClassificationDataset
 
 
 
@@ -19,7 +20,7 @@ class Eval():
         self.device = args.device
         args.valid_ratio = 0.2
         self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
-        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, need_process=True)
+        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test')
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
         
@@ -88,15 +89,23 @@ class Tester(object):
         policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
         self.policy = policy_module.Policy(args)
     
+    def adapt_batch(self, data):
+        batch = {}
+        for key in data.keys():
+            batch[key] = data[key].to(self.device)
+            if key == 'pixel_values':
+                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+        label = batch['labels'].view(-1)
+        return batch, label
+    
+    
     def calc_logtis(self, dataloader):
         self.model.eval()
         all_sample_exits_logits = [[] for _ in range(self.n_exits)]
         all_sample_targets = []
-        for i, data in enumerate(dataloader):
-            batch = {}
-            for key in data.keys():
-               batch[key] = data[key].to(self.device)
-            y = batch['labels'].view(-1)
+        for i, data in enumerate(dataloader):           
+            batch, y = self.adapt_batch(data)
+            
             all_sample_targets.append(y)
             with torch.no_grad():
                 exits_logits = self.policy(self.model(**batch))

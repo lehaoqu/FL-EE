@@ -224,15 +224,50 @@ from trainer.generator.generator import Generator_CIFAR
 # a = (torch.tensor([10, 20]), )
 # print(sum(a[:-1]))
 
-x = torch.tensor([1,2,3,4,5], dtype=torch.float32)
-a = A()
-a.train()
-c1, c2 = a(x)
+# x = torch.tensor([1,2,3,4,5], dtype=torch.float32)
+# a = A()
+# a.train()
+# c1, c2 = a(x)
 
-c1.backward(retain_graph=True)
-for n, p in a.named_parameters():
-    print(n, p.grad)
-c2.backward()
-# print(x.grad)
-for n, p in a.named_parameters():
-    print(n, p.grad)
+# c1.backward(retain_graph=True)
+# for n, p in a.named_parameters():
+#     print(n, p.grad)
+# c2.backward()
+# # print(x.grad)
+# for n, p in a.named_parameters():
+#     print(n, p.grad)
+
+device = 'cpu'
+mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343]).to(device)
+std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404]).to(device)
+images = torch.randint(0, 256, (2, 3, 32, 32))
+images_reshaped = images.view(-1, 3, 32, 32) / 255
+a = torch.nn.functional.interpolate(images_reshaped, size=(224,224), mode='bilinear', align_corners=False)
+
+
+a = (a-mean.view(1,3,1,1))/std.view(1,3,1,1)
+
+print(a.shape)
+
+
+from torchvision import transforms
+import numpy as np
+
+transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize((224, 224)),
+        transforms.Normalize(
+            (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+            (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        ),
+    ])
+
+
+images = images.numpy()
+images_reshaped = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)/255
+images_transformed = [transform(image_reshape) for image_reshape in images_reshaped]
+images_transformed = np.stack(images_transformed, axis=0, dtype=np.float32)
+
+print(a.numpy()-images_transformed)
+print(np.sum(a.numpy()-images_transformed))
+    
