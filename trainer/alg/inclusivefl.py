@@ -130,7 +130,7 @@ class Server(BaseServer):
             # == is not smallest eq, attain momentum ==
             if eq_depth != min(self.eq_depths):
                 next_small_eq_depth = self.eq_depths[eq_index-1]
-                weighted_deeper_grads = [1/(eq_depth-next_small_eq_depth+1) * self.state_dict_to_tensor(eq_named_grads[eq_depth], layer_idx_range=(depth,), include_IC=False) for depth in range(next_small_eq_depth-1, eq_depth)]
+                weighted_deeper_grads = [self.state_dict_to_tensor(eq_named_grads[eq_depth], layer_idx_range=(depth,), include_IC=False) for depth in range(next_small_eq_depth-1, eq_depth)]
                 stacked_tensor = torch.stack(weighted_deeper_grads)
                 momentum_eq[eq_depth] = torch.mean(stacked_tensor, dim=0)
             
@@ -153,15 +153,17 @@ class Server(BaseServer):
             
             
             eq_tensor_origin = eq_model.parameters_to_tensor()
-            grad = eq_named_grads[eq_depth]
+            
             
             # == fedavg ==
-            # eq_tensor_updated = eq_tensor_origin + grad
+            grad = eq_named_grads[eq_depth]
+            eq_tensor_updated = eq_tensor_origin + grad
             
             # == fedadam ==
-            self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
-            self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
-            eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
+            # grad = eq_named_grads[eq_depth] / 0.05
+            # self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
+            # self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
+            # eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
             
             # == update eq model ==
             eq_model.tensor_to_parameters(eq_tensor_updated)
