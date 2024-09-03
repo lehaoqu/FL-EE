@@ -17,11 +17,11 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
+    parser.add_argument('--kd_lr', default=1e-4, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=3, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=1, type=int)
+    parser.add_argument('--kd_n_iters', default=5, type=int)
     
     parser.add_argument('--g_gap', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
@@ -44,8 +44,20 @@ class Server(BaseServer):
         self.uplink()
         self.aggregate_eq()
         self.finetune()
+        self.lr_scheduler()
 
         self.crt_epoch += 1 
+    
+    
+    def lr_scheduler(self,):
+        for gs in self.sl_generators.values():
+            for g in gs.values():
+                g[2].step()
+        for gs in self.ls_generators.values():
+            for g in gs.values():
+                g[2].step()
+        for eq_model in self.eq_model_train.values():
+            eq_model[2].step()
     
     
     def kd_criterion(self, pred, teacher):
@@ -66,6 +78,7 @@ class Server(BaseServer):
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         
         self.global_model = self.eq_model[max(self.eq_depths)]
+        self.gamma = 0.995
         
         # == init eq_models' optimizer, lr_scheduler
         self.eq_model_train = {}
@@ -77,8 +90,8 @@ class Server(BaseServer):
             #     'weight_decay_rate': 0.01},
             #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
             # ]
-            optimizer = torch.optim.SGD(params=eq_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
+            optimizer = torch.optim.Adam(params=eq_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.eq_model_train[eq_depth] = (eq_model, optimizer, scheduler)
         
         # == relation KD loss for small to large ==
@@ -100,8 +113,8 @@ class Server(BaseServer):
                 for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
                     generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
-                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
-                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
+                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+                    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
                     generators[j]  = (generator, optimizer, lr_scheduler)
                 self.sl_generators[eq_depth] = generators
         # ls generators    
@@ -112,10 +125,11 @@ class Server(BaseServer):
                 smaller_eq_depth = list(reversed(self.eq_depths))[i+1]
                 for j in range(len(self.eq_exits[smaller_eq_depth])-1, len(self.eq_exits[eq_depth])):
                     generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
-                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr,  betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-2, amsgrad=False)
+                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j] = (generator, optimizer, lr_scheduler)
                 self.ls_generators[eq_depth] = generators
+    
     
     def uplink(self):
         assert (len(self.sampled_clients) > 0)
@@ -123,11 +137,13 @@ class Server(BaseServer):
         for idx, eq_depth in enumerate(self.eq_depths):
             self.received_params[eq_depth] = [client.weight * client.model.parameters_to_tensor() for client in self.sampled_eq_clients[eq_depth]]
     
+    
     def aggregate_eq(self):
         # == First: aggregate each eq lonely ==
         for eq_depth in self.eq_depths:
             received_tensor = sum(self.received_params[eq_depth])
             self.eq_model[eq_depth].tensor_to_parameters(received_tensor)
+    
     
     def get_gen_latent(self, g, t_eq):
         g_model = g[0]
@@ -168,12 +184,10 @@ class Server(BaseServer):
                         print("=================")
                         print(eq_depth, s_exit)
                         self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], s_exit, y_input, gen_latent, eps, direction='sl')
-                        g[2].step()
 
                     # == small eq's last exit teach larger eq's deeper exit == 
                     if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                         self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, s_exit, y_input.detach(), gen_latent.detach(), eps.detach(), direction='sl')
-                        s[2].step()
 
             # == Third: large to small ==
             for i, eq_depth in enumerate(reversed(self.eq_depths)):
@@ -223,6 +237,71 @@ class Server(BaseServer):
         for depth in attend_eqs:
             self.eq_model[depth].tensor_to_parameters(tensor, layers=aligned_layers)
     
+    
+    def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, y_input, gen_latent, eps, direction='sl'):        
+        
+        CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
+        
+        t_policy = self.eq_policy[t_eq]
+        s_policy = self.eq_policy[s_eq]
+        
+        generator = g[0]
+        optimizer:torch.optim.optimizer = g[1]
+
+        generator.train()
+        t_model.eval()
+        s_model.eval()
+        generator.to(self.device)
+        t_model.to(self.device)
+        s_model.to(self.device)
+        for i in range(n_iters):
+            optimizer.zero_grad()
+            
+            # == div kd ce loss for G ==
+            # == div loss for G ==
+            div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
+            
+            if direction == 'sl':
+                begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
+                
+                # besides s_exit, all_logits len is (s_exits - t_exits + 1) - 1
+                all_other_logits = ()
+                for end_exit in self.sl_generators[t_eq].keys():
+                    if end_exit == g_exit: continue
+                    # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
+                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit, is_latent=self.is_latent))
+                    all_other_logits += (logits, )
+                    
+                # == ensemble_logits for student exits [batch * hidden_size]
+                ensemble_logits = torch.mean(torch.stack(all_other_logits), dim=0)
+                
+                # == teacher's logits ==
+                # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
+                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
+                
+                # == kd_loss for G ==
+                kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
+                
+                # == ce_loss for G ==
+                ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
+            
+            elif direction == 'ls':
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+                s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
+                
+                kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
+                ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
+            
+            loss = ce_loss + div_loss - kd_loss
+            loss.backward(retain_graph=True) if i < n_iters-1 else loss.backward() 
+            
+            CE_LOSS += ce_loss
+            DIV_LOSS += div_loss
+            KD_LOSS += kd_loss
+            
+            optimizer.step()
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
+       
     
     def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, y_input, gen_latent, eps, direction='sl'):
         DIST_LOSS, ANGLE_LOSS, DARK_LOSS, KD_LOSS = 0, 0, 0, 0
@@ -276,88 +355,17 @@ class Server(BaseServer):
             
             loss.backward()
             s_optimizer.step()
-        # s_scheduler.step()
         if direction == 'sl':
             print(f'dist_loss:{DIST_LOSS/n_iters}, angle_loss: {ANGLE_LOSS/n_iters}, dark_loss: {DARK_LOSS/n_iters}')
         else:
             print(f'kd_loss:{KD_LOSS/n_iters}')
         
     
-    def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, y_input, gen_latent, eps, direction='sl'):        
-        
-        CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
-        
-        t_policy = self.eq_policy[t_eq]
-        s_policy = self.eq_policy[s_eq]
-        
-        generator: Generator= g[0]
-        optimizer:torch.optim.optimizer = g[1]
-
-        generator.train()
-        t_model.eval()
-        s_model.eval()
-        generator.to(self.device)
-        t_model.to(self.device)
-        s_model.to(self.device)
-        for i in range(n_iters):
-            optimizer.zero_grad()
-            
-            # == div kd ce loss for G ==
-            # == div loss for G ==
-            div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
-            
-            if direction == 'sl':
-                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)+1]]
-                
-                begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
-                
-                # besides s_exit, all_logits len is (s_exits - t_exits + 1) - 1
-                all_other_logits = ()
-                for end_exit in self.sl_generators[t_eq].keys():
-                    if end_exit == g_exit: continue
-                    # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit, is_latent=self.is_latent))
-                    all_other_logits += (logits, )
-                    
-                # == ensemble_logits for student exits [batch * hidden_size]
-                ensemble_logits = torch.mean(torch.stack(all_other_logits), dim=0)
-                
-                # == teacher's logits ==
-                # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
-                
-                # == kd_loss for G ==
-                kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
-                
-                # == ce_loss for G ==
-                ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
-            
-            elif direction == 'ls':
-                s_policy = self.eq_policy[self.eq_depths[self.eq_depths.index(t_eq)-1]]
-                
-                
-                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
-                s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
-                
-                kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
-                ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
-            
-            loss = ce_loss + div_loss - kd_loss
-            loss.backward(retain_graph=True) if i < n_iters-1 else loss.backward() 
-            
-            CE_LOSS += ce_loss
-            DIV_LOSS += div_loss
-            KD_LOSS += kd_loss
-            
-            optimizer.step()
-        # lr_scheduler.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
-       
-                
     def downlink(self):
         assert (len(self.sampled_clients) > 0)
         for client in self.sampled_clients:
             client.clone_model(self.eq_model[client.eq_depth])
+    
     
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)

@@ -16,12 +16,12 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-2, type=float)
+    parser.add_argument('--kd_lr', default=1e-4, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=10, type=int)
+    parser.add_argument('--kd_n_iters', default=5, type=int)
     
     
     parser.add_argument('--g_gap', default=1, type=int)
@@ -39,23 +39,35 @@ class Client(BaseClient):
 
 
 class Server(BaseServer):
-    
     def run(self):
         self.sample()
         self.downlink()
         self.client_update()
         self.uplink()
         self.aggregate()
+        
+        # == train generator & global model ==
         for _ in range(self.s_epoches):
             y_input_g, gen_latent_g, eps_g = self.get_gen_latent()
+            
             self.train_generator(y_input_g, gen_latent_g, eps_g)
+            
             for eq, y_input in y_input_g.items():
                 y_input_g[eq] = y_input.detach()
             for eq, gen_latent in gen_latent_g.items():
                 gen_latent_g[eq] = gen_latent.detach()
-            self.finetune(y_input_g, gen_latent_g)
             
+            self.finetune_global_model(y_input_g, gen_latent_g)
+        
+        self.lr_scheduler()
         self.crt_epoch += 1 
+   
+   
+    def lr_scheduler(self,):
+        # == decay lr for generator & global model ==
+        for g in self.generators:
+            g[2].step()
+        self.global_scheduler.step()
    
     
     def kd_criterion(self, pred, teacher):
@@ -75,6 +87,7 @@ class Server(BaseServer):
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
+        self.gamma = 0.995
         
         # == train for global model ==
         # param_optimizer = list(self.global_model.named_parameters())
@@ -86,8 +99,8 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
-        self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=args.gamma)
+        self.global_optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+        self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
         
         # == relation KD loss for small to large ==
         self.dist_criterion = RkdDistance()
@@ -103,7 +116,7 @@ class Server(BaseServer):
         for i in range(len(self.eq_exits[max(self.eq_depths)])):
             generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
-            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
+            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators.append((generator, optimizer, lr_scheduler))
      
      
@@ -135,6 +148,7 @@ class Server(BaseServer):
             # ts_logits[t_exit] = attend_logits
         return y_input_g, gen_latent_g, eps_g
     
+    
     def train_generator(self, y_input_g, gen_latent_g, eps_g):
         for g in self.generators:
             g[0].to(self.device)
@@ -147,7 +161,6 @@ class Server(BaseServer):
         for exit_idx, g in enumerate(self.generators):
             print(f'============{exit_idx}============')
             self.update_generator(g, exit_idx, self.g_n_iters, y_input_g, gen_latent_g, eps_g)
-            g[2].step()
     
     
     def update_generator(self, g, exit_idx, n_iters, y_input_g, gen_latent_g, eps_g):
@@ -196,7 +209,7 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
     
         
-    def finetune(self, y_input_g, gen_latent_g):
+    def finetune_global_model(self, y_input_g, gen_latent_g):
         # == finetune global model , multi teacher to teach each exit ==
         for g in self.generators:
             g[0].eval()
@@ -206,8 +219,7 @@ class Server(BaseServer):
         self.global_model.train()
         
         self.teach_global_model(self.generators, self.kd_n_iters, y_input_g, gen_latent_g)
-        self.global_scheduler.step()
-    
+
     
     def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
         
@@ -285,6 +297,7 @@ class Server(BaseServer):
             self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
                                 for client in self.sampled_submodel_clients[submodel_depth]],)
         
+        
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
         
@@ -294,6 +307,7 @@ class Server(BaseServer):
         avg_eq_tensor = [sum(eq_tensors) for eq_tensors in self.received_params]
         avg_tensor = torch.cat(avg_eq_tensor, 0)
         self.global_model.tensor_to_parameters(avg_tensor)
+        
         
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)
