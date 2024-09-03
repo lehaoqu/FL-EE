@@ -28,7 +28,7 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_lr', default=1e-4, type=float)
+    parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
@@ -113,7 +113,7 @@ class Server(BaseServer):
                 for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
                     generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
-                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+                    optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
                     generators[j]  = (generator, optimizer, lr_scheduler)
                 self.sl_generators[eq_depth] = generators

@@ -12,11 +12,11 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
     
-    parser.add_argument('--s_epoches', default=10, type=int)
+    parser.add_argument('--s_epoches', default=5, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-4, type=float)
+    parser.add_argument('--kd_lr', default=3e-5, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
@@ -29,7 +29,7 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_lr', default=1e-4, type=float)
+    parser.add_argument('--g_lr', default=3e-5, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
@@ -50,14 +50,16 @@ class Server(BaseServer):
         for _ in range(self.s_epoches):
             y_input_g, gen_latent_g, eps_g = self.get_gen_latent()
             
-            self.train_generator(y_input_g, gen_latent_g, eps_g)
+            if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+                self.train_generator(y_input_g, gen_latent_g, eps_g)
             
             for eq, y_input in y_input_g.items():
                 y_input_g[eq] = y_input.detach()
             for eq, gen_latent in gen_latent_g.items():
                 gen_latent_g[eq] = gen_latent.detach()
             
-            self.finetune_global_model(y_input_g, gen_latent_g)
+            if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                self.finetune_global_model(y_input_g, gen_latent_g)
         
         self.lr_scheduler()
         self.crt_epoch += 1 
@@ -115,7 +117,7 @@ class Server(BaseServer):
         self.generators = []
         for i in range(len(self.eq_exits[max(self.eq_depths)])):
             generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
-            optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+            optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators.append((generator, optimizer, lr_scheduler))
      
@@ -196,7 +198,7 @@ class Server(BaseServer):
                     former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
-                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits)
+                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
             
             loss = ce_loss + div_loss - kd_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()

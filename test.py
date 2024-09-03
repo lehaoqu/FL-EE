@@ -206,20 +206,20 @@ class A(nn.Module):
 # a[:, 0] = hidden_states[:, 0]
 # print(a)
 
-from trainer.generator.generator import Generator_CIFAR
+from trainer.generator.generator import Generator_CIFAR, Generator
 
-# g = Generator_CIFAR()
-# g.train()
-# g.to(2)
-# op = torch.optim.Adam(g.parameters(), lr=1e-4, betas=(0.9, 0.99))
+g = Generator()
+g.train()
+g.to(2)
+op = torch.optim.Adam(g.parameters(), lr=1e-2, betas=(0.9, 0.999), eps=1e-08, amsgrad=False)
 
-# for _ in range(1000):
-#     y = torch.randint(0, 100, (32,)).to(2)
-#     gen_latent, eps = g(y, )
-#     loss = g.diversity_loss(eps, gen_latent)
-#     loss.backward()
-#     print(loss.item())
-#     op.step()
+for _ in range(200):
+    y = torch.randint(0, 100, (32,)).to(2)
+    gen_latent, eps = g(y, )
+    loss = g.diversity_loss(eps, gen_latent)
+    loss.backward()
+    print(loss.item())
+    op.step()
 
 # a = (torch.tensor([10, 20]), )
 # print(sum(a[:-1]))
@@ -236,13 +236,13 @@ from trainer.generator.generator import Generator_CIFAR
 # # print(x.grad)
 # for n, p in a.named_parameters():
 #     print(n, p.grad)
-import copy
-device = 'cpu'
-# mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343], dtype=torch.float32).to(device)
-# std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404], dtype=torch.float32).to(device)
-images = torch.randint(0, 256, (2, 3, 32, 32)).float()
-images = images.view(-1, 3, 32, 32) / 255
-clone = copy.deepcopy(images)
+# import copy
+# device = 'cpu'
+# # mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343], dtype=torch.float32).to(device)
+# # std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404], dtype=torch.float32).to(device)
+# images = torch.randint(0, 256, (2, 3, 32, 32)).float()
+# images = images.view(-1, 3, 32, 32) / 255
+# clone = copy.deepcopy(images)
 # images_reshaped = images.view(-1, 3, 32, 32) / 255
 # a = torch.nn.functional.interpolate(images_reshaped, size=(224,224), mode='bilinear', align_corners=False)
 
@@ -252,39 +252,39 @@ clone = copy.deepcopy(images)
 # print(a.shape)
 
 
-from torchvision import transforms
-import numpy as np
+# from torchvision import transforms
+# import numpy as np
 
-transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.Normalize(
-            (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
-            (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
-        ),
-    ])
+# transform = transforms.Compose([
+#         transforms.Resize((224, 224)),
+#         transforms.Normalize(
+#             (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+#             (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+#         ),
+#     ])
 
-transform2 = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Resize((224, 224)),
-        transforms.Normalize(
-            (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
-            (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
-        ),
-    ])
-
-
-
-images_transformed = [transform(image) for image in images]
-images_transformed1 = np.stack(images_transformed, axis=0, dtype=np.float32)
+# transform2 = transforms.Compose([
+#         transforms.ToTensor(),
+#         transforms.Resize((224, 224)),
+#         transforms.Normalize(
+#             (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+#             (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+#         ),
+#     ])
 
 
-images = images.numpy()
-images = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)
-images_transformed = [transform2(image) for image in images]
-images_transformed2 = np.stack(images_transformed, axis=0, dtype=np.float32)
+
+# images_transformed = [transform(image) for image in images]
+# images_transformed1 = np.stack(images_transformed, axis=0, dtype=np.float32)
 
 
-# print(a.numpy()-images_transformed)
-# print(a.numpy())
-print(np.array_equal(images_transformed1, images_transformed2))
+# images = images.numpy()
+# images = np.reshape(images, (-1, 3, 32, 32)).transpose(0, 2, 3, 1)
+# images_transformed = [transform2(image) for image in images]
+# images_transformed2 = np.stack(images_transformed, axis=0, dtype=np.float32)
+
+
+# # print(a.numpy()-images_transformed)
+# # print(a.numpy())
+# print(np.array_equal(images_transformed1, images_transformed2))
     
