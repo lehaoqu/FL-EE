@@ -159,10 +159,7 @@ class Generator_CIFAR(BaseModule):
         return CIFARClassificationDataset.generator_transform_tensor(images=img), noise
 
 
-    def statistic_loss(self, g_images):
-        device = g_images.device
-        train_mean = torch.tensor([0.0, 0.0, 0.0]).to(device)
-        train_std = torch.tensor([1.0, 1.0, 1.0]).to(device)
+    def statistic_loss(self, g_images, train_mean, train_std):
         g_mean = g_images.mean([0,2,3], keepdim=True)
         g_std = g_images.std([0,2,3], keepdim=True)
         

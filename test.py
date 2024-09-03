@@ -206,20 +206,20 @@ class A(nn.Module):
 # a[:, 0] = hidden_states[:, 0]
 # print(a)
 
-from trainer.generator.generator import Generator_CIFAR, Generator_LATENT
+# from trainer.generator.generator import Generator_CIFAR, Generator_LATENT
 
-g = Generator_LATENT()
-g.train()
-g.to(2)
-op = torch.optim.Adam(g.parameters(), lr=1e-2, betas=(0.9, 0.999), eps=1e-08, amsgrad=False)
+# g = Generator_LATENT()
+# g.train()
+# g.to(2)
+# op = torch.optim.Adam(g.parameters(), lr=1e-2, betas=(0.9, 0.999), eps=1e-08, amsgrad=False)
 
-for _ in range(200):
-    y = torch.randint(0, 100, (32,)).to(2)
-    gen_latent, eps = g(y, )
-    loss = g.diversity_loss(eps, gen_latent)
-    loss.backward()
-    print(loss.item())
-    op.step()
+# for _ in range(200):
+#     y = torch.randint(0, 100, (32,)).to(2)
+#     gen_latent, eps = g(y, )
+#     loss = g.diversity_loss(eps, gen_latent)
+#     loss.backward()
+#     print(loss.item())
+#     op.step()
 
 # a = (torch.tensor([10, 20]), )
 # print(sum(a[:-1]))
@@ -287,4 +287,7 @@ for _ in range(200):
 # # print(a.numpy()-images_transformed)
 # # print(a.numpy())
 # print(np.array_equal(images_transformed1, images_transformed2))
-    
+
+for _ in range(10):
+    a = torch.rand(3750, 197, 384).to('cuda:0')
+    print(torch.std(a, [0,2]))

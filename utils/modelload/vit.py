@@ -257,7 +257,8 @@ class ViTExitModel(ViTPreTrainedModel):
         head_mask: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
         is_latent: Optional[bool] = False,
-        stop_exit:Optional[int] = None
+        stop_exit:Optional[int] = None,
+        rt_embedding:Optional[bool] = False
     ) -> Union[Tuple, BaseModelOutputWithPooling, torch.Tensor]:
         if is_latent is False:
             
@@ -273,14 +274,18 @@ class ViTExitModel(ViTPreTrainedModel):
             hidden_states = embedding_output
         else:
             hidden_states = pixel_values
-            
+        
+        
+        if rt_embedding:
+            return hidden_states
+        
         encoder_outputs = self.encoder(
             hidden_states,
             head_mask=head_mask,
             stop_exit=stop_exit
         )
             
-        return encoder_outputs, embedding_output
+        return encoder_outputs
 
 
 
@@ -311,14 +316,15 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         rt_embedding:Optional[bool]=False
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
-        outputs, embedding_output = self.vit(
+        outputs = self.vit(
             pixel_values,
             head_mask=head_mask,
             interpolate_pos_encoding=interpolate_pos_encoding,
             stop_exit=stop_exit,
-            is_latent=is_latent
+            is_latent=is_latent,
+            rt_embedding=rt_embedding
         )
-        return outputs if rt_embedding is False else outputs, embedding_output
+        return outputs
 
 
 
