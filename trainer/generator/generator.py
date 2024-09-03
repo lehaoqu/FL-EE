@@ -6,10 +6,54 @@ import numpy as np
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.modelload.model import BaseModule
 
+class DiversityLoss(nn.Module):
+    """
+    Diversity loss for improving the performance.
+    """
+    def __init__(self, metric):
+        """
+        Class initializer.
+        """
+        super().__init__()
+        self.metric = metric
+        self.cosine = nn.CosineSimilarity(dim=2)
 
-class Generator(BaseModule):
+    def compute_distance(self, tensor1, tensor2, metric):
+        """
+        Compute the distance between two tensors.
+        """
+        if metric == 'l1':
+            return torch.abs(tensor1 - tensor2).mean(dim=(2,))
+        elif metric == 'l2':
+            return torch.pow(tensor1 - tensor2, 2).mean(dim=(2,))
+        elif metric == 'cosine':
+            return 1 - self.cosine(tensor1, tensor2)
+        else:
+            raise ValueError(metric)
+
+    def pairwise_distance(self, tensor, how):
+        """
+        Compute the pairwise distances between a Tensor's rows.
+        """
+        n_data = tensor.size(0)
+        tensor1 = tensor.expand((n_data, n_data, tensor.size(1)))
+        tensor2 = tensor.unsqueeze(dim=1)
+        return self.compute_distance(tensor1, tensor2, how)
+
+    def forward(self, noises, layer):
+        """
+        Forward propagation.
+        """
+        if len(layer.shape) > 2:
+            layer = layer.view((layer.size(0), -1))
+        layer_dist = self.pairwise_distance(layer, how=self.metric)
+        noise_dist = self.pairwise_distance(noises, how='l2')
+        return torch.exp(torch.mean(-noise_dist * layer_dist))
+
+
+class Generator_LATENT(BaseModule):
     def __init__(self, args, embedding=True):
-        super(Generator, self).__init__()
+        super(Generator_LATENT, self).__init__()
         self.device = args.device
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
@@ -57,50 +101,14 @@ class Generator(BaseModule):
         return z.view(batch_size, self.token_num, self.hidden_rs), eps
 
 
-class DiversityLoss(nn.Module):
-    """
-    Diversity loss for improving the performance.
-    """
-    def __init__(self, metric):
-        """
-        Class initializer.
-        """
-        super().__init__()
-        self.metric = metric
-        self.cosine = nn.CosineSimilarity(dim=2)
-
-    def compute_distance(self, tensor1, tensor2, metric):
-        """
-        Compute the distance between two tensors.
-        """
-        if metric == 'l1':
-            return torch.abs(tensor1 - tensor2).mean(dim=(2,))
-        elif metric == 'l2':
-            return torch.pow(tensor1 - tensor2, 2).mean(dim=(2,))
-        elif metric == 'cosine':
-            return 1 - self.cosine(tensor1, tensor2)
-        else:
-            raise ValueError(metric)
-
-    def pairwise_distance(self, tensor, how):
-        """
-        Compute the pairwise distances between a Tensor's rows.
-        """
-        n_data = tensor.size(0)
-        tensor1 = tensor.expand((n_data, n_data, tensor.size(1)))
-        tensor2 = tensor.unsqueeze(dim=1)
-        return self.compute_distance(tensor1, tensor2, how)
-
-    def forward(self, noises, layer):
-        """
-        Forward propagation.
-        """
-        if len(layer.shape) > 2:
-            layer = layer.view((layer.size(0), -1))
-        layer_dist = self.pairwise_distance(layer, how=self.metric)
-        noise_dist = self.pairwise_distance(noises, how='l2')
-        return torch.exp(torch.mean(-noise_dist * layer_dist))
-
+    def statistic_loss(gen_latent, train_mean, train_std):
+        g_mean = gen_latent.mean([0,2], keepdim=True)
+        g_std = gen_latent.std([0,2], keepdim=True)
+        
+        mean_loss = torch.mean((g_mean - train_mean) **2)
+        std_loss = torch.mean((g_std - train_std) **2)
+        loss = mean_loss + std_loss
+        return loss
 
 
 class Generator_CIFAR(BaseModule):
@@ -132,7 +140,7 @@ class Generator_CIFAR(BaseModule):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(hidden_channel, output_channel, 3, stride=1, padding=1),
             nn.Tanh(),
-            nn.BatchNorm2d(output_channel, affine=False) 
+            # nn.BatchNorm2d(output_channel, affine=False) 
         )
 
     def forward(self, labels):
@@ -149,3 +157,16 @@ class Generator_CIFAR(BaseModule):
         img = nn.functional.interpolate(img,scale_factor=2)
         img = self.conv_blocks2(img)
         return CIFARClassificationDataset.generator_transform_tensor(images=img), noise
+
+
+    def statistic_loss(self, g_images):
+        device = g_images.device
+        train_mean = torch.tensor([0.0, 0.0, 0.0]).to(device)
+        train_std = torch.tensor([1.0, 1.0, 1.0]).to(device)
+        g_mean = g_images.mean([0,2,3], keepdim=True)
+        g_std = g_images.std([0,2,3], keepdim=True)
+        
+        mean_loss = torch.mean((g_mean - train_mean) **2)
+        std_loss = torch.mean((g_std - train_std) **2)
+        loss = mean_loss + std_loss
+        return loss

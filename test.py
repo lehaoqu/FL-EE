@@ -206,9 +206,9 @@ class A(nn.Module):
 # a[:, 0] = hidden_states[:, 0]
 # print(a)
 
-from trainer.generator.generator import Generator_CIFAR, Generator
+from trainer.generator.generator import Generator_CIFAR, Generator_LATENT
 
-g = Generator()
+g = Generator_LATENT()
 g.train()
 g.to(2)
 op = torch.optim.Adam(g.parameters(), lr=1e-2, betas=(0.9, 0.999), eps=1e-08, amsgrad=False)

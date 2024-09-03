@@ -4,7 +4,7 @@ import random
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient
-from trainer.generator.generator import Generator, Generator_CIFAR
+from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 
@@ -16,7 +16,7 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=3e-5, type=float)
+    parser.add_argument('--kd_lr', default=1e-4, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
@@ -29,11 +29,34 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_lr', default=3e-5, type=float)
+    parser.add_argument('--g_gamma', default=10, type=float)
+    parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
 class Client(BaseClient):
+    
+    def train(self):
+        # === train ===
+        batch_loss = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                self.optim.zero_grad()
+
+                batch, label = self.adapt_batch(data)
+                
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                    self.policy.train_meta(self.model, batch, label, self.optim)
+
+                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
+                ce_loss = sum(exits_ce_loss)
+                ce_loss.backward()
+                self.optim.step()
+                batch_loss.append(ce_loss.detach().cpu().item())
+        
+        # === record loss ===
+        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+
     def run(self):
         self.train()
 
@@ -85,7 +108,7 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits)
         
         # == args ==
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.gamma, args.g_gap, args.g_begin
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
@@ -116,7 +139,7 @@ class Server(BaseServer):
         # == train for generators (each exit has a generator) ==
         self.generators = []
         for i in range(len(self.eq_exits[max(self.eq_depths)])):
-            generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
+            generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators.append((generator, optimizer, lr_scheduler))
@@ -167,7 +190,7 @@ class Server(BaseServer):
     
     def update_generator(self, g, exit_idx, n_iters, y_input_g, gen_latent_g, eps_g):
         
-        CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
+        CE_LOSS, DIV_LOSS, KD_LOSS, STT_LOSS = 0, 0, 0, 0
         
         generator = g[0]
         optimizer = g[1]
@@ -181,7 +204,11 @@ class Server(BaseServer):
             # == div kd ce loss for G ==
             # == div loss for G ==
             div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
-
+            
+            # == statistic loss for G ==
+            stt_loss = self.g_gamma*generator.statistic_loss(gen_latent)
+            # stt_loss = 0
+            
             # == ensemble logits for attend eq's
             attend_logits = ()
             for eq_depth in attend_eq:
@@ -200,15 +227,16 @@ class Server(BaseServer):
                 
                 kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
             
-            loss = ce_loss + div_loss - kd_loss
+            loss = ce_loss + div_loss - kd_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
             
             CE_LOSS += ce_loss
             DIV_LOSS += div_loss
             KD_LOSS += kd_loss
+            STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
     
         
     def finetune_global_model(self, y_input_g, gen_latent_g):

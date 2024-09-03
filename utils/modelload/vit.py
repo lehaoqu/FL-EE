@@ -280,7 +280,7 @@ class ViTExitModel(ViTPreTrainedModel):
             stop_exit=stop_exit
         )
             
-        return encoder_outputs
+        return encoder_outputs, embedding_output
 
 
 
@@ -308,16 +308,19 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         interpolate_pos_encoding: Optional[bool] = None,
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
+        rt_embedding:Optional[bool]=False
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
-        outputs = self.vit(
+        outputs, embedding_output = self.vit(
             pixel_values,
             head_mask=head_mask,
             interpolate_pos_encoding=interpolate_pos_encoding,
             stop_exit=stop_exit,
             is_latent=is_latent
         )
-        return outputs
+        return outputs if rt_embedding is False else outputs, embedding_output
+
+
 
         # sequence_output = outputs[0]
         # logits = self.classifier(sequence_output[:, 0, :])

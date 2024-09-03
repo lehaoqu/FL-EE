@@ -53,14 +53,18 @@ class CIFARClassificationDataset(Dataset):
     
     
     def generator_transform_tensor(images: torch.tensor):
+        
+        transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.Normalize(
+                    (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+                    (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+                ),
+            ])
         device = images.device
         images_reshaped = images.view(-1, 3, 32, 32)
-        # images_reshaped /= 255.0
-        upscaled_data = F.interpolate(images_reshaped, size=(224, 224), mode='bilinear', align_corners=False)
-        mean = torch.tensor([0.5070751592371323, 0.48654887331495095, 0.4409178433670343]).view(1, 3, 1, 1).to(device)
-        std = torch.tensor([0.2673342858792401, 0.2564384629170883, 0.27615047132568404]).view(1, 3, 1, 1).to(device)
-        normalized_data = (upscaled_data - mean) / std
-        return normalized_data
+        return torch.stack([transform(image) for image in images_reshaped], dim=0)
+
     
     def __init__(self, args=None, path=None, valid_ratio=0.2, eval_valids=False):
         self.path = path

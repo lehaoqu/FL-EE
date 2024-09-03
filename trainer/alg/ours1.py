@@ -4,7 +4,7 @@ import random
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient
-from trainer.generator.generator import Generator, Generator_CIFAR
+from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
@@ -112,7 +112,7 @@ class Server(BaseServer):
                 larger_eq_depth = self.eq_depths[i+1]
                 for j in range(len(self.eq_exits[eq_depth])-1, len(self.eq_exits[larger_eq_depth])):
                     # generator = Generator(args)
-                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
+                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
                     generators[j]  = (generator, optimizer, lr_scheduler)
@@ -124,7 +124,7 @@ class Server(BaseServer):
                 generators = {}
                 smaller_eq_depth = list(reversed(self.eq_depths))[i+1]
                 for j in range(len(self.eq_exits[smaller_eq_depth])-1, len(self.eq_exits[eq_depth])):
-                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator(args)
+                    generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
                     optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
                     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
                     generators[j] = (generator, optimizer, lr_scheduler)
