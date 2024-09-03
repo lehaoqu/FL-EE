@@ -29,7 +29,7 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_gamma', default=10, type=float)
+    parser.add_argument('--g_gamma', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
@@ -53,17 +53,19 @@ class Client(BaseClient):
                 ce_loss.backward()
                 self.optim.step()
                 batch_loss.append(ce_loss.detach().cpu().item())
-        
-        self.model.eval()
-        self.embedding_outputs = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                batch, label = self.adapt_batch(data)
-                batch['rt_embedding'] = True
-                self.embedding_outputs.append(self.model(**batch))
-        
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+        
+        if self.args.is_latent is True:
+            self.model.eval()
+            self.embedding_outputs = []
+            for epoch in range(self.epoch):
+                for idx, data in enumerate(self.loader_train):
+                    batch, label = self.adapt_batch(data)
+                    batch['rt_embedding'] = True
+                    self.embedding_outputs.append(torch.mean(self.model(**batch), dim=0, keepdim=True))
+        
+        
 
     def run(self):
         self.train()
@@ -75,15 +77,16 @@ class Server(BaseServer):
         self.downlink()
         self.client_update()
         
-        self.clients_embeddings = []
-        for client in self.sampled_clients:
-            self.clients_embeddings.extend(client.embedding_outputs)
-        self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
+
         # == statistic loss for G ==
         if self.is_latent is False:
             self.train_mean = torch.tensor([0.0, 0.0, 0.0]).to(self.device)
             self.train_std = torch.tensor([1.0, 1.0, 1.0]).to(self.device)
         else:
+            self.clients_embeddings = []
+            for client in self.sampled_clients:
+                self.clients_embeddings.extend(client.embedding_outputs)
+            self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
             self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
             self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
         
