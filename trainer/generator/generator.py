@@ -101,7 +101,7 @@ class Generator_LATENT(BaseModule):
         return z.view(batch_size, self.token_num, self.hidden_rs), eps
 
 
-    def statistic_loss(gen_latent, train_mean, train_std):
+    def statistic_loss(self, gen_latent, train_mean, train_std):
         g_mean = gen_latent.mean([0,2], keepdim=True)
         g_std = gen_latent.std([0,2], keepdim=True)
         

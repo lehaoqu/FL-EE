@@ -10,14 +10,14 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
     
-    parser.add_argument('--s_epoches', default=10, type=int)
+    parser.add_argument('--s_epoches', default=5, type=int)
     
     parser.add_argument('--sl', default=1, type=int)
     parser.add_argument('--ls', default=1, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-4, type=float)
+    parser.add_argument('--kd_lr', default=5e-3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=3, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
@@ -28,11 +28,43 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
+    parser.add_argument('--g_gamma', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
 class Client(BaseClient):
+    
+    def train(self):
+        # === train ===
+        batch_loss = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                self.optim.zero_grad()
+
+                batch, label = self.adapt_batch(data)
+                
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                    self.policy.train_meta(self.model, batch, label, self.optim)
+
+                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
+                ce_loss = sum(exits_ce_loss)
+                ce_loss.backward()
+                self.optim.step()
+                batch_loss.append(ce_loss.detach().cpu().item())
+        # === record loss ===
+        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+    
+    def get_embedding(self,):
+        self.model.eval()
+        embedding_outputs = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                batch, label = self.adapt_batch(data)
+                batch['rt_embedding'] = True
+                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
+        return embedding_outputs
+    
     def run(self):
         self.train()
     
@@ -41,12 +73,30 @@ class Server(BaseServer):
         self.sample()
         self.downlink()
         self.client_update()
+        self.train_distribute()
         self.uplink()
         self.aggregate_eq()
         self.finetune()
         self.lr_scheduler()
 
         self.crt_epoch += 1 
+    
+    
+    def train_distribute(self):
+        # == statistic loss for G ==
+        if self.is_latent is False:
+            self.train_mean = torch.tensor([0.0, 0.0, 0.0]).to(self.device)
+            self.train_std = torch.tensor([1.0, 1.0, 1.0]).to(self.device)
+        else:
+            self.clients_embeddings = []
+            for client in self.sampled_clients:
+                self.clients_embeddings.extend(client.get_embedding())
+            self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
+            self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
+            self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
+            del self.clients_embeddings
+            # print(self.train_mean, self.train_mean.shape)
+            # print(self.train_std, self.train_std.shape)
     
     
     def lr_scheduler(self,):
@@ -73,12 +123,12 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         
         # == args ==
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gap, args.g_begin
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.gamma, args.g_gap, args.g_begin
         self.kd_lr, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         
         self.global_model = self.eq_model[max(self.eq_depths)]
-        self.gamma = 0.995
+        self.gamma = 0.99
         
         # == init eq_models' optimizer, lr_scheduler
         self.eq_model_train = {}
@@ -90,7 +140,7 @@ class Server(BaseServer):
             #     'weight_decay_rate': 0.01},
             #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
             # ]
-            optimizer = torch.optim.Adam(params=eq_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
+            optimizer = torch.optim.SGD(params=eq_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.eq_model_train[eq_depth] = (eq_model, optimizer, scheduler)
         
@@ -240,7 +290,7 @@ class Server(BaseServer):
     
     def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, y_input, gen_latent, eps, direction='sl'):        
         
-        CE_LOSS, DIV_LOSS, KD_LOSS = 0, 0, 0
+        CE_LOSS, DIV_LOSS, KD_LOSS, STT_LOSS = 0, 0, 0, 0
         
         t_policy = self.eq_policy[t_eq]
         s_policy = self.eq_policy[s_eq]
@@ -260,6 +310,7 @@ class Server(BaseServer):
             # == div kd ce loss for G ==
             # == div loss for G ==
             div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
+            stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
             
             if direction == 'sl':
                 begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
@@ -292,15 +343,16 @@ class Server(BaseServer):
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
-            loss = ce_loss + div_loss - kd_loss
+            loss = ce_loss + div_loss - kd_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters-1 else loss.backward() 
             
             CE_LOSS += ce_loss
             DIV_LOSS += div_loss
             KD_LOSS += kd_loss
+            STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}')
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
        
     
     def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, y_input, gen_latent, eps, direction='sl'):

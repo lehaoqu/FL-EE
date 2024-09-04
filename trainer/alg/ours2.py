@@ -16,7 +16,7 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
+    parser.add_argument('--kd_lr', default=5e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=1, type=float)
     parser.add_argument('--kd_angle_ratio', default=2, type=float)
@@ -55,16 +55,16 @@ class Client(BaseClient):
                 batch_loss.append(ce_loss.detach().cpu().item())
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
-        
-        if self.args.is_latent is True:
-            self.model.eval()
-            self.embedding_outputs = []
-            for epoch in range(self.epoch):
-                for idx, data in enumerate(self.loader_train):
-                    batch, label = self.adapt_batch(data)
-                    batch['rt_embedding'] = True
-                    self.embedding_outputs.append(torch.mean(self.model(**batch), dim=0, keepdim=True))
-        
+    
+    def get_embedding(self,):
+        self.model.eval()
+        embedding_outputs = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                batch, label = self.adapt_batch(data)
+                batch['rt_embedding'] = True
+                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
+        return embedding_outputs
         
 
     def run(self):
@@ -76,8 +76,14 @@ class Server(BaseServer):
         self.sample()
         self.downlink()
         self.client_update()
-        
-
+        self.train_distribute()
+        self.uplink()
+        self.aggregate()
+        self.finetune()
+        self.lr_scheduler()
+        self.crt_epoch += 1 
+   
+    def train_distribute(self):
         # == statistic loss for G ==
         if self.is_latent is False:
             self.train_mean = torch.tensor([0.0, 0.0, 0.0]).to(self.device)
@@ -85,31 +91,13 @@ class Server(BaseServer):
         else:
             self.clients_embeddings = []
             for client in self.sampled_clients:
-                self.clients_embeddings.extend(client.embedding_outputs)
+                self.clients_embeddings.extend(client.get_embedding())
             self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
             self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
             self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
-        
-        self.uplink()
-        self.aggregate()
-        
-        # == train generator & global model ==
-        for _ in range(self.s_epoches):
-            y_input_g, gen_latent_g, eps_g = self.get_gen_latent()
-            
-            if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
-                self.train_generator(y_input_g, gen_latent_g, eps_g)
-            
-            for eq, y_input in y_input_g.items():
-                y_input_g[eq] = y_input.detach()
-            for eq, gen_latent in gen_latent_g.items():
-                gen_latent_g[eq] = gen_latent.detach()
-            
-            if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
-                self.finetune_global_model(y_input_g, gen_latent_g)
-        
-        self.lr_scheduler()
-        self.crt_epoch += 1 
+            del self.clients_embeddings
+            # print(self.train_mean, self.train_mean.shape)
+            # print(self.train_std, self.train_std.shape)
    
    
     def lr_scheduler(self,):
@@ -149,7 +137,7 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr)
         self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
         
         # == relation KD loss for small to large ==
@@ -198,6 +186,23 @@ class Server(BaseServer):
             # ts_logits[t_exit] = attend_logits
         return y_input_g, gen_latent_g, eps_g
     
+    
+    def finetune(self):
+        # == train generator & global model ==
+        for _ in range(self.s_epoches):
+            y_input_g, gen_latent_g, eps_g = self.get_gen_latent()
+            
+            if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+                self.train_generator(y_input_g, gen_latent_g, eps_g)
+            
+            for eq, y_input in y_input_g.items():
+                y_input_g[eq] = y_input.detach()
+            for eq, gen_latent in gen_latent_g.items():
+                gen_latent_g[eq] = gen_latent.detach()
+            
+            if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                self.finetune_global_model(y_input_g, gen_latent_g)
+                
     
     def train_generator(self, y_input_g, gen_latent_g, eps_g):
         for g in self.generators:

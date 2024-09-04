@@ -34,13 +34,13 @@ class FedSim:
 
         if 'ours' in args.alg:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_{args.is_latent}.pth'
             self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}_G.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_{args.is_latent}_G.pth'
             output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.txt'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_{args.is_latent}.txt'
             self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_{args.is_latent}.json'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_{args.is_latent}.json'
         else:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
