@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 import logging
-from dataset.utils.dataset_utils import load_tsv, load_np
+from dataset.utils.dataset_utils import load_tsv, load_np, load_pkl
 
 logger = logging.getLogger(__name__)
 
@@ -11,20 +11,19 @@ transformers.logging.set_verbosity_error()
 
 
 class GLUEClassificationDataset(Dataset):
-    def __init__(self, args=None,  path=None, tokenizer=None, valid_ratio=0.2, need_process=True, eval_valids=False):
+    def __init__(self, args=None, path=None, tokenizer=None, need_process=False, eval_valids=False):
         self.path = path
         
         if eval_valids:
-            dict_all = [load_np(f'{path}{i}.pkl') for i in range(args.total_num)]
+            dict_all = [load_pkl(f'{path}{i}.pkl') for i in range(args.total_num)]
             total_data = {}
             for key in dict_all[0].keys():
                 for dic in dict_all:
                     total_data.setdefault(key, []).extend(dic[key])
             self.ann = total_data
         else: 
-            self.ann = load_tsv(path) if need_process else load_np(path)
+            self.ann = load_tsv(path) if need_process else load_pkl(path)
             # print(self.ann.keys())
-            valid_ratio = valid_ratio if args is None else args.valid_ratio
 
             if need_process:
                 labels = [item["label"] for item in self.ann]

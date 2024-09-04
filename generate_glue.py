@@ -7,6 +7,7 @@ import torch.utils
 import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
+import pickle
 
 from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer
@@ -44,7 +45,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     # train_set = global_trainset[:train_len]
     # valid_set = global_trainset[:train_len]
     
-    train_dataset = GLUEClassificationDataset(path=global_train_path, tokenizer=tokenizer)
+    train_dataset = GLUEClassificationDataset(path=global_train_path, tokenizer=tokenizer, need_process=True)
 
     
     num_classes = 2
@@ -86,6 +87,24 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     
     save_file(config_path, train_dir, valid_dir, train_data, valid_data, num_clients, num_classes, 
     statistic, niid, balance, partition)
+    
+    # == test ==
+    test_path = dir_path + task + '/test.tsv'
+    test_dataset = GLUEClassificationDataset(path=test_path, tokenizer=tokenizer, need_process=True)
+    dataset_input_id = []
+    dataset_label = []
+    dataset_mask = []
+    
+    dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in test_dataset.input_ids]))
+    dataset_label.extend(np.vstack([t.cpu().numpy() for t in test_dataset.labels]))
+    dataset_mask.extend(np.vstack([t.cpu().numpy() for t in test_dataset.attention_mask]))
+    dataset_input_id = np.array(dataset_input_id)
+    dataset_label = np.array(dataset_label)
+    dataset_mask = np.array(dataset_mask)
+    test_data = {'input_ids': dataset_input_id, 'attention_mask': dataset_mask, 'labels': dataset_label}
+    test_pkl_path = dir_path + task + '/test.pkl'
+    with open(test_pkl_path, 'wb') as f:
+            pickle.dump(test_data, f)
         
     print("Total number of samples:", train_len + valid_len)
     print("The number of train samples:", train_len)

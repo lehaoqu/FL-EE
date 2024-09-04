@@ -66,7 +66,7 @@ class CIFARClassificationDataset(Dataset):
         return torch.stack([transform(image) for image in images_reshaped], dim=0)
 
     
-    def __init__(self, args=None, path=None, valid_ratio=0.2, eval_valids=False):
+    def __init__(self, args=None, path=None, eval_valids=False):
         self.path = path
         if eval_valids:
             dict_all = [load_pkl(f'{path}{i}.pkl') for i in range(args.total_num)]
@@ -78,7 +78,6 @@ class CIFARClassificationDataset(Dataset):
             
         else:
             self.ann = load_pkl(path)
-            valid_ratio = valid_ratio if args is None else args.valid_ratio
             
             self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
             self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]

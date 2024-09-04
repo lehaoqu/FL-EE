@@ -29,7 +29,7 @@ def load_dataset_loader(args, file_name=None, id=None, eval_valids=False):
             dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/valid/', eval_valids=eval_valids)
         else:
             if file_name == 'test':
-                dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/{file_name}.tsv')
+                dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/{file_name}.pkl')
             else:
                 dataset = get_glue_dataset(args=args, path=f'dataset/glue/{args.dataset}/{file_name}/{id}.pkl')        
         
