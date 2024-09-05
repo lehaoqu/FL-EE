@@ -64,7 +64,7 @@ class BaseClient:
             
         # == y_distribute ==
         for idx, data in enumerate(self.loader_train):
-            labels = data['labels'].cpu().tolist()
+            labels = data['labels'].view(-1).cpu().tolist()
             for y in labels:
                 self.y_distribute[y] += 1
                         
