@@ -328,6 +328,9 @@ class Ree(nn.Module):
         elif 'small' in self.base_model:
             self.dim = 384
             self.pos_embedding = nn.Parameter(torch.zeros(1, 12+1, self.dim))
+        elif 'little' in self.base_model:
+            self.dim = 256
+            self.pos_embedding = nn.Parameter(torch.zeros(1, 12+1, self.dim))
         elif 'XXS24' in self.base_model or 'vim' in self.base_model:
             self.dim = 192
             self.pos_embedding = nn.Parameter(torch.zeros(1, 24+1, self.dim))

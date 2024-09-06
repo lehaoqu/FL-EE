@@ -123,6 +123,6 @@ if __name__ == "__main__":
             model_max_length=128,
             use_fast=False,
         )
-    for task in ['sst2']:
-    # for task in ['mrpc', 'sst2', 'qqp', 'qnli']:
+    # for task in ['sst2']:
+    for task in ['mrpc', 'qqp', 'qnli']:
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)

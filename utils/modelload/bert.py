@@ -16,6 +16,8 @@ from transformers.models.bert.modeling_bert import *
 from transformers.models.bert.modeling_bert import BertForSequenceClassification as Model
 from utils.modelload.model import BaseModule
 
+from utils.modelload.model import Ree
+
 
 class GradientRescaleFunction(torch.autograd.Function):
     @staticmethod
@@ -208,6 +210,7 @@ class BertExitLayer(nn.Module):
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.FloatTensor] = None,
+        o_attention_mask: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         encoder_hidden_states: Optional[torch.FloatTensor] = None,
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
@@ -265,10 +268,10 @@ class BertExitLayer(nn.Module):
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
             if self.config.policy == 'base' or self.config.policy == 'l2w':
-                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
+                logits = self.classifier(layer_output, o_attention_mask)
             elif self.config.policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
-                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
+                logits = self.classifier(layer_output, o_attention_mask)
                 layer_output = gradient_rescale(layer_output, len(self.config.exits) - exit_idx - 1)
             
         
@@ -294,6 +297,7 @@ class BertExitEncoder(nn.Module):
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.FloatTensor] = None,
+        o_attention_mask: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         encoder_hidden_states: Optional[torch.FloatTensor] = None,
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
@@ -311,6 +315,7 @@ class BertExitEncoder(nn.Module):
             layer_outputs = layer_module(
                 hidden_states,
                 attention_mask,
+                o_attention_mask,
                 layer_head_mask,
                 encoder_hidden_states,
                 encoder_attention_mask,
@@ -329,6 +334,20 @@ class BertExitEncoderRee(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.accumulator = Ree(
+            recurrent_steps=1,
+            heads=8,
+            modulation=True,
+            exit_head='normlinear',
+            mode='add',
+            base_model='little',
+            num_classes=100,
+            adapter=None,
+            depth=1,
+            attn_dim=16,
+            mlp_ratio=1.35,
+
+        )
         self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
 
@@ -336,6 +355,7 @@ class BertExitEncoderRee(nn.Module):
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.FloatTensor] = None,
+        o_attention_mask: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         encoder_hidden_states: Optional[torch.FloatTensor] = None,
         encoder_attention_mask: Optional[torch.FloatTensor] = None,
@@ -499,6 +519,7 @@ class BertExitModel(BertPreTrainedModel):
         encoder_outputs = self.encoder(
             hidden_states,
             attention_mask=extended_attention_mask,
+            o_attention_mask=attention_mask,
             head_mask=head_mask,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_extended_attention_mask,
@@ -550,7 +571,8 @@ class ExitModel(BertPreTrainedModel, BaseModule):
         attention_mask: Optional[torch.Tensor] = None,
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
-        rt_embedding:Optional[bool]=False
+        rt_embedding:Optional[bool]=False,
+        labels:Optional[torch.Tensor] = None
     ):
 
         outputs = self.bert(

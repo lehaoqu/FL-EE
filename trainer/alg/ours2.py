@@ -137,7 +137,7 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3, momentum=0.9)
         self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
         
         # == relation KD loss for small to large ==
@@ -254,7 +254,8 @@ class Server(BaseServer):
                     former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
-                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
+                # kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
+                kd_loss = self.g_eta*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))
             
             loss = ce_loss + div_loss - kd_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
@@ -335,8 +336,7 @@ class Server(BaseServer):
                         if t_exit >= s_exit:
                             loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
                         else:
-                            pass
-                            # loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
                 
                 Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
   

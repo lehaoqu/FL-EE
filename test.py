@@ -70,9 +70,9 @@
 # # 此时，pseudo_optimizer 将具有与 optimizer 相同的学习率和其他设置
 # print("Learning rate:", pseudo_optimizer.param_groups[0]['lr'])
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as F
 
 # # 定义一个简单的模型
 # class SimpleModel(nn.Module):
@@ -172,20 +172,20 @@ import time
 
 # print(total)  # 输出: tensor(10)
 
-class A(nn.Module):
-    def __init__(self,):
-        super(A, self).__init__()
-        self.l1 = nn.Linear(5,2)
-        self.c1 = nn.Linear(2,1)
-        self.l2 = nn.Linear(2,2)
-        self.c2 = nn.Linear(2,1)
+# class A(nn.Module):
+#     def __init__(self,):
+#         super(A, self).__init__()
+#         self.l1 = nn.Linear(5,2)
+#         self.c1 = nn.Linear(2,1)
+#         self.l2 = nn.Linear(2,2)
+#         self.c2 = nn.Linear(2,1)
 
-    def forward(self, x):
-        z = self.l1(x)
-        c1 = self.c1(z)
-        z = self.l2(z)
-        c2 = self.c2(z)
-        return c1, c2
+#     def forward(self, x):
+#         z = self.l1(x)
+#         c1 = self.c1(z)
+#         z = self.l2(z)
+#         c2 = self.c2(z)
+#         return c1, c2
     
 # a = A()
 # t = torch.tensor([1, 2,3,4,5], dtype=torch.float32)
@@ -288,6 +288,106 @@ class A(nn.Module):
 # # print(a.numpy())
 # print(np.array_equal(images_transformed1, images_transformed2))
 
-for _ in range(10):
-    a = torch.rand(3750, 197, 384).to('cuda:0')
-    print(torch.std(a, [0,2]))
+# for _ in range(10):
+#     a = torch.rand(3750, 197, 384).to('cuda:0')
+#     print(torch.std(a, [0,2]))
+
+# torch.manual_seed(1024)
+# torch.cuda.manual_seed(0)
+# torch.cuda.manual_seed_all(0)
+# print(torch.rand(1))
+# print(torch.rand(1))
+# from test_1 import t
+# t()
+
+# import torch.nn as nn
+# import gc
+
+# class A(nn.Module):
+#     def __init__(self, *args, **kwargs) -> None:
+#         super(A, self).__init__()
+#         self.l = nn.Linear(1000, 10000)
+
+# a = A()
+# a.to(torch.device('cuda:2'))
+# print('gpu')
+# time.sleep(10)
+# a.cpu()
+# print('cpu')
+# del a
+# torch.cuda.empty_cache()
+# gc.collect()
+# time.sleep(30)
+
+# from transformers import AutoTokenizer
+
+# model_name = "prajjwal1/bert-small"  # 替换为你的模型名称
+# tokenizer = AutoTokenizer.from_pretrained('/data/qvlehao/FL-EE/models/prajjwal/bert-small')
+# print(tokenizer)
+
+# from transformers import TFBertForPreTraining
+
+# # 模型的路径，包含 ckpt.data 文件
+# model_path = "/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_model.ckpt.data-00000-of-00001"  # 替换为你的模型路径
+
+# # 加载 TensorFlow 模型
+# tf_model = TFBertForPreTraining.from_pretrained(model_path)
+
+# import torch
+
+# from transformers import BertModel
+
+# # 将 TensorFlow 模型转换为 PyTorch 模型
+# model = BertModel.from_pretrained(tf_model)
+# # 保存模型
+# model.save_pretrained("models/google-bert/bert-12-uncasedpytorch_model.bin")
+
+# coding=utf-8
+ 
+"""Convert BERT checkpoint."""
+ 
+ 
+import argparse
+import logging
+ 
+import torch
+ 
+from transformers import BertConfig, BertForPreTraining, load_tf_weights_in_bert
+ 
+ 
+logging.basicConfig(level=logging.INFO)
+ 
+ 
+def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
+    # Initialise PyTorch model
+    config = BertConfig.from_json_file(bert_config_file)
+    print("Building PyTorch model from configuration: {}".format(str(config)))
+    model = BertForPreTraining(config)
+ 
+    # Load weights from tf checkpoint
+    load_tf_weights_in_bert(model, config, tf_checkpoint_path)
+ 
+    # Save pytorch-model
+    print("Save PyTorch model to {}".format(pytorch_dump_path))
+    torch.save(model.state_dict(), pytorch_dump_path)
+ 
+ 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # Required parameters
+    parser.add_argument(
+        "--tf_checkpoint_path", default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_model.ckpt', type=str, help="Path to the TensorFlow checkpoint path."
+    )
+    parser.add_argument(
+        "--bert_config_file",
+        default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_config.json',
+        type=str,
+        help="The config json file corresponding to the pre-trained BERT model. \n"
+        "This specifies the model architecture.",
+    )
+    parser.add_argument(
+        "--pytorch_dump_path", default='pytorch_model.bin', type=str,  help="Path to the output PyTorch model."
+    )
+    args = parser.parse_args()
+    
+    convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)

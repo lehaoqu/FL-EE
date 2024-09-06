@@ -2,6 +2,7 @@ import copy
 import json
 import importlib
 
+from transformers import AutoTokenizer
 from utils.modelload.model import *
 from utils.train_utils import *
 
@@ -86,9 +87,14 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             
             # exit(0)
         
-        # if model_arg == 'bert':
-        #     model = model.half()
-
+        if dataset_arg in GLUE:
+            tokenizer = AutoTokenizer.from_pretrained(
+                config_path,
+                padding_side="right",
+                model_max_length=128,
+                use_fast=False,
+            )
+            model.resize_token_embeddings(len(tokenizer))
     else:
         exit('Error: unrecognized model')
     return model

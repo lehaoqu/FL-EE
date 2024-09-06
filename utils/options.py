@@ -26,6 +26,7 @@ def args_parser():
     parser.add_argument('--epoch', type=int, default=1, help="Epoch num")
     parser.add_argument('--lr', type=float, default=0.001, help="Learning rate")
     parser.add_argument('--gamma', type=float, default=0.99, help="Exponential decay of learning rate")
+    parser.add_argument('--optim', type=str, default='SGD', help="optimizer")
 
     parser.add_argument('--valid_gap', type=int, default=10, help='Rounds between two valid phases')
 

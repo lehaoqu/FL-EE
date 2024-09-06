@@ -4,6 +4,9 @@ import numpy as np
 import os
 import copy
 import json
+import torch
+import numpy as np
+import random
 
 from utils.options import args_parser
 from utils.dataprocess import DataProcessor
@@ -34,13 +37,13 @@ class FedSim:
 
         if 'ours' in args.alg:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_{args.is_latent}.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_{args.is_latent}.pth'
             self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_{args.is_latent}_G.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_{args.is_latent}_G.pth'
             output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_{args.is_latent}.txt'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_{args.is_latent}.txt'
             self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_{args.is_latent}.json'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_{args.is_latent}.json'
         else:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
@@ -62,6 +65,8 @@ class FedSim:
         eq_model = {}
         
         # == for scalefl & heterofl ==
+        # exits = (i-1 for i in args.eq_depths)
+        # if args.alg == 'scalefl': exits = (i+1 for _, i in enumerate(exits) if _!=len(exits-1))
         exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
         if args.alg != 'heterofl': eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
         else: eq_exits = {eq_depth: exits for eq_depth in args.eq_depths}
@@ -141,6 +146,12 @@ class FedSim:
 
 
 if __name__ == '__main__':
+    torch.manual_seed(1024)
+    torch.cuda.manual_seed(1024)
+    torch.cuda.manual_seed_all(1024)
+    np.random.seed(1024)
+    random.seed(1024)
+    
     args = args_parser()
     fed = FedSim(args=args)
     fed.simulate()

@@ -75,31 +75,35 @@ class Server(BaseServer):
             params.append(param.view(-1))
         return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
     
+        
     def sample(self):
-        self.sampled_eq_clients = {}
         
-        sample_num = int(self.sample_rate * self.client_num)
-        
-        check_all_depths_sampled = {}
-        while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
-            check_all_depths_sampled.clear()
-            self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
-            for client in self.sampled_clients:
-                check_all_depths_sampled[client.eq_depth] = 1
-
-        for eq_depth in self.eq_depths:
-            for client in self.sampled_clients:
-                if client.eq_depth == eq_depth:
-                    self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
-        
-        self.eq_num = {}
-        for eq_depth, clients in self.sampled_eq_clients.items():
-            total_samples = sum(len(client.dataset_train) for client in clients)
-            self.eq_num[eq_depth] = total_samples
-            for client in clients:
-                client.weight = len(client.dataset_train) / total_samples
-        
+        super().sample()
         self.larger_eq_total_num = {eq_depth: sum([self.eq_num[i] for i in self.eq_depths if i >= eq_depth]) for eq_depth in self.eq_depths}
+        # self.sampled_eq_clients = {}
+        
+        # sample_num = int(self.sample_rate * self.client_num)
+        
+        # check_all_depths_sampled = {}
+        # while sum(check_all_depths_sampled.values()) != len(self.eq_depths):
+        #     check_all_depths_sampled.clear()
+        #     self.sampled_clients: List[BaseClient] = random.sample(self.clients, sample_num)
+        #     for client in self.sampled_clients:
+        #         check_all_depths_sampled[client.eq_depth] = 1
+
+        # for eq_depth in self.eq_depths:
+        #     for client in self.sampled_clients:
+        #         if client.eq_depth == eq_depth:
+        #             self.sampled_eq_clients.setdefault(eq_depth, []).append(client)
+        
+        # self.eq_num = {}
+        # for eq_depth, clients in self.sampled_eq_clients.items():
+        #     total_samples = sum(len(client.dataset_train) for client in clients)
+        #     self.eq_num[eq_depth] = total_samples
+        #     for client in clients:
+        #         client.weight = len(client.dataset_train) / total_samples
+        
+        
     
     def downlink(self):
         assert (len(self.sampled_clients) > 0)
@@ -156,14 +160,16 @@ class Server(BaseServer):
             
             
             # == fedavg ==
-            grad = eq_named_grads[eq_depth]
-            eq_tensor_updated = eq_tensor_origin + grad
+            if self.args.optim == 'sgd':
+                grad = eq_named_grads[eq_depth]
+                eq_tensor_updated = eq_tensor_origin + grad
             
             # == fedadam ==
-            # grad = eq_named_grads[eq_depth] / 0.05
-            # self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
-            # self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
-            # eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
+            elif self.args.optim == 'adam':
+                grad = eq_named_grads[eq_depth] / self.clients[0].optim.param_groups[0]['lr']
+                self.m_t[eq_depth] = self.beta_1 * self.m_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_1) * grad
+                self.v_t[eq_depth] = self.beta_2 * self.v_t.get(eq_depth, torch.zeros_like(grad)) + (1 - self.beta_2) * grad * grad
+                eq_tensor_updated = eq_tensor_origin + self.eta * self.m_t[eq_depth] / (torch.sqrt(self.v_t[eq_depth]) + self.tau)
             
             # == update eq model ==
             eq_model.tensor_to_parameters(eq_tensor_updated)
