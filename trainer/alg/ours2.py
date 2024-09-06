@@ -76,7 +76,7 @@ class Server(BaseServer):
         self.sample()
         self.downlink()
         self.client_update()
-        self.train_distribute()
+        # self.train_distribute()
         self.uplink()
         self.aggregate()
         self.finetune()
@@ -93,8 +93,11 @@ class Server(BaseServer):
             for client in self.sampled_clients:
                 self.clients_embeddings.extend(client.get_embedding())
             self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
-            self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
-            self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
+            
+            self.train_mean = torch.mean(self.clients_embeddings, dim=0)
+            self.train_std = None
+            # self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
+            # self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
             del self.clients_embeddings
             # print(self.train_mean, self.train_mean.shape)
             # print(self.train_std, self.train_std.shape)
@@ -235,8 +238,8 @@ class Server(BaseServer):
             # == div loss for G ==
             div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
 
-            stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
-            # stt_loss = 0
+            # stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
+            stt_loss = 0
             
             # == ensemble logits for attend eq's
             attend_logits = ()
@@ -254,8 +257,8 @@ class Server(BaseServer):
                     former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
                 former_attend_logits = sum(former_attend_logits)
                 
-                # kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
-                kd_loss = self.g_eta*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))
+                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
+                # kd_loss = self.g_eta*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))
             
             loss = ce_loss + div_loss - kd_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
@@ -333,12 +336,14 @@ class Server(BaseServer):
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(t_exit_max_s_logits[t_exit][:s_exit+1])
                         t_logits = t_logits_g[t_exit]
                         
-                        if t_exit >= s_exit:
-                            loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        else:
-                            loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
+                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        # if t_exit >= s_exit:
+                        #     loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        # else:
+                        #     loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
                 
-                Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
+                Loss += loss
+                # Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
   
             Loss.backward()
             self.global_optimizer.step()

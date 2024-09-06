@@ -352,42 +352,49 @@ import logging
  
 import torch
  
-from transformers import BertConfig, BertForPreTraining, load_tf_weights_in_bert
+a = torch.tensor([1.0,2.0], dtype=torch.float32, requires_grad=True)
+b = torch.tensor([3.0,4.0], dtype=torch.float32, requires_grad=True)
+c = torch.sum(a+b)
+c.backward()
+print(b.grad)
+
+
+# from transformers import BertConfig, BertForPreTraining, load_tf_weights_in_bert
  
  
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
  
  
-def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
-    # Initialise PyTorch model
-    config = BertConfig.from_json_file(bert_config_file)
-    print("Building PyTorch model from configuration: {}".format(str(config)))
-    model = BertForPreTraining(config)
+# def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
+#     # Initialise PyTorch model
+#     config = BertConfig.from_json_file(bert_config_file)
+#     print("Building PyTorch model from configuration: {}".format(str(config)))
+#     model = BertForPreTraining(config)
  
-    # Load weights from tf checkpoint
-    load_tf_weights_in_bert(model, config, tf_checkpoint_path)
+#     # Load weights from tf checkpoint
+#     load_tf_weights_in_bert(model, config, tf_checkpoint_path)
  
-    # Save pytorch-model
-    print("Save PyTorch model to {}".format(pytorch_dump_path))
-    torch.save(model.state_dict(), pytorch_dump_path)
+#     # Save pytorch-model
+#     print("Save PyTorch model to {}".format(pytorch_dump_path))
+#     torch.save(model.state_dict(), pytorch_dump_path)
  
  
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    # Required parameters
-    parser.add_argument(
-        "--tf_checkpoint_path", default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_model.ckpt', type=str, help="Path to the TensorFlow checkpoint path."
-    )
-    parser.add_argument(
-        "--bert_config_file",
-        default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_config.json',
-        type=str,
-        help="The config json file corresponding to the pre-trained BERT model. \n"
-        "This specifies the model architecture.",
-    )
-    parser.add_argument(
-        "--pytorch_dump_path", default='pytorch_model.bin', type=str,  help="Path to the output PyTorch model."
-    )
-    args = parser.parse_args()
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser()
+#     # Required parameters
+#     parser.add_argument(
+#         "--tf_checkpoint_path", default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_model.ckpt', type=str, help="Path to the TensorFlow checkpoint path."
+#     )
+#     parser.add_argument(
+#         "--bert_config_file",
+#         default='/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased/bert_config.json',
+#         type=str,
+#         help="The config json file corresponding to the pre-trained BERT model. \n"
+#         "This specifies the model architecture.",
+#     )
+#     parser.add_argument(
+#         "--pytorch_dump_path", default='pytorch_model.bin', type=str,  help="Path to the output PyTorch model."
+#     )
+#     args = parser.parse_args()
     
-    convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)
+#     convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)

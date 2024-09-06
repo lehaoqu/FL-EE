@@ -102,12 +102,13 @@ class Generator_LATENT(BaseModule):
 
 
     def statistic_loss(self, gen_latent, train_mean, train_std):
-        g_mean = gen_latent.mean([0,2], keepdim=True)
-        g_std = gen_latent.std([0,2], keepdim=True)
+        # g_mean = gen_latent.mean([0,2], keepdim=True)
+        # g_std = gen_latent.std([0,2], keepdim=True)
         
-        mean_loss = torch.mean((g_mean - train_mean) **2)
-        std_loss = torch.mean((g_std - train_std) **2)
-        loss = mean_loss + std_loss
+        # mean_loss = torch.mean((g_mean - train_mean) **2)
+        # std_loss = torch.mean((g_std - train_std) **2)
+        # loss = mean_loss + std_loss
+        loss = torch.mean(torch.mean(torch.abs(torch.mean(gen_latent, dim=0)-train_mean), dim=1))
         return loss
 
 

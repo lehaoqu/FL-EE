@@ -14,7 +14,7 @@ from utils.dataprocess import DataProcessor
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
-CLASSES = {'cifar100-224-d03': 100, 'sst2': 2}
+CLASSES = {'cifar100-224-d03': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 
 class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -29,7 +29,7 @@ class BaseClient:
         self.y_distribute = [0 for _ in range(CLASSES[args.dataset])]
         self.lr = args.lr
         self.batch_size = args.bs
-        self.epoch = args.epoch
+        self.epoch = args.epoch if len(self.dataset_train) > self.batch_size else args.epoch * 5
         self.eq_depth = depth
         self.model = model.to(self.device)
         self.exits_num = len(self.exits)
@@ -45,7 +45,7 @@ class BaseClient:
             ]
             self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08)
         else:   
-            self.optim = torch.optim.SGD(params=self.model.parameters(), momentum=0.9, weight_decay=1e-4, lr=self.lr)
+            self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
