@@ -76,7 +76,7 @@ class Server(BaseServer):
         self.sample()
         self.downlink()
         self.client_update()
-        # self.train_distribute()
+        self.train_distribute()
         self.uplink()
         self.aggregate()
         self.finetune()
@@ -124,9 +124,8 @@ class Server(BaseServer):
         
         self.clients_embeddings = []
         # == args ==
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.gamma, args.g_gap, args.g_begin
+        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gamma, args.g_gap, args.g_begin
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
-        
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99
         
@@ -140,7 +139,7 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3, momentum=0.9)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr)
         self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
         
         # == relation KD loss for small to large ==
@@ -158,7 +157,7 @@ class Server(BaseServer):
             generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
-            self.generators.append((generator, optimizer, lr_scheduler))
+            self.generators.append([generator, optimizer, lr_scheduler])
      
      
     def get_gen_latent(self, ):
@@ -238,8 +237,8 @@ class Server(BaseServer):
             # == div loss for G ==
             div_loss = self.g_beta*generator.diversity_loss(eps, gen_latent)
 
-            # stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
-            stt_loss = 0
+            stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
+            # stt_loss = 0
             
             # == ensemble logits for attend eq's
             attend_logits = ()
@@ -336,14 +335,14 @@ class Server(BaseServer):
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(t_exit_max_s_logits[t_exit][:s_exit+1])
                         t_logits = t_logits_g[t_exit]
                         
-                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        # if t_exit >= s_exit:
-                        #     loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        # else:
-                        #     loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
+                        # loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        if t_exit >= s_exit:
+                            loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        else:
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
                 
-                Loss += loss
-                # Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
+                # Loss += loss
+                Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
   
             Loss.backward()
             self.global_optimizer.step()

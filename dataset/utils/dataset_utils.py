@@ -27,7 +27,7 @@ import pickle
 
 batch_size = 32
 train_ratio = 0.8 # merge original training set and valid set, then split it manually. 
-alpha = 1000 # for Dirichlet distribution
+alpha = 0.1 # for Dirichlet distribution
 
 def check(config_path, train_path, valid_path, num_clients, niid=False, 
         balance=True, partition=None):

@@ -14,7 +14,7 @@ from utils.dataprocess import DataProcessor
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
-CLASSES = {'cifar100-224-d03': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+CLASSES = {'cifar100-224-d03': 100, 'cifar100-224-d03-1': 100, 'cifar100-224-d03-0.1': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 
 class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -45,8 +45,8 @@ class BaseClient:
             ]
             self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=self.lr, betas=(0.9, 0.999), eps=1e-08)
         else:   
-            self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr)
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
+            self.optim = torch.optim.SGD(params=self.model.parameters(), lr=self.lr, momentum=0.9, weight_decay=1e-4)
+        # self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.optim, gamma=args.gamma)
 
         self.metric = {
             'acc': DataProcessor(),
@@ -135,7 +135,19 @@ class BaseClient:
     def reset_optimizer(self, decay=True):
         if not decay:
             return
-        self.scheduler.step()
+        # self.scheduler.step()
+        if self.args.optim == 'adam':
+            param_optimizer = list(self.model.named_parameters())
+            no_decay = ['bias', 'gamma', 'beta']
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+                'weight_decay_rate': 0.01},
+                {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+            ]
+            self.optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=(self.lr * (self.args.gamma ** self.server.round)), betas=(0.9, 0.999), eps=1e-08)
+        else:   
+            self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)), momentum=0.9, weight_decay=1e-4)
+        
         # self.optim = torch.optim.SGD(params=self.model.parameters(), lr=(self.lr * (self.args.gamma ** self.server.round)), momentum=0.9, weight_decay=1e-4)
 
 

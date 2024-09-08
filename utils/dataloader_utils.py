@@ -8,11 +8,11 @@ from dataset import (
 GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 'wnli']
 
 
-CIFAR = ['cifar100-224-d03']
+CIFAR = 'cifar100-224-d03'
 
 
 def load_dataset_loader(args, file_name=None, id=None, eval_valids=False):
-    if args.dataset in CIFAR:
+    if CIFAR in args.dataset:
         if eval_valids:
             dataset = get_cifar_dataset(args=args, path=f'dataset/{args.dataset}/valid/', eval_valids=eval_valids)
         else:
