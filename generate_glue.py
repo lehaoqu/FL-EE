@@ -118,11 +118,11 @@ if __name__ == "__main__":
     partition = sys.argv[3] if sys.argv[3] != "-" else None
 
     tokenizer = AutoTokenizer.from_pretrained(
-            'models/google-bert/bert-base-uncased',
+            'models/google-bert/bert-12-uncased',
             padding_side="right",
             model_max_length=128,
             use_fast=False,
         )
     # for task in ['sst2']:
-    for task in ['mrpc', 'qqp', 'qnli']:
+    for task in ['sst2', 'mrpc', 'qqp', 'qnli']:
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)
