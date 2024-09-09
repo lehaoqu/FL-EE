@@ -60,6 +60,9 @@ class Server(BaseServer):
         
         for client in self.clients:
             self.received_params += ({'state_dict': client.model.state_dict(), 'sample': len(client.dataset_train)},)
+        
+        self.uplink_policy()
+    
     
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
@@ -78,3 +81,6 @@ class Server(BaseServer):
             aggregated_state_dict[name] = aggregate_scale_tensors(params, sample_list, self.device)
         
         self.global_model.load_state_dict(aggregated_state_dict)
+
+        
+        self.aggregate_policy()

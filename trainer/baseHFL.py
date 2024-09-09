@@ -10,6 +10,7 @@ from typing import *
 from utils.dataloader_utils import load_dataset_loader
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.dataprocess import DataProcessor
+from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
@@ -68,6 +69,9 @@ class BaseClient:
             labels = data['labels'].view(-1).cpu().tolist()
             for y in labels:
                 self.y_distribute[y] += 1
+        
+        # TODO == the max exit num is 4 ==
+        self.origin_target_policy = {self.exits_num: 4}
                         
         
     def run(self):
@@ -103,11 +107,47 @@ class BaseClient:
         
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+        
+        # self.model.eval()
+        # correct = 0
+        # total = 0
+        # corrects = [0 for _ in range(self.exits_num)]
+
+        # with torch.no_grad():
+        #     for data in self.loader_train:
+        #         batch, labels = self.adapt_batch(data)
+                
+        #         exits_logits = self.model(**batch)
+        #         exits_logits = self.policy(exits_logits)
+                
+        #         for i, exit_logits in enumerate(exits_logits):
+        #             _, predicted = torch.max(exit_logits, 1)
+        #             total += labels.size(0)
+        #             correct += (predicted == labels).sum().item()
+        #             corrects[i] += (predicted == labels).sum().item()
+        # acc = 100.00 * correct / total
+        # acc_exits = [100 * c / (total/self.exits_num) for c in corrects]
+        # print(acc)
+        # print(acc_exits)
 
     def clone_model(self, target):
         p_tensors = target.parameters_to_tensor(is_split=True)
         idx = self.args.eq_depths.index(self.eq_depth)
         self.model.tensor_to_parameters(torch.cat(p_tensors[:idx+1], 0))
+        
+    
+    def clone_policy(self, target):
+        if self.policy.name == 'l2w':
+            target_state_dict = target.meta_net.state_dict()
+            
+            new_state_dict = {}
+            for name, param in self.policy.meta_net.named_parameters():
+                if target_state_dict[name].shape != param.shape:
+                    prune_param = crop_tensor_dimensions(target_state_dict[name], self.origin_target_policy)
+                else: prune_param = target_state_dict[name]
+                new_state_dict[name] = prune_param
+            self.policy.meta_net.load_state_dict(new_state_dict)
+    
 
     def local_valid(self):
         self.model.eval()
@@ -256,6 +296,8 @@ class BaseServer:
         for client in self.sampled_clients:
             # client.clone_model(self.eq_model[client.eq_depth])
             client.clone_model(self.global_model)
+            client.clone_policy(self.eq_policy[max(self.eq_depths)])
+            
 
     def client_update(self):
         for client in self.sampled_clients:
@@ -273,12 +315,40 @@ class BaseServer:
         for idx, submodel_depth in enumerate(self.eq_depths):
             self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
                                 for client in self.sampled_submodel_clients[submodel_depth]],)
+        self.uplink_policy()
+              
+    def uplink_policy(self):
+        if self.eq_policy[max(self.eq_depths)].name == 'l2w':
+            self.received_params_policy = ()
+            for client in self.clients:
+                self.received_params_policy += ({'state_dict': client.policy.meta_net.state_dict(), 'sample': len(client.dataset_train)},)
+          
 
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
         avg_eq_tensor = [sum(eq_tensors) for eq_tensors in self.received_params]
         avg_tensor = torch.cat(avg_eq_tensor, 0)
         self.global_model.tensor_to_parameters(avg_tensor)
+        
+        self.aggregate_policy()
+
+
+    def aggregate_policy(self):
+        if self.eq_policy[max(self.eq_depths)].name == 'l2w':
+            state_dict_list = [dct['state_dict'] for dct in self.received_params_policy]
+            sample_list = [dct['sample'] for dct in self.received_params_policy]
+            
+            aggregated_state_dict = {}
+            
+            name_params = {}
+            for state_dict in state_dict_list:
+                for name, param in state_dict.items():
+                    name_params.setdefault(name, []).append(param)
+            
+            for name, params in name_params.items():
+                aggregated_state_dict[name] = aggregate_scale_tensors(params, sample_list, self.device)
+            
+            self.eq_policy[max(self.eq_depths)].meta_net.load_state_dict(aggregated_state_dict)
 
     def valid_all(self):
         self.global_model.eval()

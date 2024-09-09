@@ -35,3 +35,5 @@ class Server(BaseServer):
         exclusive_eq_depth = self.eq_depths[-1]
         self.received_params = ([client.model.parameters_to_tensor() * client.submodel_weights[exclusive_eq_depth]
                                 for client in self.sampled_submodel_clients[exclusive_eq_depth]],)
+        
+        self.uplink_policy()

@@ -97,6 +97,9 @@ class Server(BaseServer):
 
         for idx, submodel_depth in enumerate(self.eq_depths):
             self.received_params += ([{'state_dict': client.model.split_state_dict(blocks=self.global_model.config.exits)[idx], 'sample': len(client.dataset_train)} for client in self.sampled_submodel_clients[submodel_depth]],)
+        
+        self.uplink_policy()
+        
             
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
@@ -119,4 +122,5 @@ class Server(BaseServer):
                 aggregated_state_dict[name] = aggregate_scale_tensors(tensors, sample_list, self.device)
                 
         self.global_model.load_state_dict(aggregated_state_dict)
-    
+
+        self.aggregate_policy()

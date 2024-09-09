@@ -6,7 +6,7 @@ from typing import *
 
 from trainer.baseHFL import BaseServer, BaseClient
 from utils.modelload.model import BaseModule
-from utils.train_utils import get_layer_idx
+from utils.train_utils import get_layer_idx, aggregate_scale_tensors
 
 def add_args(parser):
     return parser
@@ -115,9 +115,14 @@ class Server(BaseServer):
         self.received_params = {}
         for idx, eq_depth in enumerate(self.eq_depths):
             self.received_params[eq_depth] = [self.weighted(client.model.state_dict(), client.weight) for client in self.sampled_eq_clients[eq_depth]]
+
+        self.uplink_policy()
+    
             
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
+        
+        self.aggregate_policy()
         
         # == Homomorphic aggregate ==
         momentum_eq = {}

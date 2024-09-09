@@ -187,8 +187,13 @@ class Server(BaseServer):
         for idx, eq_depth in enumerate(self.eq_depths):
             self.received_params[eq_depth] = [client.weight * client.model.parameters_to_tensor() for client in self.sampled_eq_clients[eq_depth]]
     
+        self.uplink_policy()
+    
     
     def aggregate_eq(self):
+        # == fed l2w meta_net ==
+        self.aggregate_policy()
+        
         # == First: aggregate each eq lonely ==
         for eq_depth in self.eq_depths:
             received_tensor = sum(self.received_params[eq_depth])

@@ -361,9 +361,13 @@ class Server(BaseServer):
             self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
                                 for client in self.sampled_submodel_clients[submodel_depth]],)
         
+        self.uplink_policy()
+        
         
     def aggregate(self):
         assert (len(self.sampled_clients) > 0)
+        
+        self.aggregate_policy()
         
         for eq_depth in self.eq_depths:
             self.eq_model[eq_depth].tensor_to_parameters(sum(self.received_params_eq[eq_depth]))
