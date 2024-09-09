@@ -398,3 +398,11 @@ print(b.grad)
 #     args = parser.parse_args()
     
 #     convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)
+
+import pickle as pkl
+
+for i in range(120):
+    with open(f"dataset/cifar100-224-d03-0.1/train/{i}.pkl", 'rb') as f:
+        l = pkl.load(f, encoding='bytes')
+        l = len(l[b'data'])
+        print(l)

@@ -27,7 +27,7 @@ import pickle
 
 batch_size = 32
 train_ratio = 0.8 # merge original training set and valid set, then split it manually. 
-alpha = 1000 # for Dirichlet distribution
+alpha = 1 # for Dirichlet distribution
 
 def check(config_path, train_path, valid_path, num_clients, niid=False, 
         balance=True, partition=None):
@@ -123,7 +123,8 @@ def separate_data(data, num_clients, num_classes, niid=False, balance=False, par
                 idx_batch = [idx_j + idx.tolist() for idx_j,idx in zip(idx_batch,np.split(idx_k,proportions))]
                 min_size = min([len(idx_j) for idx_j in idx_batch])
             try_cnt += 1
-
+            print(try_cnt)
+            
         for j in range(num_clients):
             dataidx_map[j] = idx_batch[j]
     else:

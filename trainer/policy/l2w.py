@@ -97,6 +97,7 @@ class MLP_tanh(nn.Module):
 class Policy():
     def __init__(self, args) -> None:
         self.name = 'l2w'
+        self.optim = args.optim
         self.exits_num = args.exits_num
         self.device = args.device
         # == default input is loss or confidence   [exits_num] ==
@@ -151,6 +152,7 @@ class Policy():
     def train_meta(self, model, batch, label, optimizer):
         batch_1, batch_2 = {},{}
         for key in batch.keys():
+            if batch[key].shape[0] < 2: return
             batch_1[key], batch_2[key] = batch[key].chunk(2, dim=0)
         label_1, label_2 = label.chunk(2, dim=0)
         
@@ -164,8 +166,21 @@ class Policy():
     def train_meta_part(self, model, optimizer, data):
         # TODO p = 15
         
-        
+        lr = optimizer.param_groups[0]['lr']
         pseudo_net = copy.deepcopy(model).to(self.device)
+
+        if self.optim == 'adam':
+            param_optimizer = list(pseudo_net.named_parameters())
+            no_decay = ['bias', 'gamma', 'beta']
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+                'weight_decay_rate': 0.01},
+                {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+            ]
+            pseudo_optimizer = torch.optim.Adam(params=optimizer_grouped_parameters, lr=lr, betas=(0.9, 0.999), eps=1e-08)
+        else:   
+            pseudo_optimizer = torch.optim.SGD(params=pseudo_net.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+        
         pseudo_net.train()
         batch_pseudo, batch_meta, label_pseudo, label_meta = data
         # print(batch_pseudo)
@@ -184,7 +199,9 @@ class Policy():
         pseudo_weight = torch.ones(pseudo_weight.shape).to(pseudo_weight.device) + 0.8 * pseudo_weight
         pseudo_loss_multi_exits = torch.sum(torch.mean(pseudo_weight * pseudo_losses, 0))
         # print(pseudo_loss_multi_exits)
+        pseudo_optimizer.zero_grad()
         pseudo_loss_multi_exits.backward(retain_graph=True)
+        pseudo_optimizer.step()
         # pseudo_grads = {n: p.grad for n, p in pseudo_net.named_parameters()}
         
         # pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True, allow_unused=True)
@@ -196,14 +213,14 @@ class Policy():
         # pseudo_optimizer = MetaSGD(pseudo_net, pseudo_net.parameters())
         # pseudo_optimizer.load_state_dict(optimizer.state_dict())
         # pseudo_optimizer.meta_step(pseudo_grads)
-        pseudo_optimizer = copy.deepcopy(optimizer)
-        pseudo_optimizer.step()
+        
+        
         
         # del pseudo_grads
         
-        for n, p in pseudo_net.named_parameters():
-            if p.requires_grad is False:
-                print(n)
+        # for n, p in pseudo_net.named_parameters():
+        #     if p.requires_grad is False:
+        #         print(n)
         meta_outputs = pseudo_net(**batch_meta)
         # print(meta_outputs)
         used_index = []

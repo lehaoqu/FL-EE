@@ -19,7 +19,7 @@ do
     python main.py depthfl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
     python main.py scalefl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
     python main.py exclusivefl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
-    python main.py heterofl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
+    # python main.py heterofl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
     python main.py eefl $ply --suffix $1 --device $2 --dataset $3 --model $md --sr $sr --total_num $total_num --lr $4 --bs $bs
 done
 
