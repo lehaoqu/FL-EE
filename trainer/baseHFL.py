@@ -29,7 +29,7 @@ class BaseClient:
         self.y_distribute = [0 for _ in range(CLASSES[args.dataset])]
         self.lr = args.lr
         self.batch_size = args.bs
-        self.epoch = args.epoch if len(self.dataset_train) > self.batch_size else args.epoch * 5
+        self.epoch = args.epoch
         self.eq_depth = depth
         self.model = model.to(self.device)
         self.exits_num = len(self.exits)
