@@ -140,7 +140,7 @@ class Policy():
             # TODO 0.8
             weight = torch.ones(weight.shape).to(weight.device) + 0.8 * weight
         
-        # print(f'weight for exits: {weight[0]}')
+        print(f'weight for exits: {weight[0]}')
         losses_tensor = torch.mean(weight*losses, 0)
         losses_tuple = tuple(losses_tensor)
         exits_loss = ()
@@ -258,10 +258,10 @@ class Policy():
                 
                 meta_loss += F.cross_entropy(meta_outputs[j][selected_index], label_meta[selected_index].long(), reduction='mean')
 
-        # print(f'{100*correct/(total):.2f}, {correct}, {total}')
+        print(f'{100*correct/(total):.2f}, {correct}, {total}')
         
         self.meta_optimizer.zero_grad()
-        # print(meta_loss)
+        print(meta_loss)
         meta_loss.backward()
         self.meta_optimizer.step()
         # print(meta_loss)
