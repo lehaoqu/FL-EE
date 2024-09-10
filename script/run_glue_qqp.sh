@@ -14,7 +14,7 @@ policies=(base boosted l2w)
 # datasets=(wnli rte)
 
 # policies=(base boosted)
-datasets=(mrpc sst2 qnli)
+datasets=(qqp)
 
 
 for ds in "${datasets[@]}"

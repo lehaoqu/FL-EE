@@ -207,8 +207,8 @@ class Server(BaseServer):
         y_distribute = self.eq_y[t_eq]
         y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
         # == data ==
-        gen_latent, eps = g[0](y_input, )
-        return y_input, gen_latent, eps
+        eps = torch.rand((y_input.shape[0], g_model.noise_dim)).to(self.device)
+        return y_input, eps
         
     
     def finetune(self,):
@@ -231,15 +231,16 @@ class Server(BaseServer):
                     s_eq = self.eq_depths[i+1]
                     t = self.eq_model_train[t_eq]
                     s = self.eq_model_train[s_eq]
-                    y_input, gen_latent, eps = self.get_gen_latent(g, t_eq)
+                    y_input, eps = self.get_gen_latent(g, t_eq)
                     
-                    
+                    gen_latent = g[0](y_input, eps)
                     # == train generator for each arrow ==
                     if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
                         print("=================")
                         print(eq_depth, s_exit)
                         self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], s_exit, y_input, gen_latent, eps, direction='sl')
 
+                    gen_latent = g[0](y_input, eps)
                     # == small eq's last exit teach larger eq's deeper exit == 
                     if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                         self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, s_exit, y_input.detach(), gen_latent.detach(), eps.detach(), direction='sl')
@@ -256,7 +257,8 @@ class Server(BaseServer):
                     s_eq = list(reversed(self.eq_depths))[i+1]
                     t = self.eq_model_train[t_eq]
                     s = self.eq_model_train[s_eq]
-                    y_input, gen_latent, eps = self.get_gen_latent(g, t_eq)
+                    y_input, eps = self.get_gen_latent(g, t_eq)
+                    gen_latent = g[0](y_input, eps)
                     
                     # == train generator for each arrow ==
                     if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
@@ -264,6 +266,7 @@ class Server(BaseServer):
                         print(eq_depth, t_exit)
                         self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], t_exit, y_input, gen_latent, eps, direction='ls')
                     
+                    gen_latent = g[0](y_input, eps)
                     # == large eq's deeper exits teach smaller eq's last exit ==
                     if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                         self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, t_exit, y_input.detach(), gen_latent.detach(), eps.detach(), direction='ls')
