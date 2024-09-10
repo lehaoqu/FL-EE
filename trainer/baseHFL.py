@@ -71,7 +71,7 @@ class BaseClient:
                 self.y_distribute[y] += 1
         
         # TODO == the max exit num is 4 ==
-        self.origin_target_policy = {self.exits_num: 4}
+        self.origin_target_policy = {4: self.exits_num}
                         
         
     def run(self):

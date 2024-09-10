@@ -11,8 +11,7 @@ bs=32
 optim=adam
 
 policies=(base boosted l2w)
-datasets=(qqp)
-# datasets=(wnli rte)
+datasets=(rte)
 
 # policies=(base boosted)
 # datasets=(mrpc sst2 qnli qqp)

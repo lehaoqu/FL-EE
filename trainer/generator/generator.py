@@ -85,9 +85,8 @@ class Generator_LATENT(BaseModule):
         # == Representation Layer ==
         self.representation_layer = nn.Linear(self.fc_configs[-1], self.latent_dim)
         
-    def forward(self, labels):
+    def forward(self, labels, eps):
         batch_size = labels.shape[0]
-        eps = torch.rand((batch_size, self.noise_dim)).to(self.device)
         if self.embedding:
             y_input = self.embedding_layer(labels)
         else:
@@ -98,7 +97,7 @@ class Generator_LATENT(BaseModule):
         for layer in self.fc_layers:
             z = layer(z)
         z = self.representation_layer(z)
-        return z.view(batch_size, self.token_num, self.hidden_rs), eps
+        return z.view(batch_size, self.token_num, self.hidden_rs)
 
 
     def statistic_loss(self, gen_latent, train_mean, train_std):

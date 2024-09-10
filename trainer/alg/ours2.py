@@ -165,7 +165,6 @@ class Server(BaseServer):
             g[0].to(self.device)
             g[0].train()
         y_input_g = {}
-        gen_latent_g = {}
         eps_g = {}
         for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
             # == new y based y_distribute ==
@@ -175,10 +174,11 @@ class Server(BaseServer):
             y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             
             # == data ==
-            gen_latent, eps = self.generators[t_exit][0](y_input, )
+            # gen_latent, eps = self.generators[t_exit][0](y_input, )
             y_input_g[t_exit] = y_input
-            gen_latent_g[t_exit] = gen_latent
-            eps_g[t_exit] = eps
+            # gen_latent_g[t_exit] = gen_latent
+            g = self.generators[t_exit][0]
+            eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
 
             # attend_logits = ()
             # for eq_depth in attend_eq:
@@ -186,22 +186,27 @@ class Server(BaseServer):
             # attend_logits = sum(attend_logits)
             
             # ts_logits[t_exit] = attend_logits
-        return y_input_g, gen_latent_g, eps_g
+        return y_input_g, eps_g
     
     
     def finetune(self):
         # == train generator & global model ==
         for _ in range(self.s_epoches):
-            y_input_g, gen_latent_g, eps_g = self.get_gen_latent()
-            
+            y_input_g, eps_g = self.get_gen_latent()
+            gen_latent_g = {}
+            for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
+                gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
+                gen_latent_g[t_exit] = gen_latent      
             if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
                 self.train_generator(y_input_g, gen_latent_g, eps_g)
             
+            
             for eq, y_input in y_input_g.items():
                 y_input_g[eq] = y_input.detach()
-            for eq, gen_latent in gen_latent_g.items():
-                gen_latent_g[eq] = gen_latent.detach()
-            
+            gen_latent_g = {}
+            for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
+                gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
+                gen_latent_g[t_exit] = gen_latent.detach()
             if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                 self.finetune_global_model(y_input_g, gen_latent_g)
                 
