@@ -338,7 +338,7 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
+                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent)).detach()
                 
                 # == kd_loss for G ==
                 kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
@@ -347,7 +347,7 @@ class Server(BaseServer):
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
             elif direction == 'ls':
-                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent)).deatch()
                 s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
                 
                 kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
@@ -435,7 +435,7 @@ class Server(BaseServer):
             # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
             # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
             
-            t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
+            t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent)).deatch()
             s_logits = s_policy.sf(s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
             
             dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
@@ -449,10 +449,10 @@ class Server(BaseServer):
             loss = dist_loss + angle_loss + dark_loss
         
         elif direction == 'ls':
-            t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+            t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent)).detach()
             s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
             
-            kd_loss = self.kd_criterion(s_logits, t_logits.detach())
+            kd_loss = self.kd_criterion(s_logits, t_logits)
             
             KD_LOSS += kd_loss
             
