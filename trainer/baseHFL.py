@@ -108,27 +108,6 @@ class BaseClient:
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
         
-        # self.model.eval()
-        # correct = 0
-        # total = 0
-        # corrects = [0 for _ in range(self.exits_num)]
-
-        # with torch.no_grad():
-        #     for data in self.loader_train:
-        #         batch, labels = self.adapt_batch(data)
-                
-        #         exits_logits = self.model(**batch)
-        #         exits_logits = self.policy(exits_logits)
-                
-        #         for i, exit_logits in enumerate(exits_logits):
-        #             _, predicted = torch.max(exit_logits, 1)
-        #             total += labels.size(0)
-        #             correct += (predicted == labels).sum().item()
-        #             corrects[i] += (predicted == labels).sum().item()
-        # acc = 100.00 * correct / total
-        # acc_exits = [100 * c / (total/self.exits_num) for c in corrects]
-        # print(acc)
-        # print(acc_exits)
 
     def clone_model(self, target):
         p_tensors = target.parameters_to_tensor(is_split=True)

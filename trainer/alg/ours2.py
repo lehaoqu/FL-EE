@@ -198,7 +198,7 @@ class Server(BaseServer):
                 gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
                 gen_latent_g[t_exit] = gen_latent      
             if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
-                self.train_generator(y_input_g, gen_latent_g, eps_g)
+                self.train_generators(y_input_g, gen_latent_g, eps_g)
             
             
             for eq, y_input in y_input_g.items():
@@ -211,7 +211,7 @@ class Server(BaseServer):
                 self.finetune_global_model(y_input_g, gen_latent_g)
                 
     
-    def train_generator(self, y_input_g, gen_latent_g, eps_g):
+    def train_generators(self, y_input_g, gen_latent_g, eps_g):
         for g in self.generators:
             g[0].to(self.device)
             g[0].train()

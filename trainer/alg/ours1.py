@@ -213,63 +213,18 @@ class Server(BaseServer):
     
     def finetune(self,):
         for _ in range(self.s_epoches):
-    
             # == Second: small to large ==
             # 1. aggregate params 2. train generator 2. small teach large
+            # == 1. 一次性的聚合所有align的exits 并赋值 ==
             for i, eq_depth in enumerate(self.eq_depths):
                 if eq_depth == max(self.eq_depths): break
-                
-                # == aggregate for eq ==
                 self.aggregate_aligned_layers(eq_depth)
-                
-                if self.args.sl == 0: continue
-                # == each KD arrow for specific eq ==
-                # == small eq's last exit teach larger eq's deeper exits == 
-                for s_exit, g in self.sl_generators[eq_depth].items():
-                    
-                    t_eq = self.eq_depths[i]
-                    s_eq = self.eq_depths[i+1]
-                    t = self.eq_model_train[t_eq]
-                    s = self.eq_model_train[s_eq]
-                    y_input, eps = self.get_gen_latent(g, t_eq)
-                    
-                    gen_latent = g[0](y_input, eps)
-                    # == train generator for each arrow ==
-                    if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
-                        print("=================")
-                        print(eq_depth, s_exit)
-                        self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], s_exit, y_input, gen_latent, eps, direction='sl')
-
-                    gen_latent = g[0](y_input, eps)
-                    # == small eq's last exit teach larger eq's deeper exit == 
-                    if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
-                        self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, s_exit, y_input.detach(), gen_latent.detach(), eps.detach(), direction='sl')
-
-            # == Third: large to small ==
-            for i, eq_depth in enumerate(reversed(self.eq_depths)):
-                if eq_depth == min(self.eq_depths): break
-
-                if self.args.ls == 0: continue
-                # == each KD arrow for specific eq ==
-                # == larger eq's deeper exits teach smaller eq's last exits ==
-                for t_exit, g in self.ls_generators[eq_depth].items():
-                    t_eq = list(reversed(self.eq_depths))[i]
-                    s_eq = list(reversed(self.eq_depths))[i+1]
-                    t = self.eq_model_train[t_eq]
-                    s = self.eq_model_train[s_eq]
-                    y_input, eps = self.get_gen_latent(g, t_eq)
-                    gen_latent = g[0](y_input, eps)
-                    
-                    # == train generator for each arrow ==
-                    if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
-                        print("================")
-                        print(eq_depth, t_exit)
-                        self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], t_exit, y_input, gen_latent, eps, direction='ls')
-                    
-                    gen_latent = g[0](y_input, eps)
-                    # == large eq's deeper exits teach smaller eq's last exit ==
-                    if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
-                        self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, t_exit, y_input.detach(), gen_latent.detach(), eps.detach(), direction='ls')
+    
+            y_input_gs_sl, eps_gs_sl = self.train_generators(direction='sl')
+            self.finetune_eq_model(y_input_gs_sl, eps_gs_sl, direction='sl')
+            
+            y_input_gs_ls, eps_gs_ls = self.train_generators(direction='ls')
+            self.finetune_eq_model(y_input_gs_ls, eps_gs_ls, direction='ls')
                 
 
     def aggregate_aligned_layers(self, eq_depth):
@@ -294,6 +249,50 @@ class Server(BaseServer):
         tensor = sum(tensors)
         for depth in attend_eqs:
             self.eq_model[depth].tensor_to_parameters(tensor, layers=aligned_layers)
+    
+    
+    def train_generators(self, direction='sl'):
+        y_input_gs = {}, eps_gs = {}
+        # == 2. train generator jointly ==
+        for i, eq_depth in enumerate(self.eq_depths):
+            if direction == 'sl':
+            
+                if eq_depth == max(self.eq_depths): break
+                if self.args.sl == 0: continue
+                # == each KD arrow for specific eq ==
+                # == small eq's last exit teach larger eq's deeper exits == 
+                for s_exit, g in self.sl_generators[eq_depth].items():
+                    t_eq, s_eq, t, s = self.eq_depths[i], self.eq_depths[i+1], self.eq_model_train[t_eq], self.eq_model_train[s_eq]
+                    y_input, eps = self.get_gen_latent(g, t_eq)                    
+                    gen_latent = g[0](y_input, eps)
+                    
+                    # == train generator for each arrow ==
+                    if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+                        print("=================")
+                        print(eq_depth, s_exit)
+                        self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], s_exit, y_input, gen_latent, eps, direction)
+                    y_input_gs[(eq_depth, s_exit)] = y_input.detach()
+                    eps_gs[(eq_depth, s_exit)] = eps.detach()
+            
+            elif direction == 'ls':  
+                if eq_depth == min(self.eq_depths): break
+                if self.args.ls == 0: continue
+                # == each KD arrow for specific eq ==
+                # == larger eq's deeper exits teach smaller eq's last exits ==
+                for t_exit, g in self.ls_generators[eq_depth].items():
+                    t_eq, s_eq, t, s = list(reversed(self.eq_depths))[i], list(reversed(self.eq_depths))[i+1], self.eq_model_train[t_eq], self.eq_model_train[s_eq]
+                    y_input, eps = self.get_gen_latent(g, t_eq)
+                    gen_latent = g[0](y_input, eps)
+                    
+                    # == train generator for each arrow ==
+                    if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+                        print("================")
+                        print(eq_depth, t_exit)
+                        self.update_generator(self.g_n_iters, g, t_eq, s_eq, t[0], s[0], t_exit, y_input, gen_latent, eps, direction)
+                    y_input_gs[(eq_depth, t_exit)] = y_input.detach()
+                    eps_gs[(eq_depth, t_exit)] = eps.detach()
+            
+        return y_input_gs, eps_gs
     
     
     def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, y_input, gen_latent, eps, direction='sl'):        
@@ -363,7 +362,51 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
        
     
-    def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, y_input, gen_latent, eps, direction='sl'):
+    def finetune_eq_model(self, y_input_gs, eps_gs, direction='sl'):
+        # == 2. train generator jointly ==
+        total_loss = torch.zeros(1).to(self.device)
+        for i, eq_depth in enumerate(self.eq_depths):
+            if direction == 'sl':
+                if eq_depth == max(self.eq_depths): break
+                if self.args.sl == 0: continue
+                # == each KD arrow for specific eq ==
+                # == small eq's last exit teach larger eq's deeper exits == 
+                for s_exit, g in self.sl_generators[eq_depth].items():
+                    t_eq, s_eq, t, s = self.eq_depths[i], self.eq_depths[i+1], self.eq_model_train[t_eq], self.eq_model_train[s_eq]
+                    y_input, eps = y_input_gs[(eq_depth, s_exit)], eps_gs[(eq_depth, s_exit)]
+                    gen_latent = g[0](y_input, eps).detach()
+                  
+                    # == small eq's last exit teach larger eq's deeper exit == 
+                    if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                        total_loss += self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, s_exit, gen_latent, direction)
+            
+            elif direction == 'ls':
+                for i, eq_depth in enumerate(reversed(self.eq_depths)):
+                    if eq_depth == min(self.eq_depths): break
+                    if self.args.ls == 0: continue
+                    # == each KD arrow for specific eq ==
+                    # == larger eq's deeper exits teach smaller eq's last exits ==
+                    for t_exit, g in self.ls_generators[eq_depth].items():
+                        t_eq, s_eq, t, s = list(reversed(self.eq_depths))[i], list(reversed(self.eq_depths))[i+1], self.eq_model_train[t_eq], self.eq_model_train[s_eq]                  
+                        y_input, eps = y_input_gs[(eq_depth, t_exit)], eps_gs[(eq_depth, t_exit)]
+                        gen_latent = g[0](y_input, eps).detach()
+                
+                        # == large eq's deeper exits teach smaller eq's last exit ==
+                        if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                            total_loss += self.teach_next_model(self.kd_n_iters, g, t_eq, s_eq, t, s, t_exit, gen_latent.detach(), direction)
+        
+        # == update all eq_models jointly == 
+        for eq_depth, eq_model in self.eq_model_train.items():
+            eq_model[1].zero_grad()
+            eq_model[1].step()
+        total_loss.backward()
+        for eq_depth, eq_model in self.eq_model_train.items():
+            eq_model[1].step()
+        
+        print(f'total loss: {total_loss.deatch().cpu().item()}')          
+    
+    
+    def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, gen_latent, direction='sl'):
         DIST_LOSS, ANGLE_LOSS, DARK_LOSS, KD_LOSS = 0, 0, 0, 0
 
         t_policy = self.eq_policy[t_eq]
@@ -413,12 +456,13 @@ class Server(BaseServer):
                 
                 loss = kd_loss
             
-            loss.backward()
-            s_optimizer.step()
+            # loss.backward()
+            # s_optimizer.step()
         if direction == 'sl':
             print(f'dist_loss:{DIST_LOSS/n_iters}, angle_loss: {ANGLE_LOSS/n_iters}, dark_loss: {DARK_LOSS/n_iters}')
         else:
             print(f'kd_loss:{KD_LOSS/n_iters}')
+        return loss
         
     
     def downlink(self):
