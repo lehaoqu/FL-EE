@@ -586,7 +586,7 @@ class ExitModel(BertPreTrainedModel, BaseModule):
             is_latent=is_latent,
             rt_embedding=rt_embedding
         )
-        if rt_feature: return exits_feature
+        if rt_feature: return exits_logits, exits_feature
         else: return exits_logits
                 
         # hidden_states = BaseModelOutputWithPoolingAndCrossAttentions(outputs).hidden_states

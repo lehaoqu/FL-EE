@@ -227,7 +227,7 @@ class Server(BaseServer):
     
     def update_generator(self, g, exit_idx, n_iters, y_input_g, gen_latent_g, eps_g):
         
-        CE_LOSS, DIV_LOSS, KD_LOSS, STT_LOSS = 0, 0, 0, 0
+        CE_LOSS, DIV_LOSS, GAP_LOSS, STT_LOSS = 0, 0, 0, 0
         
         generator = g[0]
         optimizer = g[1]
@@ -247,9 +247,16 @@ class Server(BaseServer):
             
             # == ensemble logits for attend eq's
             attend_logits = ()
+            attend_feature = ()
             for eq_depth in attend_eq:
-                attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
-            attend_logits = sum(attend_logits)
+                r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
+                exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx, is_latent=self.is_latent, rt_feature=True)
+                
+                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r)
+                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r)
+                
+            attend_logits = sum(attend_logits).detach()
+            attend_feature = sum(attend_feature).detach()
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
             kd_loss = self.g_eta*torch.zeros(1).to(self.device)
@@ -259,23 +266,32 @@ class Server(BaseServer):
                 former_attend_logits = ()
                 former_attend_feature = ()
                 for eq_depth in former_attend_eq:
-                    former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
-                    # former_attend_feature
+                    r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq])
+                    
+                    exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent, rt_feature=True)
+                    former_attend_logits += (self.eq_policy[eq_depth].sf(exits_logits)*r)
+                    former_attend_feature += (self.eq_policy[eq_depth].sf(exits_feature)*r)
+
                 former_attend_logits = sum(former_attend_logits)
+                former_attend_feature = sum(former_attend_feature)
                 
-                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
+                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature, attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature, attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature, attend_feature)
+                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits)
+                gap_loss = relation_loss + kd_loss
+                
+                
                 # kd_loss = self.g_eta*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))
             
-            loss = ce_loss + div_loss - kd_loss + stt_loss
+            loss = ce_loss + div_loss - gap_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
             
             CE_LOSS += ce_loss
             DIV_LOSS += div_loss
-            KD_LOSS += kd_loss
+            GAP_LOSS += gap_loss
             STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
     
         
     def finetune_global_model(self, y_input_g, gen_latent_g):
@@ -292,7 +308,7 @@ class Server(BaseServer):
     
     def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
         
-        t_logits_g = {}
+        t_logits_g, t_feature_g = {}, {}
         
         for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
             # == new y based y_distribute ==
@@ -308,11 +324,17 @@ class Server(BaseServer):
             y_input, gen_latent = y_input_g[t_exit], gen_latent_g[t_exit]
 
             attend_logits = ()
+            attend_feature = ()
             for eq_depth in attend_eq:
-                attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=t_exit, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq]), )
+                r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
+                exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=t_exit, is_latent=self.is_latent, rt_feature=True)
+                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r)
+                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r)
             attend_logits = sum(attend_logits)
+            attend_feature = sum(attend_feature)
             
             t_logits_g[t_exit] = attend_logits.detach()
+            t_feature_g[t_exit] = attend_feature.deatch()
         Losses = []
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()
@@ -326,10 +348,12 @@ class Server(BaseServer):
                         t_exit_s_exit.setdefault(t_exit, []).append(s_exit)
             
             t_exit_max_s_logits = {}
+            t_exit_max_s_feature = {}
             for t_exit in t_exit_s_exit.keys():
                 max_s_exit = max(t_exit_s_exit[t_exit])
-                max_s_logits = self.global_model(gen_latent_g[t_exit], stop_exit=max_s_exit, is_latent=self.is_latent)
+                max_s_logits, max_s_feature = self.global_model(gen_latent_g[t_exit], stop_exit=max_s_exit, is_latent=self.is_latent, rt_feature=True)
                 t_exit_max_s_logits[t_exit] = max_s_logits
+                t_exit_max_s_feature[t_exit] = max_s_feature
             
             
             
@@ -340,13 +364,15 @@ class Server(BaseServer):
                     if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
 
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(t_exit_max_s_logits[t_exit][:s_exit+1])
-                        t_logits = t_logits_g[t_exit]
+                        s_feature = self.eq_policy[max(self.eq_depths)].sf(t_exit_max_s_feature[t_exit][:s_exit+1])
+                        
+                        t_logits, t_feature = t_logits_g[t_exit], t_feature_g[t_exit]
                         
                         # loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
                         if t_exit >= s_exit:
                             loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
                         else:
-                            loss += self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature)
                 
                 # Loss += loss
                 Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))

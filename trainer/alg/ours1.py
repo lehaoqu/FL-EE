@@ -406,7 +406,7 @@ class Server(BaseServer):
                 eq_model[1].step()
                 eq_model[1].zero_grad()
         
-        print(f'total loss: {total_loss.detach().cpu().item()}')          
+            print(f'total loss: {total_loss.detach().cpu().item()}')          
     
     
     def teach_next_model(self, n_iters, g, t_eq, s_eq, t, s, g_exit, gen_latent, direction='sl'):
@@ -452,7 +452,7 @@ class Server(BaseServer):
             t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
             s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
             
-            kd_loss = self.kd_criterion(s_logits, t_logits)
+            kd_loss = self.kd_criterion(s_logits, t_logits.detach())
             
             KD_LOSS += kd_loss
             
