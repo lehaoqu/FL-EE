@@ -306,6 +306,7 @@ class BertExitEncoder(nn.Module):
     ):
         
         exits_logits = ()
+        exits_feature = ()
 
         for i, layer_module in enumerate(self.layer):
 
@@ -324,10 +325,11 @@ class BertExitEncoder(nn.Module):
 
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             if layer_module.exit:
-                exits_logits += (exit_logits,)
+                exits_logits += (exit_logits, )
+                exits_feature += (exits_feature, )
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
-        return exits_logits
+        return exits_logits, exits_feature
     
     
 class BertExitEncoderRee(nn.Module):
@@ -364,7 +366,8 @@ class BertExitEncoderRee(nn.Module):
     ):
         
         cls_tokens = []
-        all_ree_exit_outputs = ()
+        exits_logits = ()
+        exits_feature = ()
 
         for i, layer_module in enumerate(self.layer):
 
@@ -396,15 +399,15 @@ class BertExitEncoderRee(nn.Module):
                 mod_tokens = self.accumulator(exit_cls_tokens)
                 _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
                 # 记录每个exit的logits  exits_num * (batch*label_nums)
-                all_ree_exit_outputs += (_outputs, )
-            
+                exits_logits += (_outputs, )
+                exits_feature += (hidden_states, )
             if self.accumulator.modulation:
                 if mod_tokens is None:
                     mod_tokens = self.accumulator(torch.cat((cls_tokens), 1))
                     hidden_states[:, 0] = mod_tokens[:, -1]
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
-        return all_ree_exit_outputs
+        return exits_logits, exits_feature
 
 
 class BertExitModel(BertPreTrainedModel):
@@ -516,7 +519,7 @@ class BertExitModel(BertPreTrainedModel):
         if rt_embedding:
             return hidden_states
         
-        encoder_outputs = self.encoder(
+        exits_logits, exits_feature = self.encoder(
             hidden_states,
             attention_mask=extended_attention_mask,
             o_attention_mask=attention_mask,
@@ -526,7 +529,7 @@ class BertExitModel(BertPreTrainedModel):
             past_key_values=past_key_values,
             stop_exit=stop_exit
         )
-        return encoder_outputs
+        return exits_logits, exits_feature
         # sequence_output = encoder_outputs[0]
         # pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
@@ -572,16 +575,19 @@ class ExitModel(BertPreTrainedModel, BaseModule):
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
         rt_embedding:Optional[bool]=False,
-        labels:Optional[torch.Tensor] = None
+        labels:Optional[torch.Tensor] = None,
+        rt_feature:Optional[bool]=False,
     ):
 
-        outputs = self.bert(
+        exits_logits, exits_feature = self.bert(
             input_ids,
             attention_mask=attention_mask,
             stop_exit=stop_exit,
             is_latent=is_latent,
             rt_embedding=rt_embedding
         )
+        if rt_feature: return exits_feature
+        else: return exits_logits
                 
         # hidden_states = BaseModelOutputWithPoolingAndCrossAttentions(outputs).hidden_states
 
@@ -590,5 +596,3 @@ class ExitModel(BertPreTrainedModel, BaseModule):
         #     if i < self.config.num_hidden_layers:
         #         classifier = getattr(self.bert.encoder.layer[i], f"classifier")
         #         all_logits += (classifier(hidden_states[i + 1], attention_mask),)
-
-        return outputs
