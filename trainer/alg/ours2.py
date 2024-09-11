@@ -255,8 +255,8 @@ class Server(BaseServer):
                 attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
                 attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
                 
-            attend_logits = sum(attend_logits).detach()
-            attend_feature = sum(attend_feature).detach()
+            attend_logits = sum(attend_logits)
+            attend_feature = sum(attend_feature)
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
             gap_loss = self.g_eta*torch.zeros(1).to(self.device)
@@ -275,8 +275,8 @@ class Server(BaseServer):
                 former_attend_logits = sum(former_attend_logits)
                 former_attend_feature = sum(former_attend_feature)
                 
-                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature, attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature, attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature, attend_feature)
-                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits)
+                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature, attend_feature.detach()) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature, attend_feature.detach()) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature, attend_feature.detach())
+                kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
                 gap_loss = relation_loss + kd_loss
                 
                 

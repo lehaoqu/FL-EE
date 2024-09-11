@@ -338,19 +338,19 @@ class Server(BaseServer):
                 
                 # == teacher's logits ==
                 # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent)).detach()
+                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
                 
                 # == kd_loss for G ==
-                kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits)
+                kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits.detach())
                 
                 # == ce_loss for G ==
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
             elif direction == 'ls':
-                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent)).detach()
+                t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
                 s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
                 
-                kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits)
+                kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits.detach())
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
             loss = ce_loss + div_loss - kd_loss + stt_loss
