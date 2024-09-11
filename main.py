@@ -96,7 +96,7 @@ class FedSim:
         with open(self.config_save_path, 'w', encoding='utf-8') as f:
             json.dump(self.server.global_model.config.to_dict(), f, ensure_ascii=False, indent=4)
         
-        valid_GAP = self.args.valid_gap
+        valid_GAP = self.args.valid_gap if args.dataset not in ('mrpc', 'rte') else 1
         best_acc = 0.0
         best_rnd = 0
         try:
@@ -146,11 +146,11 @@ class FedSim:
 
 
 if __name__ == '__main__':
-    # torch.manual_seed(1024)
-    # torch.cuda.manual_seed(1024)
-    # torch.cuda.manual_seed_all(1024)
-    # np.random.seed(1024)
-    # random.seed(1024)
+    torch.manual_seed(1024)
+    torch.cuda.manual_seed(1024)
+    torch.cuda.manual_seed_all(1024)
+    np.random.seed(1024)
+    random.seed(1024)
     
     args = args_parser()
     fed = FedSim(args=args)

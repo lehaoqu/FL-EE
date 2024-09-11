@@ -10,7 +10,7 @@ total_num=120
 bs=32
 optim=adam
 
-policies=(base boosted l2w)
+policies=(base boosted)
 # datasets=(wnli rte)
 
 # policies=(base boosted)
