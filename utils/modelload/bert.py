@@ -326,7 +326,7 @@ class BertExitEncoder(nn.Module):
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             if layer_module.exit:
                 exits_logits += (exit_logits, )
-                exits_feature += (exits_feature, )
+                exits_feature += (hidden_states[:0], )
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
         return exits_logits, exits_feature
@@ -400,7 +400,7 @@ class BertExitEncoderRee(nn.Module):
                 _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
                 # 记录每个exit的logits  exits_num * (batch*label_nums)
                 exits_logits += (_outputs, )
-                exits_feature += (hidden_states, )
+                exits_feature += (hidden_states[:0], )
             if self.accumulator.modulation:
                 if mod_tokens is None:
                     mod_tokens = self.accumulator(torch.cat((cls_tokens), 1))

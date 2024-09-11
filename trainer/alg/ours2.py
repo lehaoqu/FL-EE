@@ -257,8 +257,10 @@ class Server(BaseServer):
             if exit_idx != 0:
                 former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
                 former_attend_logits = ()
+                former_attend_feature = ()
                 for eq_depth in former_attend_eq:
                     former_attend_logits += (self.eq_policy[eq_depth].sf(self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent)) * self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq]), )
+                    # former_attend_feature
                 former_attend_logits = sum(former_attend_logits)
                 
                 kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
