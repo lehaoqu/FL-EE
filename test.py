@@ -347,16 +347,16 @@ import time
 """Convert BERT checkpoint."""
  
  
-import argparse
-import logging
+# import argparse
+# import logging
  
-import torch
+# import torch
  
-a = torch.tensor([1.0,2.0], dtype=torch.float32, requires_grad=True)
-b = torch.tensor([3.0,4.0], dtype=torch.float32, requires_grad=True)
-c = torch.sum(a+b)
-c.backward()
-print(b.grad)
+# a = torch.tensor([1.0,2.0], dtype=torch.float32, requires_grad=True)
+# b = torch.tensor([3.0,4.0], dtype=torch.float32, requires_grad=True)
+# c = torch.sum(a+b)
+# c.backward()
+# print(b.grad)
 
 
 # from transformers import BertConfig, BertForPreTraining, load_tf_weights_in_bert
@@ -399,10 +399,14 @@ print(b.grad)
     
 #     convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)
 
-import pickle as pkl
+# import pickle as pkl
 
-for i in range(120):
-    with open(f"dataset/cifar100-224-d03-0.1/train/{i}.pkl", 'rb') as f:
-        l = pkl.load(f, encoding='bytes')
-        l = len(l[b'data'])
-        print(l)
+# for i in range(120):
+#     with open(f"dataset/cifar100-224-d03-0.1/train/{i}.pkl", 'rb') as f:
+#         l = pkl.load(f, encoding='bytes')
+#         l = len(l[b'data'])
+#         print(l)
+import torch
+a = torch.rand(1,2,3)
+print(a)
+print(a[:, 0])

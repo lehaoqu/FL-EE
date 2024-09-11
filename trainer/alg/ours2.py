@@ -252,14 +252,14 @@ class Server(BaseServer):
                 r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
                 exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx, is_latent=self.is_latent, rt_feature=True)
                 
-                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r)
-                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r)
+                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
+                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
                 
             attend_logits = sum(attend_logits).detach()
             attend_feature = sum(attend_feature).detach()
             
             ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
-            kd_loss = self.g_eta*torch.zeros(1).to(self.device)
+            gap_loss = self.g_eta*torch.zeros(1).to(self.device)
             
             if exit_idx != 0:
                 former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
@@ -269,8 +269,8 @@ class Server(BaseServer):
                     r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq])
                     
                     exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent, rt_feature=True)
-                    former_attend_logits += (self.eq_policy[eq_depth].sf(exits_logits)*r)
-                    former_attend_feature += (self.eq_policy[eq_depth].sf(exits_feature)*r)
+                    former_attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
+                    former_attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
 
                 former_attend_logits = sum(former_attend_logits)
                 former_attend_feature = sum(former_attend_feature)
@@ -328,13 +328,13 @@ class Server(BaseServer):
             for eq_depth in attend_eq:
                 r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
                 exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=t_exit, is_latent=self.is_latent, rt_feature=True)
-                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r)
-                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r)
+                attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
+                attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
             attend_logits = sum(attend_logits)
             attend_feature = sum(attend_feature)
             
             t_logits_g[t_exit] = attend_logits.detach()
-            t_feature_g[t_exit] = attend_feature.deatch()
+            t_feature_g[t_exit] = attend_feature.detach()
         Losses = []
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()

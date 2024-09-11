@@ -162,7 +162,7 @@ class ViTExitEncoder(nn.Module):
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             if layer_module.exit:
                 exits_logits += (exit_logits,)
-                exits_feature += (hidden_states[:0], )
+                exits_feature += (hidden_states[:, 0], )
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
         return exits_logits, exits_feature
         
@@ -225,7 +225,7 @@ class ViTExitEncoderRee(nn.Module):
                 _outputs = self.accumulator.head(mod_tokens[:, 0] + exit_cls_tokens[:, -1])
                 # 记录每个exit的logits  exits_num * (batch*label_nums)
                 exits_logits += (_outputs, )
-                exits_feature += (hidden_states[:0], )
+                exits_feature += (hidden_states[:, 0], )
             
             if self.accumulator.modulation:
                 if mod_tokens is None:
@@ -289,7 +289,7 @@ class ViTExitModel(ViTPreTrainedModel):
             stop_exit=stop_exit
         )
             
-        return exits_logits, exits_feature
+        return (exits_logits, exits_feature)
 
 
 
@@ -321,7 +321,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         rt_feature:Optional[bool]=False
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
-        exits_logits, exits_feature = self.vit(
+        outputs = self.vit(
             pixel_values,
             head_mask=head_mask,
             interpolate_pos_encoding=interpolate_pos_encoding,
@@ -329,8 +329,9 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
             is_latent=is_latent,
             rt_embedding=rt_embedding,
         )
-        if rt_feature: return exits_logits, exits_feature
-        else: return exits_logits
+        if rt_embedding: return outputs
+        if rt_feature: return outputs
+        return outputs[0]
 
         # sequence_output = outputs[0]
         # logits = self.classifier(sequence_output[:, 0, :])
