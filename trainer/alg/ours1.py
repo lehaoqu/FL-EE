@@ -300,7 +300,7 @@ class Server(BaseServer):
     
     def update_generator(self, n_iters, g, t_eq, s_eq, t_model, s_model, g_exit, y_input, gen_latent, eps, direction='sl'):        
         
-        CE_LOSS, DIV_LOSS, KD_LOSS, STT_LOSS = 0, 0, 0, 0
+        CE_LOSS, DIV_LOSS, GAP_LOSS, STT_LOSS = 0, 0, 0, 0
         
         t_policy = self.eq_policy[t_eq]
         s_policy = self.eq_policy[s_eq]
@@ -324,25 +324,21 @@ class Server(BaseServer):
             
             if direction == 'sl':
                 begin_exit = len(t_model.config.exits)-2 if len(t_model.config.exits) > 1 else None
-                
-                # besides s_exit, all_logits len is (s_exits - t_exits + 1) - 1
-                all_other_logits = ()
-                for end_exit in self.sl_generators[t_eq].keys():
-                    if end_exit == g_exit: continue
-                    # logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, end_exit))
-                    logits = s_policy.sf(s_model(gen_latent, stop_exit=end_exit, is_latent=self.is_latent))
-                    all_other_logits += (logits, )
-                    
-                # == ensemble_logits for student exits [batch * hidden_size]
-                ensemble_logits = torch.mean(torch.stack(all_other_logits), dim=0)
+                                
+                logits, feature = s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent, rt_feature=True)
+                s_feature = feature[-1]
                 
                 # == teacher's logits ==
-                # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
-                t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent))
+                t_logits, t_feature = t_model(gen_latent, is_latent=self.is_latent, rt_feature=True)
+                t_feature = t_feature[-1]
+                t_logits = t_policy.sf(t_logits)
                 
                 # == kd_loss for G ==
-                kd_loss = self.g_eta*self.kd_criterion(ensemble_logits, t_logits.detach())
+                dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature.detach())
+                angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature.detach())
+                dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature.detach())
                 
+                gap_loss = dist_loss + angle_loss + dark_loss
                 # == ce_loss for G ==
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
@@ -350,19 +346,19 @@ class Server(BaseServer):
                 t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
                 s_logits = s_policy.sf(s_model(gen_latent, is_latent=self.is_latent))
                 
-                kd_loss = self.g_eta*self.kd_criterion(s_logits, t_logits.detach())
+                gap_loss = self.g_eta*self.kd_criterion(s_logits, t_logits.detach())
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
-            loss = ce_loss + div_loss - kd_loss + stt_loss
+            loss = ce_loss + div_loss - gap_loss + stt_loss
             loss.backward(retain_graph=True) if i < n_iters-1 else loss.backward() 
             
             CE_LOSS += ce_loss
             DIV_LOSS += div_loss
-            KD_LOSS += kd_loss
+            GAP_LOSS += gap_loss
             STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, kd_loss: {KD_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
+        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
        
     
     def finetune_eq_model(self, y_input_gs, eps_gs, direction='sl'):
@@ -435,12 +431,15 @@ class Server(BaseServer):
             # t_logits = t_model(latent=gen_latent, exit_idxs=(begin_exit, len(t_model.config.exits)-1))
             # s_logits = s_model(latent=gen_latent, exit_idxs=(begin_exit, s_exit))
             
-            t_logits = t_policy.sf(t_model(gen_latent, is_latent=self.is_latent)).detach()
-            s_logits = s_policy.sf(s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent))
+            t_logits, t_feature = t_model(gen_latent, is_latent=self.is_latent, rt_feature=True)
+            t_feature = t_feature[-1].detach()
+
+            s_logits, s_feature = s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent, rt_feature=True)
+            s_feature = s_feature[-1]
             
-            dist_loss = self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
-            angle_loss = self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
-            dark_loss = self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
+            dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature)
+            angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature)
+            dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature)
             
             DIST_LOSS += dist_loss
             ANGLE_LOSS += angle_loss
