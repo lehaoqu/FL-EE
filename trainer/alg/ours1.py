@@ -9,6 +9,7 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
+    parser.add_argument('--is_feature', default=False, type=bool)
     
     parser.add_argument('--s_epoches', default=5, type=int)
     
@@ -123,6 +124,7 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
         
         # == args ==
+        self.is_feature = args.is_feature
         self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.gamma, args.g_gap, args.g_begin
         self.kd_lr, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
@@ -233,10 +235,10 @@ class Server(BaseServer):
             begin_layer = 0
             end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
         elif eq_depth == max(self.eq_depths):
-            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
+            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]
             end_layer = max(self.eq_depths)
         else:
-            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]+1
+            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]
             end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
     
         aligned_layers = [begin_layer, end_layer]
@@ -334,9 +336,9 @@ class Server(BaseServer):
                 t_logits = t_policy.sf(t_logits)
                 
                 # == kd_loss for G ==
-                dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature.detach())
-                angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature.detach())
-                dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature.detach())
+                dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits.detach())
+                angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits.detach())
+                dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits.detach())
                 
                 gap_loss = dist_loss + angle_loss + dark_loss
                 # == ce_loss for G ==
@@ -433,13 +435,15 @@ class Server(BaseServer):
             
             t_logits, t_feature = t_model(gen_latent, is_latent=self.is_latent, rt_feature=True)
             t_feature = t_feature[-1].detach()
+            t_logits = t_policy.sf(t_logits).detach()
 
             s_logits, s_feature = s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent, rt_feature=True)
             s_feature = s_feature[-1]
+            s_logits = s_policy.sf(s_logits)
             
-            dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature)
-            angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature)
-            dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature)
+            dist_loss = self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits)
+            angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) if self.is_feature else self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits)
+            dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) if self.is_feature else self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
             
             DIST_LOSS += dist_loss
             ANGLE_LOSS += angle_loss

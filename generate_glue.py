@@ -125,5 +125,5 @@ if __name__ == "__main__":
         )
     # for task in ['sst2']:
     # for task in ['sst2', 'mrpc', 'qqp', 'qnli']:
-    for task in ['wnli', 'rte']:
+    for task in ['qnli']:
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)

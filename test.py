@@ -319,11 +319,7 @@ import time
 # gc.collect()
 # time.sleep(30)
 
-# from transformers import AutoTokenizer
 
-# model_name = "prajjwal1/bert-small"  # 替换为你的模型名称
-# tokenizer = AutoTokenizer.from_pretrained('/data/qvlehao/FL-EE/models/prajjwal/bert-small')
-# print(tokenizer)
 
 # from transformers import TFBertForPreTraining
 
@@ -407,6 +403,10 @@ import time
 #         l = len(l[b'data'])
 #         print(l)
 import torch
-a = torch.rand(1,2,3)
-print(a)
-print(a[:, 0])
+
+from transformers import AutoTokenizer
+
+s1 = "He said the foodservice pie business doesn 't fit the company 's long-term growth strategy ."	
+s2 = "The foodservice pie business does not fit our long-term growth strategy ."
+tokenizer = AutoTokenizer.from_pretrained('/data/qvlehao/FL-EE/models/google-bert/bert-12-uncased')
+print(tokenizer)

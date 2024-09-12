@@ -143,9 +143,8 @@ class Generator_CIFAR(BaseModule):
             # nn.BatchNorm2d(output_channel, affine=False) 
         )
 
-    def forward(self, labels):
+    def forward(self, labels, noise):
         batch_size = labels.shape[0]
-        noise = torch.rand((batch_size, self.noise_dim)).to(self.device)
         y_embedding = self.embedding_layer(labels)
         
         z = torch.cat((noise, y_embedding), dim=-1)
@@ -156,7 +155,7 @@ class Generator_CIFAR(BaseModule):
         img = self.conv_blocks1(img)
         img = nn.functional.interpolate(img,scale_factor=2)
         img = self.conv_blocks2(img)
-        return CIFARClassificationDataset.generator_transform_tensor(images=img), noise
+        return CIFARClassificationDataset.generator_transform_tensor(images=img)
 
 
     def statistic_loss(self, g_images, train_mean, train_std):

@@ -11,6 +11,7 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
+    parser.add_argument('--is_feature', default=False, type=bool)
     
     parser.add_argument('--s_epoches', default=5, type=int)
     
@@ -124,6 +125,7 @@ class Server(BaseServer):
         
         self.clients_embeddings = []
         # == args ==
+        self.is_feature = args.is_feature
         self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gamma, args.g_gap, args.g_begin
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
@@ -275,7 +277,7 @@ class Server(BaseServer):
                 former_attend_logits = sum(former_attend_logits)
                 former_attend_feature = sum(former_attend_feature)
                 
-                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature.detach(), attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature.detach(), attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature.detach(), attend_feature)
+                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature.detach(), attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature.detach(), attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature.detach(), attend_feature) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(former_attend_logits.detach(), attend_logits) + self.kd_angle_ratio*self.angle_criterion(former_attend_logits.detach(), attend_logits) + self.kd_dark_ratio*self.dark_criterion(former_attend_logits.detach(), attend_logits)
                 kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
                 gap_loss = relation_loss + kd_loss
                 
@@ -372,7 +374,7 @@ class Server(BaseServer):
                         if t_exit >= s_exit:
                             loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
                         else:
-                            loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature)
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits)
                 
                 # Loss += loss
                 Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
