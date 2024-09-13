@@ -277,9 +277,9 @@ class Server(BaseServer):
                 former_attend_logits = sum(former_attend_logits)
                 former_attend_feature = sum(former_attend_feature)
                 
-                relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature.detach(), attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature.detach(), attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature.detach(), attend_feature) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(former_attend_logits.detach(), attend_logits) + self.kd_angle_ratio*self.angle_criterion(former_attend_logits.detach(), attend_logits) + self.kd_dark_ratio*self.dark_criterion(former_attend_logits.detach(), attend_logits)
+                # relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature.detach(), attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature.detach(), attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature.detach(), attend_feature) if self.is_feature else self.kd_dist_ratio*self.dist_criterion(former_attend_logits.detach(), attend_logits) + self.kd_angle_ratio*self.angle_criterion(former_attend_logits.detach(), attend_logits) + self.kd_dark_ratio*self.dark_criterion(former_attend_logits.detach(), attend_logits)
                 kd_loss = self.g_eta*self.kd_criterion(former_attend_logits, attend_logits.detach())
-                gap_loss = relation_loss + kd_loss
+                gap_loss = kd_loss
                 
                 
                 # kd_loss = self.g_eta*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))

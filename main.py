@@ -37,21 +37,21 @@ class FedSim:
 
         if 'ours' in args.alg:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.pth'
             self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}_G.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}_G.pth'
             output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.txt'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.txt'
             self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.json'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.json'
         else:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.pth'
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.pth'
             self.generator_save_path = ''
             output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'   
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.txt'   
             self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.json'    
+                      f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.json'    
 
         self.output = open(output_path, 'a')
         args.output = self.output

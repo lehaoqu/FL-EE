@@ -11,7 +11,7 @@ bs=32
 optim=sgd
 
 policies=(base boosted l2w)
-datasets=(mrpc rte)
+datasets=(rte mrpc)
 
 # policies=(base boosted)
 # datasets=(mrpc sst2 qnli qqp)

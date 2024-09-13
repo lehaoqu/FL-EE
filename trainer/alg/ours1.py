@@ -329,6 +329,7 @@ class Server(BaseServer):
                                 
                 logits, feature = s_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent, rt_feature=True)
                 s_feature = feature[-1]
+                s_logits = s_policy.sf(logits)
                 
                 # == teacher's logits ==
                 t_logits, t_feature = t_model(gen_latent, is_latent=self.is_latent, rt_feature=True)
