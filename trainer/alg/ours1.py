@@ -230,18 +230,17 @@ class Server(BaseServer):
                 
 
     def aggregate_aligned_layers(self, eq_depth):
-        exits = self.eq_exits[eq_depth]
-        if eq_depth == min(self.eq_depths):
-            begin_layer = 0
-            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
-        elif eq_depth == max(self.eq_depths):
-            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]
-            end_layer = max(self.eq_depths)
+        if eq_depth == max(self.eq_depths):
+            return
+        elif eq_depth == min(self.eq_depths):
+            begin_layer = -1
+            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else -1
         else:
-            begin_layer = self.eq_exits[self.eq_depths[self.eq_depths.index(eq_depth)-1]][-1]
+            smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
+            begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
             end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
     
-        aligned_layers = [begin_layer, end_layer]
+        aligned_layers = list(range(begin_layer, end_layer+1))
         
         tensors = []
         attend_eqs = self.eq_depths[self.eq_depths.index(eq_depth):]
