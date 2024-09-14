@@ -230,15 +230,25 @@ class Server(BaseServer):
                 
 
     def aggregate_aligned_layers(self, eq_depth):
+        # if eq_depth == max(self.eq_depths):
+        #     return
+        # elif eq_depth == min(self.eq_depths):
+        #     begin_layer = -1
+        #     end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else -1
+        # else:
+        #     smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
+        #     begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
+        #     end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
+            
         if eq_depth == max(self.eq_depths):
             return
         elif eq_depth == min(self.eq_depths):
-            begin_layer = -1
-            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else -1
+            begin_layer = 0
+            end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else -1
         else:
             smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
-            begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
-            end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
+            begin_layer = self.eq_exits[smaller_eq][-1]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
+            end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else 0
     
         if end_layer < 0: return
         aligned_layers = list(range(begin_layer, end_layer+1))
@@ -341,7 +351,7 @@ class Server(BaseServer):
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits.detach())
                 dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits.detach())
                 
-                gap_loss = dist_loss + angle_loss + dark_loss
+                gap_loss = self.g_eta * (dist_loss + angle_loss + dark_loss)
                 # == ce_loss for G ==
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
