@@ -218,37 +218,40 @@ class Server(BaseServer):
             # == Second: small to large ==
             # 1. aggregate params 2. train generator 2. small teach large
             # == 1. 一次性的聚合所有align的exits 并赋值 ==
-            for i, eq_depth in enumerate(self.eq_depths):
-                if eq_depth == max(self.eq_depths): break
-                self.aggregate_aligned_layers(eq_depth)
+ 
     
             y_input_gs_sl, eps_gs_sl = self.train_generators(direction='sl')
             self.finetune_eq_model(y_input_gs_sl, eps_gs_sl, direction='sl')
             
             y_input_gs_ls, eps_gs_ls = self.train_generators(direction='ls')
             self.finetune_eq_model(y_input_gs_ls, eps_gs_ls, direction='ls')
+            
+            for i, eq_depth in enumerate(self.eq_depths):
+                if eq_depth == max(self.eq_depths): break
+                self.aggregate_aligned_layers(eq_depth)
                 
 
-    def aggregate_aligned_layers(self, eq_depth):
-        # if eq_depth == max(self.eq_depths):
-        #     return
-        # elif eq_depth == min(self.eq_depths):
-        #     begin_layer = -1
-        #     end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else -1
-        # else:
-        #     smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
-        #     begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
-        #     end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
-            
-        if eq_depth == max(self.eq_depths):
-            return
-        elif eq_depth == min(self.eq_depths):
-            begin_layer = 0
-            end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else -1
+    def aggregate_aligned_layers(self, eq_depth, need_align=True):
+        if need_align is True:
+            if eq_depth == max(self.eq_depths):
+                return
+            elif eq_depth == min(self.eq_depths):
+                begin_layer = -1
+                end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else -1
+            else:
+                smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
+                begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
+                end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
         else:
-            smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
-            begin_layer = self.eq_exits[smaller_eq][-1]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
-            end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else 0
+            if eq_depth == max(self.eq_depths):
+                return
+            elif eq_depth == min(self.eq_depths):
+                begin_layer = 0
+                end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else -1
+            else:
+                smaller_eq = self.eq_depths[self.eq_depths.index(eq_depth)-1]
+                begin_layer = self.eq_exits[smaller_eq][-1]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
+                end_layer = self.eq_exits[eq_depth][-1] if len(self.eq_exits[eq_depth]) > 1 else 0
     
         if end_layer < 0: return
         aligned_layers = list(range(begin_layer, end_layer+1))
