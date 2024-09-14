@@ -233,13 +233,15 @@ class BaseServer:
             y_distribute = [sum(column) for column in zip(*self.eq_y[eq_depth])]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
             self.eq_y[eq_depth] = y_distribute
-            
-            tmp = {}
-            for label in range(0,2):
-                sl_distribute = self.eq_y_sl[eq_depth][label]
-                sl_distribute = [sl/sum(sl_distribute) for sl in sl_distribute]
-                tmp[label] = sl_distribute
-            self.eq_y_sl[eq_depth] = tmp
+        
+        if self.args.dataset in GLUE:
+            for eq_depth in self.eq_depths:
+                tmp = {}
+                for label in range(0,2):
+                    sl_distribute = self.eq_y_sl[eq_depth][label]
+                    sl_distribute = [sl/sum(sl_distribute) for sl in sl_distribute]
+                    tmp[label] = sl_distribute
+                self.eq_y_sl[eq_depth] = tmp
         # print(self.eq_y_sl)
             
         self.crt_epoch = 0
