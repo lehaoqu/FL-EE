@@ -240,6 +240,7 @@ class Server(BaseServer):
             begin_layer = self.eq_exits[smaller_eq][-2]+1 if len(self.eq_exits[smaller_eq]) > 1 else 0
             end_layer = self.eq_exits[eq_depth][-2] if len(self.eq_exits[eq_depth]) > 1 else 0
     
+        if end_layer < 0: return
         aligned_layers = list(range(begin_layer, end_layer+1))
         
         tensors = []
