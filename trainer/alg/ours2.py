@@ -3,7 +3,7 @@ import torch.nn as nn
 import random
 
 from typing import *
-from trainer.baseHFL import BaseServer, BaseClient
+from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 
@@ -162,6 +162,16 @@ class Server(BaseServer):
             self.generators.append([generator, optimizer, lr_scheduler])
      
      
+    def get_batch(self, gen_latent, y_input):
+        batch = {}
+        if 'cifar' in self.args.dataset:
+            batch['pixel_values'] = gen_latent
+        else:
+            batch['input_ids'] = gen_latent
+            batch['attention_mask'] = y_input[1]
+        return batch
+     
+     
     def get_gen_latent(self, ):
         for g in self.generators:
             g[0].to(self.device)
@@ -173,11 +183,27 @@ class Server(BaseServer):
             attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
             y_distribute = [sum(column) for column in zip(*[[y*self.eq_num[eq] for y in self.eq_y[eq]] for eq in attend_eq])]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
-            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             
+            # TODO two classes for GLUE
+            y_sl_distribute = {y:[sum(column) for column in zip(*[[sl*self.eq_num[eq] for sl in self.eq_y_sl[eq][y]] for eq in attend_eq])] for y in range(0,2)}
+            y_sl_distribute = {y: [sl/sum(y_sl_distribute[y]) for sl in y_sl_distribute[y]] for y in range(0, 2)}
+            
+            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
+            if self.args.dataset in GLUE:
+                attention_mask = ()
+                for i in range(self.args.bs):
+                    y = y_input.cpu().tolist()[i]
+                    sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
+                    mask = torch.zeros(128)
+                    mask[:sentence_len] = 1
+                    attention_mask += (mask.to(self.device), )
+                attention_mask = torch.stack(attention_mask)
+                y_input_g[t_exit] = (y_input, attention_mask)
+            else:
+                y_input_g[t_exit] = (y_input, )
             # == data ==
             # gen_latent, eps = self.generators[t_exit][0](y_input, )
-            y_input_g[t_exit] = y_input
+            
             # gen_latent_g[t_exit] = gen_latent
             g = self.generators[t_exit][0]
             eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
@@ -202,9 +228,9 @@ class Server(BaseServer):
             if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
                 self.train_generators(y_input_g, gen_latent_g, eps_g)
             
+            for exit, y_input in y_input_g.items():
+                if isinstance(y_input, tuple): y_input_g[exit] = tuple(tensor.detach() for tensor in y_input)
             
-            for eq, y_input in y_input_g.items():
-                y_input_g[eq] = y_input.detach()
             gen_latent_g = {}
             for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
                 gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
@@ -252,7 +278,7 @@ class Server(BaseServer):
             attend_feature = ()
             for eq_depth in attend_eq:
                 r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
-                exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx, is_latent=self.is_latent, rt_feature=True)
+                exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=exit_idx, is_latent=self.is_latent, rt_feature=True)
                 
                 attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
                 attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
@@ -260,7 +286,7 @@ class Server(BaseServer):
             attend_logits = sum(attend_logits)
             attend_feature = sum(attend_feature)
             
-            ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input.view(-1))
+            ce_loss = self.g_alpha*self.ce_criterion(attend_logits, y_input[0].view(-1))
             gap_loss = self.g_eta*torch.zeros(1).to(self.device)
             
             if exit_idx != 0:
@@ -270,7 +296,7 @@ class Server(BaseServer):
                 for eq_depth in former_attend_eq:
                     r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq])
                     
-                    exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=exit_idx-1, is_latent=self.is_latent, rt_feature=True)
+                    exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=exit_idx-1, is_latent=self.is_latent, rt_feature=True)
                     former_attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
                     former_attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
 
@@ -329,7 +355,7 @@ class Server(BaseServer):
             attend_feature = ()
             for eq_depth in attend_eq:
                 r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
-                exits_logits, exits_feature = self.eq_model[eq_depth](gen_latent, stop_exit=t_exit, is_latent=self.is_latent, rt_feature=True)
+                exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=t_exit, is_latent=self.is_latent, rt_feature=True)
                 attend_logits += (self.eq_policy[eq_depth].sf(exits_logits) * r, )
                 attend_feature += (self.eq_policy[eq_depth].sf(exits_feature) * r, )
             attend_logits = sum(attend_logits)
@@ -337,6 +363,7 @@ class Server(BaseServer):
             
             t_logits_g[t_exit] = attend_logits.detach()
             t_feature_g[t_exit] = attend_feature.detach()
+            
         Losses = []
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()
@@ -353,7 +380,7 @@ class Server(BaseServer):
             t_exit_max_s_feature = {}
             for t_exit in t_exit_s_exit.keys():
                 max_s_exit = max(t_exit_s_exit[t_exit])
-                max_s_logits, max_s_feature = self.global_model(gen_latent_g[t_exit], stop_exit=max_s_exit, is_latent=self.is_latent, rt_feature=True)
+                max_s_logits, max_s_feature = self.global_model(**self.get_batch(gen_latent_g[t_exit], y_input_g[t_exit]), stop_exit=max_s_exit, is_latent=self.is_latent, rt_feature=True)
                 t_exit_max_s_logits[t_exit] = max_s_logits
                 t_exit_max_s_feature[t_exit] = max_s_feature
             

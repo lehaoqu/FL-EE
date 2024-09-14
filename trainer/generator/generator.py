@@ -57,7 +57,10 @@ class Generator_LATENT(BaseModule):
         self.device = args.device
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
-        self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 197, 384, 100, 100
+        if 'cifar' in args.dataset:
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 197, 384, 100, 100
+        else:
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 128, 256, 100, 2
         self.latent_dim = self.token_num * self.hidden_rs
         
         input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
@@ -86,6 +89,7 @@ class Generator_LATENT(BaseModule):
         self.representation_layer = nn.Linear(self.fc_configs[-1], self.latent_dim)
         
     def forward(self, labels, eps):
+        if isinstance(labels, tuple): labels = labels[0]
         batch_size = labels.shape[0]
         if self.embedding:
             y_input = self.embedding_layer(labels)

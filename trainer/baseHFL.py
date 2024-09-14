@@ -16,6 +16,7 @@ from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
 CLASSES = {'cifar100-224-d03': 100, 'cifar100-224-d03-1': 100, 'cifar100-224-d03-0.1': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
 
 class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -28,6 +29,8 @@ class BaseClient:
         self.server = None
 
         self.y_distribute = [0 for _ in range(CLASSES[args.dataset])]
+        # == label -> sentence len for GLUE ==
+        self.y_sl = {0: [0 for _ in range(128)], 1: [0 for _ in range(128)]}
         self.lr = args.lr
         self.batch_size = args.bs
         self.epoch = args.epoch
@@ -65,10 +68,21 @@ class BaseClient:
         self.policy = policy_module.Policy(args)
             
         # == y_distribute ==
-        for idx, data in enumerate(self.loader_train):
-            labels = data['labels'].view(-1).cpu().tolist()
-            for y in labels:
-                self.y_distribute[y] += 1
+        if args.dataset not in GLUE:
+            for idx, data in enumerate(self.loader_train):
+                labels = data['labels'].view(-1).cpu().tolist()
+                for y in labels:
+                    self.y_distribute[y] += 1
+        else:
+            for idx, data in enumerate(self.loader_train):
+                labels = data['labels'].view(-1).cpu().tolist()
+                attention_mask = data['attention_mask'].cpu().tolist()
+                for i in range(len(labels)):
+                    label = labels[i]
+                    sentence_len = len([x for x in attention_mask[i] if x != 0])
+                    self.y_distribute[label] += 1
+                    self.y_sl[label][sentence_len] += 1
+        # print(self.y_sl)
         
         # TODO == the max exit num is 4 ==
         self.origin_target_policy = {4: self.exits_num}
@@ -205,12 +219,28 @@ class BaseServer:
         
         # == ratio of each classes for each eq ==  
         self.eq_y = {}
+        self.eq_y_sl_t = {}
+        self.eq_y_sl = {eq:{} for eq in self.eq_depths}
         for client in self.clients:
             self.eq_y.setdefault(client.eq_depth, []).append(client.y_distribute)
+            self.eq_y_sl_t.setdefault(client.eq_depth, []).append(client.y_sl)
+
+        for eq in self.eq_y_sl.keys():
+            for y in range(0,2):
+                self.eq_y_sl[eq][y] = [sum(column) for column in zip(*[self.eq_y_sl_t[eq][i][y] for i in range(len(self.eq_y_sl_t[eq]))])]
+        
         for eq_depth in self.eq_depths:
             y_distribute = [sum(column) for column in zip(*self.eq_y[eq_depth])]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
             self.eq_y[eq_depth] = y_distribute
+            
+            tmp = {}
+            for label in range(0,2):
+                sl_distribute = self.eq_y_sl[eq_depth][label]
+                sl_distribute = [sl/sum(sl_distribute) for sl in sl_distribute]
+                tmp[label] = sl_distribute
+            self.eq_y_sl[eq_depth] = tmp
+        # print(self.eq_y_sl)
             
         self.crt_epoch = 0
         
