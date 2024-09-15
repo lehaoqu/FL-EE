@@ -79,7 +79,7 @@ class BaseClient:
                 attention_mask = data['attention_mask'].cpu().tolist()
                 for i in range(len(labels)):
                     label = labels[i]
-                    sentence_len = len([x for x in attention_mask[i] if x != 0])
+                    sentence_len = len([x for x in attention_mask[i] if x != 0]) -1
                     self.y_distribute[label] += 1
                     self.y_sl[label][sentence_len] += 1
         # print(self.y_sl)

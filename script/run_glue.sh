@@ -10,12 +10,12 @@ total_num=120
 bs=32
 optim=sgd
 
-policies=(base boosted)
+policies=(base boosted l2w)
 # datasets=(wnli rte)
 
 # policies=(base boosted)
 # datasets=(mrpc sst2 qnli)
-datasets=(qnli)
+datasets=(sst2)
 
 
 for ds in "${datasets[@]}"

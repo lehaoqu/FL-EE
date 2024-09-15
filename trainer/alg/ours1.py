@@ -218,7 +218,9 @@ class Server(BaseServer):
             # == Second: small to large ==
             # 1. aggregate params 2. train generator 2. small teach large
             # == 1. 一次性的聚合所有align的exits 并赋值 ==
- 
+            for i, eq_depth in enumerate(self.eq_depths):
+                if eq_depth == max(self.eq_depths): break
+                self.aggregate_aligned_layers(eq_depth)
     
             y_input_gs_sl, eps_gs_sl = self.train_generators(direction='sl')
             self.finetune_eq_model(y_input_gs_sl, eps_gs_sl, direction='sl')
