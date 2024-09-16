@@ -524,6 +524,17 @@ import time
     # acc_exits = [100 * c / (total/4) for c in corrects]
     # print(acc, acc_exits)
     
-a = [[0,1,2,3,4]]
-c = [sum(column) for column in zip(*a)]
-print(c)
+import torch
+import torch.nn as nn
+
+def kd_loss_func(pred, teacher):
+    kld_loss = nn.KLDivLoss(reduction='batchmean')
+    log_softmax = nn.LogSoftmax(dim=-1)
+    softmax = nn.Softmax(dim=1)
+    T=3
+    _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
+    return _kld
+
+a = torch.rand(1000,100)
+b = torch.rand(1000,100)
+print(kd_loss_func(a,b))

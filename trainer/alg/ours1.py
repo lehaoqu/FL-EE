@@ -14,7 +14,7 @@ def add_args(parser):
     parser.add_argument('--s_epoches', default=5, type=int)
     
     parser.add_argument('--sl', default=1, type=int)
-    parser.add_argument('--ls', default=1, type=int)
+    parser.add_argument('--ls', default=0, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
@@ -218,19 +218,21 @@ class Server(BaseServer):
             # == Second: small to large ==
             # 1. aggregate params 2. train generator 2. small teach large
             # == 1. 一次性的聚合所有align的exits 并赋值 ==
-            for i, eq_depth in enumerate(self.eq_depths):
-                if eq_depth == max(self.eq_depths): break
-                self.aggregate_aligned_layers(eq_depth)
+
     
             y_input_gs_sl, eps_gs_sl = self.train_generators(direction='sl')
             self.finetune_eq_model(y_input_gs_sl, eps_gs_sl, direction='sl')
             
-            y_input_gs_ls, eps_gs_ls = self.train_generators(direction='ls')
-            self.finetune_eq_model(y_input_gs_ls, eps_gs_ls, direction='ls')
-            
             for i, eq_depth in enumerate(self.eq_depths):
                 if eq_depth == max(self.eq_depths): break
                 self.aggregate_aligned_layers(eq_depth)
+            
+            y_input_gs_ls, eps_gs_ls = self.train_generators(direction='ls')
+            self.finetune_eq_model(y_input_gs_ls, eps_gs_ls, direction='ls')
+            
+            # for i, eq_depth in enumerate(self.eq_depths):
+            #     if eq_depth == max(self.eq_depths): break
+            #     self.aggregate_aligned_layers(eq_depth, need_align=True)
                 
 
     def aggregate_aligned_layers(self, eq_depth, need_align=True):
@@ -356,7 +358,7 @@ class Server(BaseServer):
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits.detach())
                 dark_loss = self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature.detach()) if self.is_feature else self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits.detach())
                 
-                gap_loss = self.g_eta * (dist_loss + angle_loss + dark_loss)
+                gap_loss = 10 * self.g_eta * (dist_loss + angle_loss + dark_loss)
                 # == ce_loss for G ==
                 ce_loss = self.g_alpha*self.ce_criterion(t_logits, y_input.view(-1))
             
@@ -465,7 +467,7 @@ class Server(BaseServer):
             ANGLE_LOSS += angle_loss
             DARK_LOSS += dark_loss
             
-            loss = dist_loss + angle_loss + dark_loss
+            loss = 10*(dist_loss + angle_loss + dark_loss)
         
         elif direction == 'ls':
             t_logits = t_policy.sf(t_model(gen_latent, stop_exit=g_exit, is_latent=self.is_latent)).detach()
