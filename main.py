@@ -129,9 +129,9 @@ class FedSim:
             ...
         finally:
             acc_list = self.acc_processor.data
-            np.save(f'./{self.args.suffix}/{self.args.alg}_{self.args.dataset}'
-                    f'_{self.args.model}_{self.args.total_num}c_{self.args.epoch}E_lr{args.lr}_{args.policy}.npy',
-                    np.array(acc_list))
+            # np.save(f'./{self.args.suffix}/{self.args.alg}_{self.args.dataset}'
+            #         f'_{self.args.model}_{self.args.total_num}c_{self.args.epoch}E_lr{args.lr}_{args.policy}.npy',
+            #         np.array(acc_list))
             avg_count = 2
             acc_avg = np.mean(acc_list[-avg_count:]).item()
             acc_std = ret_dict['std']
