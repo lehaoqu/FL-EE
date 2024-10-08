@@ -386,8 +386,10 @@ class BertExitEncoderRee(nn.Module):
                 encoder_attention_mask,
                 past_key_value,
             )
-
+            
             hidden_states = layer_outputs[0]
+            hidden_states = gradient_rescale(hidden_states, 1.0/(len(self.config.exits) - i))
+            
             cls_token_batch = hidden_states[:, 0][:, None, :]
             cls_tokens.append(cls_token_batch)
             mod_tokens = None
@@ -410,6 +412,8 @@ class BertExitEncoderRee(nn.Module):
                     mod_tokens = self.accumulator(torch.cat((cls_tokens), 1))
                     hidden_states[:, 0] = mod_tokens[:, -1]
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
+
+            hidden_states = gradient_rescale(hidden_states, len(self.config.exits) - i - 1)
 
         return exits_logits, exits_feature
 

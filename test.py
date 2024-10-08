@@ -469,7 +469,7 @@ print(len(test_dataset))
 #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
 # ]
 # optim = AdamW(params=optimizer_grouped_parameters, lr=1e-4, betas=(0.9, 0.999), eps=1e-08)
-optim = torch.optim.SGD(params=model.parameters(), lr=3e-5, momentum=0.9, weight_decay=1e-4)
+optim = torch.optim.SGD(params=model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
 
 loss_func = nn.CrossEntropyLoss()
 for epoch in range(100):
@@ -485,7 +485,6 @@ for epoch in range(100):
     # optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=1e-4*(0.99)**epoch, betas=(0.9, 0.999), eps=1e-08)
     optim = torch.optim.SGD(params=model.parameters(), lr=3e-5, momentum=0.9, weight_decay=1e-4)
     for idx, data in enumerate(loader_train):
-        if idx == 14: break
         optim.zero_grad()
 
         batch, label = adapt_batch(data)
@@ -499,7 +498,7 @@ for epoch in range(100):
             exits_loss += (loss_func(exit_logits, label) * ws[i],)
         
         ce_loss = sum(exits_loss)
-        print(ce_loss)
+        # print(ce_loss)
         # ce_loss = loss_func(exit_logits, label)
         ce_loss.backward()
         optim.step()
