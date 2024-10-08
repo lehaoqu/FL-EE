@@ -146,12 +146,14 @@ class FedSim:
 
 
 if __name__ == '__main__':
-    torch.manual_seed(0)
-    torch.cuda.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
-    np.random.seed(0)
-    random.seed(0)
     
     args = args_parser()
+    seed = args.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    
     fed = FedSim(args=args)
     fed.simulate()

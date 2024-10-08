@@ -16,6 +16,7 @@ def args_parser():
     parser.add_argument('--config_path', type=str, default='models/facebook/deit-small-patch16-224')
 
     # ===== Training Setting =====
+    parser.add_argument('--seed', type=int, default=1117, help="seed")
     parser.add_argument('--total_num', type=int, default=4, help="Total clients num")
     parser.add_argument('--sr', type=float, default=0.3, help="Clients sample rate")
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")

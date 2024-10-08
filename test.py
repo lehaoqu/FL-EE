@@ -416,10 +416,12 @@ from dataset import (
 )
 from utils.train_utils import AdamW
 
+device=1
+
 def adapt_batch(data):
     batch = {}
     for key in data.keys():
-        batch[key] = data[key].to(1)
+        batch[key] = data[key].to(device)
     label = batch['labels'].view(-1)
     return batch, label
 
@@ -437,17 +439,17 @@ eq_config.num_hidden_layers = 12
 eq_exit_config = ExitConfig(eq_config, num_labels=2, exits=(2,5,8,11), policy='base', alg='exclusivefl') 
 model = ExitModel(eq_exit_config)
 model.load_state_dict(pre_model.state_dict(), strict=False)
-model.to(1)
+model.to(device)
 
 tokenizer = AutoTokenizer.from_pretrained(
-        'models/google-bert/bert-base-uncased',
+        'models/google-bert/bert-12-uncased',
         padding_side="right",
         model_max_length=128,
         use_fast=False,
     )
 
 train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/train/', eval_valids=True)
-loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=None)
+loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, collate_fn=None)
 print(len(train_dataset))
 
 valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/valid/', eval_valids=True)
@@ -481,8 +483,9 @@ for epoch in range(100):
     #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
     # ]
     # optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=1e-4*(0.99)**epoch, betas=(0.9, 0.999), eps=1e-08)
-    optim = torch.optim.SGD(params=model.parameters(), lr=3e-5*0.99**epoch, momentum=0.9, weight_decay=1e-4)
+    optim = torch.optim.SGD(params=model.parameters(), lr=3e-5, momentum=0.9, weight_decay=1e-4)
     for idx, data in enumerate(loader_train):
+        if idx == 14: break
         optim.zero_grad()
 
         batch, label = adapt_batch(data)
@@ -496,6 +499,7 @@ for epoch in range(100):
             exits_loss += (loss_func(exit_logits, label) * ws[i],)
         
         ce_loss = sum(exits_loss)
+        print(ce_loss)
         # ce_loss = loss_func(exit_logits, label)
         ce_loss.backward()
         optim.step()
@@ -505,7 +509,7 @@ for epoch in range(100):
     model.eval()
     correct = 0
     total = 0
-    corrects = [0 for _ in range(1)]
+    corrects = [0 for _ in range(4)]
 
     with torch.no_grad():
         for data in loader_test:

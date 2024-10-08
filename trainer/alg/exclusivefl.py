@@ -22,8 +22,8 @@ class Server(BaseServer):
         self.aggregate()
     
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
+        eq_model = {12:eq_model[12]}
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits=eq_exits)
-        self.eq_depths = [12]
         largest_num = int(args.eq_ratios[-1] * len(self.clients))
         sample_rate = self.sample_rate / (args.eq_ratios[-1])
         self.sample_rate = sample_rate if sample_rate < 1 else 1
