@@ -33,10 +33,14 @@ class Eval():
         self.model.to(self.device)
         self.tester = Tester(self.model, self.args)
         
-        self.test_exits_preds, self.test_targets = self.tester.calc_logtis(self.test_dataloader)
-        self.valid_exits_preds, self.valid_targets = self.tester.calc_logtis(self.valid_dataloader)
+        self.test_exits_preds, self.test_targets, self.test_all_sample_exits_logits = self.tester.calc_logtis(self.test_dataloader)
+        self.valid_exits_preds, self.valid_targets, self.valid_all_sample_exits_logits  = self.tester.calc_logtis(self.valid_dataloader)
         
         self.eval_output.write('logits calc compeleted\n')
+        
+        if self.args.cosine is True:
+            self.cos(self.test_all_sample_exits_logits)
+            self.cos(self.valid_all_sample_exits_logits)
         
         if self.args.if_mode == 'anytime':
             self.anytime()
@@ -74,6 +78,21 @@ class Eval():
             self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
+         
+            
+    def cos(self, all_sample_exits_logits):
+        cos_exits = [0 for _ in range(self.n_exits)]
+        sample_num = all_sample_exits_logits[0].size(0)
+        for i in range(sample_num):
+            last_logits = all_sample_exits_logits[-1][i].unsqueeze(0)
+            for exit_idx in range(self.n_exits):
+                exit_logits = all_sample_exits_logits[exit_idx][i].unsqueeze(0)
+                cos_exits[exit_idx] += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1).cpu().item()
+        cos_exits = [cos_exits[exit_idx]/sample_num for exit_idx in range(len(cos_exits))]
+        print(cos_exits)
+        self.eval_output.write(str(cos_exits)+"\n")
+        self.eval_output.flush()
+        return cos_exits
             
             
 class Tester(object):
@@ -110,8 +129,9 @@ class Tester(object):
             with torch.no_grad():
                 exits_logits = self.policy(self.model(**batch))
                 for i, exit_logits in enumerate(exits_logits):
-                    _t = self.softmax(exit_logits)
-                    all_sample_exits_logits[i].append(_t)
+                    # _t = self.softmax(exit_logits)
+                    # all_sample_exits_logits[i].append(_t)
+                    all_sample_exits_logits[i].append(exit_logits)
         
         for i in range(self.n_exits):
             all_sample_exits_logits[i] = torch.cat(all_sample_exits_logits[i], dim=0)
@@ -122,7 +142,7 @@ class Tester(object):
             ts_preds[i] = all_sample_exits_logits[i]
             
         all_sample_targets = torch.cat(all_sample_targets, dim=0)
-        return ts_preds, all_sample_targets
+        return ts_preds, all_sample_targets, all_sample_exits_logits
     
     def dynamic_eval_find_threshold(self, preds, targets, p, flops):
         """
@@ -202,5 +222,4 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if 'G' not in model_path:
-            eval.eval(model_path+'.pth', model_path+'.json')
+      eval.eval(model_path+'.pth', model_path+'.json')

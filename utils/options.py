@@ -44,6 +44,7 @@ def args_parser():
     
     # ===== Eval Setting =====
     parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')
+    parser.add_argument('--cosine', action='store_true', help='cosin')
     parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of valid for train_dataset')
     parser.add_argument('--eval_models_dir', type=str, default='script/0818-1e-1', help='dict need to evaled. config.json and model.pkl')
 
