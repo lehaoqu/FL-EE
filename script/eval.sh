@@ -1,8 +1,8 @@
-# dts=cifar100-224-d03
-# md=vit
+dts=cifar100-224-d03
+md=vit
 
-dts=sst2
-md=bert
+# dts=sst2
+# md=bert
 
 vr=0.2
 

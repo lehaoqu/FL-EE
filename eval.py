@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import math
 import importlib
+from PIL import Image
+import numpy as np
 
 from tqdm import tqdm
 
@@ -19,13 +21,21 @@ class Eval():
         self.if_mode = args.if_mode
         self.device = args.device
         args.valid_ratio = 0.2
-        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
-        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test')
+        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True, shuffle=False)
+        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test', shuffle=False)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
+        self.img_dir = args.img_dir
+        if not os.path.exists(self.img_dir):
+            os.makedirs(self.img_dir)
         
         
     def eval(self, model_path, config_path):
+        base_name = os.path.basename(model_path)
+        name_without_extension = os.path.splitext(base_name)[0]
+        self.model_path = name_without_extension
+        
+        
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
         self.n_exits = len(self.model.config.exits)
@@ -39,8 +49,12 @@ class Eval():
         self.eval_output.write('logits calc compeleted\n')
         
         if self.args.cosine is True:
-            self.cos(self.test_all_sample_exits_logits)
-            self.cos(self.valid_all_sample_exits_logits)
+            self.test_cos_exits, self.test_all_sample_cos_exits = self.cos_similiarity(self.test_all_sample_exits_logits)
+            # self.valid_cos_exits, self.valid_all_sample_cos_exits = self.cos_similiarity(self.valid_all_sample_exits_logits)
+            
+            self.sort(self.test_all_sample_cos_exits, self.test_dataset)
+            # self.sort(self.valid_all_sample_cos_exits, self.valid_dataset)
+            
         
         if self.args.if_mode == 'anytime':
             self.anytime()
@@ -80,19 +94,45 @@ class Eval():
             self.eval_output.flush()
          
             
-    def cos(self, all_sample_exits_logits):
-        cos_exits = [0 for _ in range(self.n_exits)]
+    def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)
+        all_sample_cos_exits = [[] for _ in range(sample_num)]
+        
         for i in range(sample_num):
             last_logits = all_sample_exits_logits[-1][i].unsqueeze(0)
             for exit_idx in range(self.n_exits):
                 exit_logits = all_sample_exits_logits[exit_idx][i].unsqueeze(0)
-                cos_exits[exit_idx] += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1).cpu().item()
-        cos_exits = [cos_exits[exit_idx]/sample_num for exit_idx in range(len(cos_exits))]
-        print(cos_exits)
-        self.eval_output.write(str(cos_exits)+"\n")
+                cos_similar = nn.functional.cosine_similarity(exit_logits, last_logits, dim=1).cpu().item()
+                all_sample_cos_exits[i].append(cos_similar)
+        print(len(all_sample_cos_exits), len(all_sample_cos_exits[0]))
+        cos_exits_array = np.array(all_sample_cos_exits).transpose()
+        cos_exits_means = np.mean(cos_exits_array, axis=1)
+        print(cos_exits_means)
+        self.eval_output.write(str(cos_exits_means)+"\n")
         self.eval_output.flush()
-        return cos_exits
+        return cos_exits_means, all_sample_cos_exits
+    
+    
+    def sort(self, all_sample_cos_exits, dataset):
+        
+        all_sample_score = [sum(cos_exits) for cos_exits in all_sample_cos_exits]
+        score_array = np.array(all_sample_score)
+        indices = np.argsort(score_array)
+        
+        n = 5
+        div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
+        
+        for dlevel, level_idx in enumerate(div_points):
+            label = dataset[indices[level_idx]]['labels']
+            sample = dataset[indices[level_idx]]['pixel_values']
+
+            sample = sample.numpy().reshape(3,32,32) if isinstance(sample, torch.Tensor) else sample.reshape(3,32,32)
+            array = np.transpose(sample, (1, 2, 0))
+            img = Image.fromarray(array.astype(np.uint8))
+            img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
+            self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+                
+    
             
             
 class Tester(object):
@@ -216,10 +256,13 @@ class Tester(object):
     
 if __name__ == '__main__':
     args = args_parser()
-    eval = Eval(args=args)
     eval_dir = args.suffix
+    args.img_dir = eval_dir + "/img"
+    eval = Eval(args=args)
+
     file_names = os.listdir(eval_dir)
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-      eval.eval(model_path+'.pth', model_path+'.json')
+        if 'eefl' in model_path and 'reefl' not in model_path:
+            eval.eval(model_path+'.pth', model_path+'.json')

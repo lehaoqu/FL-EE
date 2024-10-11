@@ -8,4 +8,5 @@ models/
 script/08*/
 exps/
 dataset/glue/
+img/
 __pycache__/
