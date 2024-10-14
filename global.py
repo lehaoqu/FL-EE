@@ -36,7 +36,9 @@ model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
             f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.pth'
 config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
             f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.json'    
-
+output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+            f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.txt' 
+output = open(output_path, 'a')  
 
 config_path = args.config_path
 pre_model = Model.from_pretrained(pretrained_model_name_or_path=config_path)
@@ -62,16 +64,16 @@ tokenizer = AutoTokenizer.from_pretrained(
 
 ds = args.dataset
 train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/train/', eval_valids=True)
-loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, collate_fn=None)
+loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=False, collate_fn=None)
 print(len(train_dataset))
 
 valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/valid/', eval_valids=True)
-loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=32, shuffle=True, collate_fn=None)
+loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(valid_dataset))
 
-test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/test.pkl')
-loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
-print(len(test_dataset))
+# test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/test.pkl')
+# loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
+# print(len(test_dataset))
 
 
 optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
@@ -83,7 +85,7 @@ policy = policy_module.Policy(args)
 for epoch in range(50):
     batch_loss = []
     model.train()
-    optim = torch.optim.SGD(params=model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
+    # optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
     
     for idx, data in enumerate(loader_train):
         
@@ -114,6 +116,7 @@ for epoch in range(50):
                 batch, labels = adapt_batch(data)
                 
                 exits_logits = model(**batch)
+                exits_logits = policy(exits_logits)
                 
                 for i, exit_logits in enumerate(exits_logits):
                     _, predicted = torch.max(exit_logits, 1)
@@ -128,4 +131,6 @@ for epoch in range(50):
             
         
         acc_exits = [100 * c / (total/4) for c in corrects]
+        output.write(f'{epoch}, {acc}, {acc_exits}\n')
+        output.flush()
         print(epoch, acc, acc_exits)
