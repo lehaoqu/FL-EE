@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 
 from tqdm import tqdm
+from transformers import BertTokenizer
 
 from utils.options import args_parser
 from utils.dataloader_utils import load_dataset_loader
@@ -30,8 +31,9 @@ class Eval():
         
         
     def eval(self, model_path, config_path):
-        if not os.path.exists(self.img_dir):
-            os.makedirs(self.img_dir)
+        if 'cifar' in args.dataset:
+            if not os.path.exists(self.img_dir):
+                os.makedirs(self.img_dir)
         
         base_name = os.path.basename(model_path)
         name_without_extension = os.path.splitext(base_name)[0]
@@ -123,16 +125,27 @@ class Eval():
         n = 5
         div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
         
-        for dlevel, level_idx in enumerate(div_points):
-            label = dataset[indices[level_idx]]['labels']
-            sample = dataset[indices[level_idx]]['pixel_values']
+        if 'cifar' in dataset:
+            for dlevel, level_idx in enumerate(div_points):
+                label = dataset[indices[level_idx]]['labels']
+                sample = dataset[indices[level_idx]]['pixel_values']
 
-            sample = sample.numpy().reshape(3,32,32) if isinstance(sample, torch.Tensor) else sample.reshape(3,32,32)
-            array = np.transpose(sample, (1, 2, 0))
-            img = Image.fromarray(array.astype(np.uint8))
-            img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
-            self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
-                
+                sample = sample.numpy().reshape(3,32,32) if isinstance(sample, torch.Tensor) else sample.reshape(3,32,32)
+                array = np.transpose(sample, (1, 2, 0))
+                img = Image.fromarray(array.astype(np.uint8))
+                img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
+                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+        else:
+            for dlevel, level_idx in enumerate(div_points):
+                label = dataset[indices[level_idx]]['labels'].item()
+                sample = dataset[indices[level_idx]]['input_ids']
+
+                tokenizer = BertTokenizer.from_pretrained('./models/google-bert/bert-12-uncased')
+                detokenized_tokens = tokenizer.convert_ids_to_tokens(sample)
+                filtered_tokens = [token for token in detokenized_tokens if token not in ("[CLS]", "[PAD]")]
+                detokenized_text = " ".join(filtered_tokens)
+                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+                self.eval_output.write(f'label: {label}, sample: {detokenized_text}' + "\n")
     
             
             

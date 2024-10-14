@@ -403,129 +403,129 @@ import time
 #         l = len(l[b'data'])
 #         print(l)
 
-import torch
+# import torch
 
-from transformers import AutoTokenizer
-from dataset.utils.dataset_utils import load_tsv, load_np, load_pkl
-from utils.dataloader_utils import load_dataset_loader
-from utils.modelload.bert import *
-import copy, argparse
-from dataset import (
-    get_cifar_dataset,
-    get_glue_dataset
-)
-from utils.train_utils import AdamW
+# from transformers import AutoTokenizer
+# from dataset.utils.dataset_utils import load_tsv, load_np, load_pkl
+# from utils.dataloader_utils import load_dataset_loader
+# from utils.modelload.bert import *
+# import copy, argparse
+# from dataset import (
+#     get_cifar_dataset,
+#     get_glue_dataset
+# )
+# from utils.train_utils import AdamW
 
-device=1
+# device=1
 
-def adapt_batch(data):
-    batch = {}
-    for key in data.keys():
-        batch[key] = data[key].to(device)
-    label = batch['labels'].view(-1)
-    return batch, label
+# def adapt_batch(data):
+#     batch = {}
+#     for key in data.keys():
+#         batch[key] = data[key].to(device)
+#     label = batch['labels'].view(-1)
+#     return batch, label
 
-parser = argparse.ArgumentParser()
-args = parser.parse_args()
-args.total_num=120
+# parser = argparse.ArgumentParser()
+# args = parser.parse_args()
+# args.total_num=120
 
-config_path = 'models/google-bert/bert-base-uncased'
-pre_model = Model.from_pretrained(pretrained_model_name_or_path=config_path)
-eq_config = copy.deepcopy(pre_model.config)
+# config_path = 'models/google-bert/bert-base-uncased'
+# pre_model = Model.from_pretrained(pretrained_model_name_or_path=config_path)
+# eq_config = copy.deepcopy(pre_model.config)
         
 
-eq_config.num_hidden_layers = 12
+# eq_config.num_hidden_layers = 12
 
-eq_exit_config = ExitConfig(eq_config, num_labels=2, exits=(2,5,8,11), policy='base', alg='exclusivefl') 
-model = ExitModel(eq_exit_config)
-model.load_state_dict(pre_model.state_dict(), strict=False)
-model.to(device)
+# eq_exit_config = ExitConfig(eq_config, num_labels=2, exits=(2,5,8,11), policy='base', alg='exclusivefl') 
+# model = ExitModel(eq_exit_config)
+# model.load_state_dict(pre_model.state_dict(), strict=False)
+# model.to(device)
 
-tokenizer = AutoTokenizer.from_pretrained(
-        'models/google-bert/bert-12-uncased',
-        padding_side="right",
-        model_max_length=128,
-        use_fast=False,
-    )
+# tokenizer = AutoTokenizer.from_pretrained(
+#         'models/google-bert/bert-12-uncased',
+#         padding_side="right",
+#         model_max_length=128,
+#         use_fast=False,
+#     )
 
-train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/train/', eval_valids=True)
-loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, collate_fn=None)
-print(len(train_dataset))
+# train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/train/', eval_valids=True)
+# loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, collate_fn=None)
+# print(len(train_dataset))
 
-valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/valid/', eval_valids=True)
-loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=32, shuffle=True, collate_fn=None)
-print(len(valid_dataset))
+# valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/valid/', eval_valids=True)
+# loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=32, shuffle=True, collate_fn=None)
+# print(len(valid_dataset))
 
-test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/test.pkl')
-loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
-print(len(test_dataset))
+# test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/sst2/test.pkl')
+# loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
+# print(len(test_dataset))
 
 
-# param_optimizer = list(model.named_parameters())
-# no_decay = ['bias', 'gamma', 'beta']
-# optimizer_grouped_parameters = [
-#     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
-#     'weight_decay_rate': 0.01},
-#     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
-# ]
-# optim = AdamW(params=optimizer_grouped_parameters, lr=1e-4, betas=(0.9, 0.999), eps=1e-08)
-optim = torch.optim.SGD(params=model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
+# # param_optimizer = list(model.named_parameters())
+# # no_decay = ['bias', 'gamma', 'beta']
+# # optimizer_grouped_parameters = [
+# #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+# #     'weight_decay_rate': 0.01},
+# #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+# # ]
+# # optim = AdamW(params=optimizer_grouped_parameters, lr=1e-4, betas=(0.9, 0.999), eps=1e-08)
+# optim = torch.optim.SGD(params=model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
 
-loss_func = nn.CrossEntropyLoss()
-for epoch in range(100):
-    batch_loss = []
-    model.train()
-    # param_optimizer = list(model.named_parameters())
-    # no_decay = ['bias', 'gamma', 'beta']
-    # optimizer_grouped_parameters = [
-    #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
-    #     'weight_decay_rate': 0.01},
-    #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
-    # ]
-    # optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=1e-4*(0.99)**epoch, betas=(0.9, 0.999), eps=1e-08)
-    optim = torch.optim.SGD(params=model.parameters(), lr=3e-5, momentum=0.9, weight_decay=1e-4)
-    for idx, data in enumerate(loader_train):
-        optim.zero_grad()
+# loss_func = nn.CrossEntropyLoss()
+# for epoch in range(100):
+#     batch_loss = []
+#     model.train()
+#     # param_optimizer = list(model.named_parameters())
+#     # no_decay = ['bias', 'gamma', 'beta']
+#     # optimizer_grouped_parameters = [
+#     #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+#     #     'weight_decay_rate': 0.01},
+#     #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+#     # ]
+#     # optim = torch.optim.Adam(params=optimizer_grouped_parameters, lr=1e-4*(0.99)**epoch, betas=(0.9, 0.999), eps=1e-08)
+#     optim = torch.optim.SGD(params=model.parameters(), lr=3e-5, momentum=0.9, weight_decay=1e-4)
+#     for idx, data in enumerate(loader_train):
+#         optim.zero_grad()
 
-        batch, label = adapt_batch(data)
+#         batch, label = adapt_batch(data)
 
-        exits_logits = model(**batch)
+#         exits_logits = model(**batch)
         
-        ws = [1 for _ in range(4)]
+#         ws = [1 for _ in range(4)]
                     
-        exits_loss = ()
-        for i, exit_logits in enumerate(exits_logits):
-            exits_loss += (loss_func(exit_logits, label) * ws[i],)
+#         exits_loss = ()
+#         for i, exit_logits in enumerate(exits_logits):
+#             exits_loss += (loss_func(exit_logits, label) * ws[i],)
         
-        ce_loss = sum(exits_loss)
-        # print(ce_loss)
-        # ce_loss = loss_func(exit_logits, label)
-        ce_loss.backward()
-        optim.step()
-        batch_loss.append(ce_loss.detach().cpu().item())
+#         ce_loss = sum(exits_loss)
+#         # print(ce_loss)
+#         # ce_loss = loss_func(exit_logits, label)
+#         ce_loss.backward()
+#         optim.step()
+#         batch_loss.append(ce_loss.detach().cpu().item())
     
-    print(sum(batch_loss) / len(batch_loss))
-    model.eval()
-    correct = 0
-    total = 0
-    corrects = [0 for _ in range(4)]
+#     print(sum(batch_loss) / len(batch_loss))
+#     model.eval()
+#     correct = 0
+#     total = 0
+#     corrects = [0 for _ in range(4)]
 
-    with torch.no_grad():
-        for data in loader_test:
-            batch, labels = adapt_batch(data)
+#     with torch.no_grad():
+#         for data in loader_test:
+#             batch, labels = adapt_batch(data)
             
-            exits_logits = model(**batch)
+#             exits_logits = model(**batch)
             
-            for i, exit_logits in enumerate(exits_logits):
-                _, predicted = torch.max(exit_logits, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                corrects[i] += (predicted == labels).sum().item()
-    acc = 100.00 * correct / total
+#             for i, exit_logits in enumerate(exits_logits):
+#                 _, predicted = torch.max(exit_logits, 1)
+#                 total += labels.size(0)
+#                 correct += (predicted == labels).sum().item()
+#                 corrects[i] += (predicted == labels).sum().item()
+#     acc = 100.00 * correct / total
     
-    print(acc)
-    acc_exits = [100 * c / (total/4) for c in corrects]
-    print(acc, acc_exits)
+#     print(acc)
+#     acc_exits = [100 * c / (total/4) for c in corrects]
+#     print(acc, acc_exits)
     
 # import torch
 # import torch.nn as nn
@@ -541,3 +541,34 @@ for epoch in range(100):
 # a = torch.rand(1000,100)
 # b = torch.rand(1000,100)
 # print(kd_loss_func(a,b))
+
+from transformers import BertTokenizer
+
+# 加载预训练的BERT分词器
+tokenizer = BertTokenizer.from_pretrained('./models/google-bert/bert-12-uncased')
+
+strings = [("Hello, how are you?", "I am fine, thank you.")]
+
+# 使用分词器对文本进行标记化
+tokenized_list = tokenizer(
+    strings,
+    return_tensors="pt",
+    padding='max_length',
+    truncation=True,
+    max_length=128
+)
+
+# 从张量中提取标记ID
+token_ids = tokenized_list['input_ids'].tolist()[0]
+
+# 将标记ID转换回标记
+detokenized_tokens = tokenizer.convert_ids_to_tokens(token_ids)
+# print("Detokenized tokens list:", detokenized_tokens_list)
+
+# 去除特殊标记
+filtered_tokens = [token for token in detokenized_tokens if token not in ("[CLS]", "[PAD]")]
+# print("Filtered tokens list:", filtered_tokens_list)
+
+# 重新组合标记为字符串
+detokenized_texts = " ".join(filtered_tokens)
+print("Detokenized texts:", detokenized_texts)
