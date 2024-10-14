@@ -64,11 +64,11 @@ tokenizer = AutoTokenizer.from_pretrained(
 
 ds = args.dataset
 train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/train/', eval_valids=True)
-loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=False, collate_fn=None)
+loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(train_dataset))
 
 valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/valid/', eval_valids=True)
-loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
+loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=False, collate_fn=None)
 print(len(valid_dataset))
 
 # test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/test.pkl')
@@ -82,6 +82,8 @@ loss_func = nn.CrossEntropyLoss()
 
 policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 policy = policy_module.Policy(args)
+best_acc = 0.0
+
 for epoch in range(50):
     batch_loss = []
     model.train()
@@ -108,7 +110,6 @@ for epoch in range(50):
     correct = 0
     total = 0
     corrects = [0 for _ in range(4)]
-    best_acc = 0.0
 
     if epoch % 1 == 0:
         with torch.no_grad():

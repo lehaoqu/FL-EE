@@ -26,11 +26,13 @@ class Eval():
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
         self.img_dir = args.img_dir
-        if not os.path.exists(self.img_dir):
-            os.makedirs(self.img_dir)
+  
         
         
     def eval(self, model_path, config_path):
+        if not os.path.exists(self.img_dir):
+            os.makedirs(self.img_dir)
+        
         base_name = os.path.basename(model_path)
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
@@ -67,7 +69,6 @@ class Eval():
     
     def anytime(self,):
         crt_list = [0 for _ in range(self.n_exits)]
-        
         for i in range(self.n_exits):
             _, predicted = torch.max(self.test_exits_preds[i], 1)
             crt_list[i] += (predicted == self.test_targets).sum().item()
@@ -261,8 +262,9 @@ if __name__ == '__main__':
     eval = Eval(args=args)
 
     file_names = os.listdir(eval_dir)
-    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if 'base' in model_path and 'reefl' not in model_path:
-            eval.eval(model_path+'.pth', model_path+'.json')
+        print(model_path)
+        # if 'base' in model_path and 'reefl' not in model_path:
+        eval.eval(model_path+'.pth', model_path+'.json')
