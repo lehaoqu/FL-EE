@@ -7,7 +7,7 @@ dts=cifar100-224-d03
 # dts=cifar100-224-d03-1
 md=vit
 bs=32
-lr=5e-2
+lr=1e-3
 ply=$3
 
 echo "$ply" 
