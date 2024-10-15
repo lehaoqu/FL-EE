@@ -10,14 +10,17 @@ from dataset import (
     get_cifar_dataset,
     get_glue_dataset
 )
-from utils.train_utils import AdamW
+from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.options import args_parser
+from utils.modelload.modelloader import load_model
 
 
 def adapt_batch(data):
     batch = {}
     for key in data.keys():
         batch[key] = data[key].to(device)
+        if key == 'pixel_values':
+            batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
     label = batch['labels'].view(-1)
     return batch, label
 
@@ -40,34 +43,25 @@ output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
             f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.txt' 
 output = open(output_path, 'a')  
 
-config_path = args.config_path
-pre_model = Model.from_pretrained(pretrained_model_name_or_path=config_path)
-eq_config = copy.deepcopy(pre_model.config)
-        
 
-eq_config.num_hidden_layers = 12
-
-eq_exit_config = ExitConfig(eq_config, num_labels=2, exits=(2,5,8,11), policy='base', alg='exclusivefl') 
-model = ExitModel(eq_exit_config)
-model.load_state_dict(pre_model.state_dict(), strict=False)
+model = load_model(args, model_depth=12, is_scalefl=False, exits=(2,5,8,11))
 model.to(device)
 
 with open(config_save_path, 'w', encoding='utf-8') as f:
     json.dump(model.config.to_dict(), f, ensure_ascii=False, indent=4)
 
-tokenizer = AutoTokenizer.from_pretrained(
-        'models/google-bert/bert-12-uncased',
-        padding_side="right",
-        model_max_length=128,
-        use_fast=False,
-)
-
 ds = args.dataset
-train_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/train/', eval_valids=True)
+if 'cifar' not in ds:
+    ds = f'glue/{ds}'
+    get_dataset = get_glue_dataset
+else:
+    get_dataset = get_cifar_dataset
+    
+train_dataset = get_dataset(args=args, path=f'dataset/{ds}/train/', eval_valids=True)
 loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(train_dataset))
 
-valid_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/valid/', eval_valids=True)
+valid_dataset = get_dataset(args=args, path=f'dataset/{ds}/valid/', eval_valids=True)
 loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=False, collate_fn=None)
 print(len(valid_dataset))
 
@@ -82,8 +76,8 @@ loss_func = nn.CrossEntropyLoss()
 
 policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 policy = policy_module.Policy(args)
-best_acc = 0.0
 
+best_acc = 0.0
 for epoch in range(50):
     batch_loss = []
     model.train()

@@ -81,9 +81,11 @@ class Eval():
         
     
     def budgeted(self,):
-        rnd = 40
+        rnd = 20
         # TODO flops need to be measured
         flops = [i+1 for i in range(self.n_exits)]
+        acc_test_list = ''
+        exp_flops_list = ''
         for p in range(1, rnd):
             # self.eval_output.write("\n*********************\n")
             _p = torch.tensor([p * (1.0/(rnd/2))], dtype=torch.float32).to(self.device)
@@ -92,10 +94,14 @@ class Eval():
             
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
             acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
+            acc_test_list += (str(acc_test)+'\n')
+            exp_flops_list += (str(exp_flops.cpu().item())+'\n')
             self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
-         
+        self.eval_output.write(acc_test_list)
+        self.eval_output.write(exp_flops_list)
+        self.eval_output.flush()
             
     def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)
