@@ -1,11 +1,7 @@
 
 import torch
 import importlib, json
-from transformers import AutoTokenizer
-from dataset.utils.dataset_utils import load_tsv, load_np, load_pkl
-from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.bert import *
-import copy, argparse
 from dataset import (
     get_cifar_dataset,
     get_glue_dataset
@@ -13,6 +9,8 @@ from dataset import (
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.options import args_parser
 from utils.modelload.modelloader import load_model
+import numpy as np
+import random
 
 
 def adapt_batch(data):
@@ -24,14 +22,17 @@ def adapt_batch(data):
     label = batch['labels'].view(-1)
     return batch, label
 
-# parser = argparse.ArgumentParser()
-# args = parser.parse_args()
-# args.total_num = 120
-# args.device = device
-# 
 args = args_parser()
 args.exits_num = 4
 device = args.device
+
+seed = args.seed
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
+
 if not os.path.exists(f'./{args.suffix}'):
     os.makedirs(f'./{args.suffix}')
     
@@ -62,7 +63,7 @@ loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, sh
 print(len(train_dataset))
 
 valid_dataset = get_dataset(args=args, path=f'dataset/{ds}/valid/', eval_valids=True)
-loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=False, collate_fn=None)
+loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(valid_dataset))
 
 # test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/test.pkl')
@@ -81,7 +82,6 @@ best_acc = 0.0
 for epoch in range(50):
     batch_loss = []
     model.train()
-    # optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
     
     for idx, data in enumerate(loader_train):
         
@@ -98,8 +98,9 @@ for epoch in range(50):
         optim.step()
         batch_loss.append(ce_loss.detach().cpu().item())
         
-    
     print(sum(batch_loss) / len(batch_loss))
+    
+    
     model.eval()
     correct = 0
     total = 0

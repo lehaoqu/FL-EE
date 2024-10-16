@@ -131,7 +131,7 @@ class Eval():
         n = 5
         div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
         
-        if 'cifar' in dataset:
+        if 'cifar' in self.args.dataset:
             for dlevel, level_idx in enumerate(div_points):
                 label = dataset[indices[level_idx]]['labels']
                 sample = dataset[indices[level_idx]]['pixel_values']
@@ -285,5 +285,5 @@ if __name__ == '__main__':
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
         print(model_path)
-        # if 'base' in model_path and 'reefl' not in model_path:
+        # if 'l2w' in model_path:
         eval.eval(model_path+'.pth', model_path+'.json')
