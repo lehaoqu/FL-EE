@@ -3,7 +3,7 @@ import numpy as np
 from torchvision import transforms
 
 from torch.utils.data import Dataset
-from dataset.utils.dataset_utils import load_np, load_pkl
+from dataset.utils.dataset_utils import load_np, load_pkl, load_mat
 
 
 import torch.nn.functional as F
@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class CIFARClassificationDataset(Dataset):
+class SVHNClassificationDataset(Dataset):
         
     
     def transform_for_vit(images: torch.tensor):
@@ -56,13 +56,20 @@ class CIFARClassificationDataset(Dataset):
             self.ann = total_data
             
         else:
-            self.ann = load_pkl(path)
+            if '.mat' in path:
+                self.ann = load_mat(path)
+                self.ann['X'] = np.transpose(self.ann['X'], (3, 2, 0, 1))
+                self.ann['y'] = np.squeeze(self.ann['y'])
+                self.ann['X'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann['X']]
+                self.ann['y'] = [torch.tensor(row, dtype=torch.long) for row in self.ann['y']]
             
-            self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
-            self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]
+            else:
+                self.ann = load_pkl(path)
+                self.ann['X'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann['X']]
+                self.ann['y'] = [torch.tensor(row, dtype=torch.long) for row in self.ann['y']]
             
-        self.pixel_values = self.ann[b'data']
-        self.labels = self.ann[b'fine_labels']
+        self.pixel_values = self.ann['X']
+        self.labels = self.ann['y']
         
     def __len__(self):
         return len(self.labels)

@@ -24,6 +24,7 @@ import gc
 import torch
 from sklearn.model_selection import train_test_split
 import pickle
+import scipy.io as sio
 
 batch_size = 32
 train_ratio = 0.8 # merge original training set and valid set, then split it manually. 
@@ -257,3 +258,5 @@ def load_pkl(file):
         dict = pickle.load(f, encoding='bytes')
     return dict
 
+def load_mat(file):
+    return sio.loadmat(file)

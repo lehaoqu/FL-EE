@@ -3,10 +3,11 @@
 .idea
 .vscode/
 dataset/cifar*/
+dataset/glue/
+dataset/svhn/
 cifar*/
 models/
 script/08*/
 exps/
-dataset/glue/
 img/
 __pycache__/

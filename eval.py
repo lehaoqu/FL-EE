@@ -13,6 +13,7 @@ from utils.options import args_parser
 from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.modelloader import load_model_eval
 from dataset.cifar100_dataset import CIFARClassificationDataset
+from dataset.svhn_dataset import SVHNClassificationDataset
 
 
 
@@ -173,7 +174,10 @@ class Tester(object):
         for key in data.keys():
             batch[key] = data[key].to(self.device)
             if key == 'pixel_values':
-                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+                if 'cifar' in self.args.dataset:
+                    batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+                else:
+                    batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
         label = batch['labels'].view(-1)
         return batch, label
     

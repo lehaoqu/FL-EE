@@ -126,7 +126,7 @@ class ViTExitLayer(nn.Module):
         # exit
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
-            if self.config.policy == 'base' or self.config.policy == 'l2w' or self.config.policy == 'boosted':
+            if self.config.policy == 'base' or self.config.policy == 'l2w':
                 logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
             elif self.config.policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))

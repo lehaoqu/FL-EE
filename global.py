@@ -4,21 +4,27 @@ import importlib, json
 from utils.modelload.bert import *
 from dataset import (
     get_cifar_dataset,
-    get_glue_dataset
+    get_glue_dataset,
+    get_svhn_dataset
 )
 from dataset.cifar100_dataset import CIFARClassificationDataset
+from dataset.svhn_dataset import SVHNClassificationDataset
 from utils.options import args_parser
 from utils.modelload.modelloader import load_model
 import numpy as np
 import random
+from tqdm import tqdm
 
 
-def adapt_batch(data):
+def adapt_batch(data, args):
     batch = {}
     for key in data.keys():
         batch[key] = data[key].to(device)
         if key == 'pixel_values':
-            batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+            if 'cifar' in args.dataset:
+                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+            else:
+                batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
     label = batch['labels'].view(-1)
     return batch, label
 
@@ -52,11 +58,13 @@ with open(config_save_path, 'w', encoding='utf-8') as f:
     json.dump(model.config.to_dict(), f, ensure_ascii=False, indent=4)
 
 ds = args.dataset
-if 'cifar' not in ds:
+if 'cifar' in ds:
+    get_dataset = get_cifar_dataset
+elif 'svhn' in ds:
+    get_dataset = get_svhn_dataset
+else:
     ds = f'glue/{ds}'
     get_dataset = get_glue_dataset
-else:
-    get_dataset = get_cifar_dataset
     
 train_dataset = get_dataset(args=args, path=f'dataset/{ds}/train/', eval_valids=True)
 loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
@@ -87,7 +95,7 @@ for epoch in range(50):
         
         optim.zero_grad()
 
-        batch, label = adapt_batch(data)
+        batch, label = adapt_batch(data, args)
         
         if policy.name == 'l2w' and idx % args.meta_gap == 0:
             policy.train_meta(model, batch, label, optim)
@@ -109,7 +117,7 @@ for epoch in range(50):
     if epoch % 1 == 0:
         with torch.no_grad():
             for data in loader_valid:
-                batch, labels = adapt_batch(data)
+                batch, labels = adapt_batch(data, args)
                 
                 exits_logits = model(**batch)
                 exits_logits = policy(exits_logits)
