@@ -11,7 +11,7 @@ GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 
 
 CIFAR = 'cifar100-224-d03'
 
-SVHN = 'SVHN'
+SVHN = 'svhn'
 
 
 def load_dataset_loader(args, file_name=None, id=None, eval_valids=False, shuffle=True):
