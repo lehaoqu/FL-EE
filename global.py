@@ -80,6 +80,16 @@ print(len(valid_dataset))
 
 
 optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, [150, 225], gamma=0.1)
+# param_optimizer = list(model.named_parameters())
+# no_decay = ['bias', 'gamma', 'beta']
+# optimizer_grouped_parameters = [
+#     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+#     'weight_decay_rate': 0.01},
+#     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.0}
+# ]
+# optim = torch.optim.AdamW(params=optimizer_grouped_parameters, lr=args.lr, betas=(0.9, 0.999), eps=1e-08)
+
 
 loss_func = nn.CrossEntropyLoss()
 
@@ -87,7 +97,7 @@ policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 policy = policy_module.Policy(args)
 
 best_acc = 0.0
-for epoch in range(50):
+for epoch in range(300):
     batch_loss = []
     model.train()
     
@@ -108,6 +118,7 @@ for epoch in range(50):
         
     print(sum(batch_loss) / len(batch_loss))
     
+    scheduler.step()
     
     model.eval()
     correct = 0
