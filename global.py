@@ -80,7 +80,7 @@ print(len(valid_dataset))
 
 
 optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, [150, 225], gamma=0.1)
+# scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, [150, 225], gamma=0.1)
 # param_optimizer = list(model.named_parameters())
 # no_decay = ['bias', 'gamma', 'beta']
 # optimizer_grouped_parameters = [
@@ -97,7 +97,7 @@ policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 policy = policy_module.Policy(args)
 
 best_acc = 0.0
-for epoch in range(300):
+for epoch in range(50):
     batch_loss = []
     model.train()
     
@@ -118,7 +118,7 @@ for epoch in range(300):
         
     print(sum(batch_loss) / len(batch_loss))
     
-    scheduler.step()
+    # scheduler.step()
     
     model.eval()
     correct = 0

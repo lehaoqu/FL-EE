@@ -4,6 +4,7 @@ import torch.nn as nn
 from typing import *
 
 def add_args(parser):
+    parser.add_argument('--ensemble_weight', type=float, default=0.5, help="ensemble weight")
     return parser
 
 class Policy():
@@ -13,6 +14,7 @@ class Policy():
         self.device = self.args.device
         self.exits_num = self.args.exits_num
         self.loss_func = nn.CrossEntropyLoss()
+        self.reweight = [self.args.ensemble_weight] * self.exits_num
     
     def train(self, model, batch, label, ws=None) -> torch.tensor:
         exits_logits = model(**batch)
@@ -22,7 +24,7 @@ class Policy():
         ws = [1 for i in range(self.exits_num)] if ws is None else ws
         pred_ensembels = [torch.zeros(1).to(self.device)]
         for i, logits in enumerate(exits_logits):
-            tmp = logits + pred_ensembels[-1]
+            tmp = (logits + pred_ensembels[-1]) * self.reweight[i]
             pred_ensembels.append(tmp)
             
         exits_loss = ()
@@ -36,16 +38,19 @@ class Policy():
     def __call__(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]
         for i, logits in enumerate(exits_logits):
-            tmp = logits + pred_ensembels[-1]
+            tmp = logits + pred_ensembels[-1] * self.reweight[i]
             pred_ensembels.append(tmp)
-        ensemble_exits_logits = [pred_ensembels[i+1] for i in range(len(exits_logits))]
+        ensemble_exits_logits = pred_ensembels[1:]
         return ensemble_exits_logits
     
     # == for finetune in server == 
     def sf(self, exits_logits):
-        if len(exits_logits) > 1:
-            former_ensemble = sum(exits_logits[:-1])
-            pred_final = exits_logits[-1] + former_ensemble.detach()
-        else:
-            pred_final = exits_logits[0]
+        pred_ensembels = [torch.zeros(1).to(self.device)]
+        for i, logits in enumerate(exits_logits):
+            tmp = (logits + pred_ensembels[-1]) * self.reweight[i]
+            pred_ensembels.append(tmp)
+
+        former_ensemble = pred_ensembels[len(exits_logits)-1]
+        pred_final = exits_logits[-1] + former_ensemble.detach()
+
         return pred_final
