@@ -144,8 +144,8 @@ class FedSim:
 
 
 if __name__ == '__main__':
-    
     args = args_parser()
+
     seed = args.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

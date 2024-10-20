@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -40,3 +41,4 @@ plt.legend()
 plt.grid(True)
 plt.savefig('t.png')
 plt.show()
+

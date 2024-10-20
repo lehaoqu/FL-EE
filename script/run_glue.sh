@@ -9,15 +9,18 @@ total_num=120
 
 bs=32
 optim=sgd
+
 lr=5e-2
 epoch=1
 
 
 datasets=(qqp qnli)
+
 ply=$3
 
 for ds in "${datasets[@]}"
 do
+
 
     echo "$ply" 
     if [ "$ply" == "boosted" ]; then
@@ -37,5 +40,6 @@ do
         python main.py reefl        $ply --suffix $1/$ds --device $2 --dataset $ds --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --config_path $cp --optim $optim --epoch $epoch
         
     fi
+
 
 done
