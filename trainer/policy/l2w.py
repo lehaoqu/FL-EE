@@ -9,6 +9,7 @@ def add_args(parser):
     parser.add_argument('--meta_lr', type=float, default=1e-4, help="meta lr")
     parser.add_argument('--meta_weight_decay', type=float, default=1e-4, help="meta weight_decay")
     parser.add_argument('--meta_p', type=int, default=15, help="meta valid p")
+    parser.add_argument('--meta_net_hidden_size', type=int, default=500, help="meta net hidden size")
     return parser
 
 class MetaSGD(torch.optim.SGD):
@@ -100,7 +101,7 @@ class Policy():
         self.exits_num = args.exits_num
         self.device = args.device
         # == default input is loss or confidence   [exits_num] ==
-        self.meta_net = MLP_tanh(input_size=self.exits_num, output_size=self.exits_num).to(self.device)
+        self.meta_net = MLP_tanh(input_size=self.exits_num, output_size=self.exits_num, hidden_size=args.meta_net_hidden_size).to(self.device)
         
         self.loss_func = nn.CrossEntropyLoss()
         self.meta_optimizer = torch.optim.Adam(self.meta_net.parameters(), lr=args.meta_lr, weight_decay=args.meta_weight_decay)

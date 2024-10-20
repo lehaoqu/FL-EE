@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import *
 
 def add_args(parser):
-    parser.add_argument('--ensemble_weight', type=float, default=0.5, help="ensemble weight")
+    parser.add_argument('--ensemble_weight', type=float, default=0.2, help="ensemble weight")
     return parser
 
 class Policy():
