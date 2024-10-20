@@ -13,7 +13,7 @@ def args_parser():
     
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--model', type=str, default='mlp')
-    parser.add_argument('--config_path', type=str, default='models/facebook/deit-small-patch16-224')
+    parser.add_argument('--config_path', type=str, default='models/facebook/deit-tiny-patch16-224')
 
     # ===== Training Setting =====
     parser.add_argument('--seed', type=int, default=1117, help="seed")
