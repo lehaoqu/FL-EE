@@ -1,26 +1,42 @@
-import torchvision
+import numpy as np
+import matplotlib.pyplot as plt
 
-data_directory = 'ttt'
-# transforms = torchvision.transforms.Compose([
-#     torchvision.transforms.ToTensor()]
-# )
+# 定义离散随机变量的值和对应的概率
+values = np.array([1, 2, 3])
+probabilities = np.array([0.2, 0.3, 0.5])
 
-# train_set = torchvision.datasets.SVHN(
-#     root=data_directory, split="train", download=True, transform=transforms)
-# test_set = torchvision.datasets.SVHN(
-#     root=data_directory, split="test", download=True, transform=transforms)
+# 计算累积分布函数
+cdf = np.cumsum(probabilities)
 
-import scipy.io as sio
+# 定义一个函数，用于生成连续随机变量的PDF
+def generate_pdf(values, probabilities, num_points=1000):
+    # 计算连续变量的值
+    x = np.linspace(min(values) - 0.5, max(values) + 0.5, num_points)
+    # 初始化PDF
+    pdf = np.zeros_like(x)
+    # 计算每个区间的PDF
+    for i in range(len(values)-1):
+        dx = values[i+1] - values[i]
+        pdf[(x >= values[i]) & (x < values[i+1])] = probabilities[i] / dx
+    # 处理最后一个区间
+    if len(values) > 1:
+        dx = x.max() - values[-1]
+        pdf[(x >= values[-1])] = probabilities[-1] / dx if dx != 0 else 0
+    else:
+        # 如果只有一个值，PDF是一个在该值处的delta函数
+        pdf[x == values[0]] = probabilities[0]
+    return x, pdf
 
-# 读取.mat文件
-mat_data = sio.loadmat('ttt/train_32x32.mat')
-print(mat_data.keys())
+# 生成PDF
+x, pdf = generate_pdf(values, probabilities)
 
-# 提取变量
-matrix1 = mat_data['X']
-print(matrix1.shape)
-matrix2 = mat_data['y']
-
-# 显示变量信息
-print("matrix1的形状:", matrix1.shape)
-print("matrix2的数据类型:", type(matrix2))
+# 绘制PDF
+plt.figure(figsize=(8, 4))
+plt.plot(x, pdf, label='PDF')
+plt.xlabel('x')
+plt.ylabel('Probability Density')
+plt.title('Probability Density Function of Continuous Variable')
+plt.legend()
+plt.grid(True)
+plt.savefig('t.png')
+plt.show()

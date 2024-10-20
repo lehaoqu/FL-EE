@@ -97,7 +97,7 @@ policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 policy = policy_module.Policy(args)
 
 best_acc = 0.0
-for epoch in range(50):
+for epoch in range(200):
     batch_loss = []
     model.train()
     
