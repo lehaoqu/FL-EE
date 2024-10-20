@@ -33,7 +33,7 @@ class FedSim:
         if args.alg == 'fl':
             args.eq_ratios = (0,0,0,1)
 
-        if 'ours' in args.alg:
+        if 'darkfl' in args.alg:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                       f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_kd{args.kd_lr}_g{args.g_lr}_alpha{args.g_alpha}_eta{args.g_eta}_gg{args.g_gamma}_{args.is_latent}.pth'
             self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \

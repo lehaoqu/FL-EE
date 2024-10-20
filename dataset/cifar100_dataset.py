@@ -40,7 +40,6 @@ class CIFARClassificationDataset(Dataset):
                     (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
                 ),
             ])
-        device = images.device
         images_reshaped = images.view(-1, 3, 32, 32)
         return torch.stack([transform(image) for image in images_reshaped], dim=0)
 

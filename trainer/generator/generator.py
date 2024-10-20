@@ -52,18 +52,18 @@ class DiversityLoss(nn.Module):
 
 
 class Generator_LATENT(BaseModule):
-    def __init__(self, args, embedding=True):
+    def __init__(self, args=None, embedding=True):
         super(Generator_LATENT, self).__init__()
-        self.device = args.device
+        self.device = args.device if args is not None else 0
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
         if 'cifar' in args.dataset:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 197, 384, 100, 100
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 500, 197, 192, 100, 100, 10
         else:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 500, 128, 256, 2, 2
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 500, 128, 256, 2, 2, 10
         self.latent_dim = self.token_num * self.hidden_rs
         
-        input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
+        input_dim = self.noise_dim * 3 if self.embedding else self.noise_dim + self.n_class
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
         self.build_network()
@@ -73,6 +73,7 @@ class Generator_LATENT(BaseModule):
         self.diversity_loss = DiversityLoss(metric='l1')
         
     def build_network(self):
+        self.embedding_layer_diff = nn.Embedding(self.n_diff, self.noise_dim)
         if self.embedding:
             self.embedding_layer = nn.Embedding(self.n_class, self.noise_dim)
         
@@ -88,14 +89,16 @@ class Generator_LATENT(BaseModule):
         # == Representation Layer ==
         self.representation_layer = nn.Linear(self.fc_configs[-1], self.latent_dim)
         
-    def forward(self, labels, eps):
+    def forward(self, diffs, labels, eps):
         if isinstance(labels, tuple): labels = labels[0]
         batch_size = labels.shape[0]
+        
+        diff_embedding = self.embedding_layer_diff(diffs)
         if self.embedding:
             y_input = self.embedding_layer(labels)
         else:
             y_input = F.one_hot(labels, num_classes=self.n_class).float()
-        z = torch.cat((eps, y_input), dim=1)
+        z = torch.cat((eps, y_input, diff_embedding), dim=1)
         
         # == FC Layers ==
         for layer in self.fc_layers:
@@ -116,19 +119,20 @@ class Generator_LATENT(BaseModule):
 
 
 class Generator_CIFAR(BaseModule):
-    def __init__(self, args, dataset='cifar100_dataset'):
-        hidden_channel, output_channel, img_size, n_class, noise_dim= 64, 3, 32, 100, 100
+    def __init__(self, args=None, dataset='cifar100_dataset'):
+        hidden_channel, output_channel, img_size, n_class, noise_dim, n_diff = 64, 3, 32, 100, 100, 10
         super(Generator_CIFAR, self).__init__()
         
         self.noise_dim = noise_dim
         self.diversity_loss = DiversityLoss(metric='l1')
         
-        self.device = args.device
+        self.device = args.device if args is not None else 0
 
         self.init_size = img_size//4
         
         self.embedding_layer = nn.Embedding(n_class, noise_dim)
-        self.l1 = nn.Sequential(nn.Linear(noise_dim*2, hidden_channel*2*self.init_size**2))
+        self.embedding_layer_diff = nn.Embedding(n_diff, noise_dim)
+        self.l1 = nn.Sequential(nn.Linear(noise_dim*3, hidden_channel*2*self.init_size**2))
 
         self.conv_blocks0 = nn.Sequential(
             nn.BatchNorm2d(hidden_channel*2),
@@ -147,11 +151,13 @@ class Generator_CIFAR(BaseModule):
             # nn.BatchNorm2d(output_channel, affine=False) 
         )
 
-    def forward(self, labels, noise):
+    def forward(self, diffs, labels, noise, raw=False):
+        if isinstance(labels, tuple): labels = labels[0]
         batch_size = labels.shape[0]
         y_embedding = self.embedding_layer(labels)
+        diff_embedding = self.embedding_layer_diff(diffs)
         
-        z = torch.cat((noise, y_embedding), dim=-1)
+        z = torch.cat((noise, y_embedding, diff_embedding), dim=-1)
         out = self.l1(z.view(z.shape[0],-1))
         out = out.view(out.shape[0], -1, self.init_size, self.init_size)
         img = self.conv_blocks0(out)
@@ -159,7 +165,7 @@ class Generator_CIFAR(BaseModule):
         img = self.conv_blocks1(img)
         img = nn.functional.interpolate(img,scale_factor=2)
         img = self.conv_blocks2(img)
-        return CIFARClassificationDataset.generator_transform_tensor(images=img)
+        return CIFARClassificationDataset.generator_transform_tensor(images=img) if raw else img
 
 
     def statistic_loss(self, g_images, train_mean, train_std):
