@@ -174,13 +174,14 @@ class ViTExitEncoderRee(nn.Module):
         super().__init__()
         self.config = config
         # TODO more accurate ree config
+        base_model = 'small' if self.config.hidden_size == 384 else "tiny"
         self.accumulator = Ree(
             recurrent_steps=1,
             heads=8,
             modulation=True,
             exit_head='normlinear',
             mode='add',
-            base_model='small',
+            base_model=base_model,
             num_classes=100,
             adapter=None,
             depth=1,
