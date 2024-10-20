@@ -21,7 +21,7 @@ class FedSim:
         self.args = args
 
         # === load trainer ===
-        trainer_module = importlib.import_module(f'trainer.alg.{args.alg}')
+        trainer_module = importlib.import_module(f'trainer.alg.{args.alg}') if args.alg != 'fl' else importlib.import_module(f'trainer.alg.exclusivefl')
 
         # === init other config ===
         self.acc_processor = DataProcessor()
@@ -29,11 +29,9 @@ class FedSim:
 
         if not os.path.exists(f'./{args.suffix}'):
             os.makedirs(f'./{args.suffix}')
-
-        result_path = f'./{args.suffix}/result_{args.dataset}_{args.model}_' \
-                      f'{args.total_num}c_{args.epoch}E_lr{args.lr}_{args.policy}.txt'
-        # self.res_output = open(result_path, 'a')
         
+        if args.alg == 'fl':
+            args.eq_ratios = (0,0,0,1)
 
         if 'ours' in args.alg:
             self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
@@ -147,7 +145,7 @@ class FedSim:
 
 if __name__ == '__main__':
     args = args_parser()
-    
+
     seed = args.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

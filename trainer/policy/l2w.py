@@ -5,10 +5,11 @@ import copy
 import math
 
 def add_args(parser):
-    parser.add_argument('--meta_gap', type=int, default=100, help="meta gap")
+    parser.add_argument('--meta_gap', type=int, default=1, help="meta gap")
     parser.add_argument('--meta_lr', type=float, default=1e-4, help="meta lr")
     parser.add_argument('--meta_weight_decay', type=float, default=1e-4, help="meta weight_decay")
     parser.add_argument('--meta_p', type=int, default=15, help="meta valid p")
+    parser.add_argument('--meta_net_hidden_size', type=int, default=500, help="meta net hidden size")
     return parser
 
 class MetaSGD(torch.optim.SGD):
@@ -36,8 +37,7 @@ class MetaSGD(torch.optim.SGD):
         nesterov = group['nesterov']
         lr = group['lr']
 
-        for name, parameter in self.net.named_parameters():
-            grad = grads[name]
+        for (name, parameter), grad in zip(self.net.named_parameters(), grads):
             parameter.detach_()
             if weight_decay != 0:
                 grad_wd = grad.add(parameter, alpha=weight_decay)
@@ -101,7 +101,7 @@ class Policy():
         self.exits_num = args.exits_num
         self.device = args.device
         # == default input is loss or confidence   [exits_num] ==
-        self.meta_net = MLP_tanh(input_size=self.exits_num, output_size=self.exits_num).to(self.device)
+        self.meta_net = MLP_tanh(input_size=self.exits_num, output_size=self.exits_num, hidden_size=args.meta_net_hidden_size).to(self.device)
         
         self.loss_func = nn.CrossEntropyLoss()
         self.meta_optimizer = torch.optim.Adam(self.meta_net.parameters(), lr=args.meta_lr, weight_decay=args.meta_weight_decay)
@@ -198,32 +198,31 @@ class Policy():
         pseudo_weight = pseudo_weight - torch.mean(pseudo_weight, 1, keepdim=True) 
         # TODO 0.8
         pseudo_weight = torch.ones(pseudo_weight.shape).to(pseudo_weight.device) + 0.8 * pseudo_weight
+        # print(f'weights: {pseudo_weight}')
         pseudo_loss_multi_exits = torch.sum(torch.mean(pseudo_weight * pseudo_losses, 0))
-        # print(pseudo_loss_multi_exits)
-        pseudo_optimizer.zero_grad()
-        pseudo_loss_multi_exits.backward(retain_graph=True)
-        pseudo_optimizer.step()
-        # pseudo_grads = {n: p.grad for n, p in pseudo_net.named_parameters()}
-        
-        # pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True, allow_unused=True)
 
-        # for n, p in pseudo_net.named_parameters():
-        #     if p.grad is None:
-        #         print(n)
+        # pseudo_optimizer.zero_grad()
+        # pseudo_loss_multi_exits.backward(retain_graph=True)
+        # pseudo_optimizer.step()
+
+        pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True, allow_unused=True)
+
+        # # 获取未使用的参数名称
+        # used_params = {p for g, p in zip(pseudo_grads, list(pseudo_net.parameters())) if g is not None}
+        # unused_params = [name for name, param in pseudo_net.named_parameters() if param not in used_params]
+
+        # print("未使用的参数名称:", unused_params)
         
-        # pseudo_optimizer = MetaSGD(pseudo_net, pseudo_net.parameters())
-        # pseudo_optimizer.load_state_dict(optimizer.state_dict())
-        # pseudo_optimizer.meta_step(pseudo_grads)
-        
-        
-        
-        # del pseudo_grads
+        pseudo_optimizer = MetaSGD(pseudo_net, pseudo_net.parameters(), lr=lr)
+        pseudo_optimizer.load_state_dict(optimizer.state_dict())
+        pseudo_optimizer.meta_step(pseudo_grads)
+                
+        del pseudo_grads
         
         # for n, p in pseudo_net.named_parameters():
         #     if p.requires_grad is False:
         #         print(n)
         meta_outputs = pseudo_net(**batch_meta)
-        # print(meta_outputs)
         used_index = []
         meta_loss = 0.0
         
@@ -259,13 +258,12 @@ class Policy():
                 
                 meta_loss += F.cross_entropy(meta_outputs[j][selected_index], label_meta[selected_index].long(), reduction='mean')
 
-        # print(f'{100*correct/(total):.2f}, {correct}, {total}')
+        print(f'{100*correct/(total):.2f}, {correct}, {total}')
         
         self.meta_optimizer.zero_grad()
-        # print(meta_loss)
         meta_loss.backward()
         self.meta_optimizer.step()
-        # print(meta_loss)
+        print(meta_loss.cpu().item())
     
 
     def __call__(self, exits_logits):

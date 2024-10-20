@@ -13,10 +13,11 @@ def args_parser():
     
     parser.add_argument('--dataset', type=str, default='mnist')
     parser.add_argument('--model', type=str, default='mlp')
-    parser.add_argument('--config_path', type=str, default='models/facebook/deit-small-patch16-224')
+    parser.add_argument('--config_path', type=str, default='models/facebook/deit-tiny-patch16-224')
 
     # ===== Training Setting =====
-    parser.add_argument('--total_num', type=int, default=4, help="Total clients num")
+    parser.add_argument('--seed', type=int, default=1117, help="seed")
+    parser.add_argument('--total_num', type=int, default=120, help="Total clients num")
     parser.add_argument('--sr', type=float, default=0.3, help="Clients sample rate")
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
@@ -44,6 +45,7 @@ def args_parser():
     
     # ===== Eval Setting =====
     parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')
+    parser.add_argument('--cosine', action='store_true', help='cosin')
     parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of valid for train_dataset')
     parser.add_argument('--eval_models_dir', type=str, default='script/0818-1e-1', help='dict need to evaled. config.json and model.pkl')
 

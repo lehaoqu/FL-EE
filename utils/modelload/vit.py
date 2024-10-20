@@ -91,6 +91,7 @@ class ViTExitLayer(nn.Module):
         self.exit = True if index in config.exits else False
         if self.exit:
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+            self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
         self.attention = ViTAttention(config)
@@ -98,7 +99,7 @@ class ViTExitLayer(nn.Module):
         self.output = ViTOutput(config)
         self.layernorm_before = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.layernorm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        
 
     def forward(
         self,
@@ -173,13 +174,14 @@ class ViTExitEncoderRee(nn.Module):
         super().__init__()
         self.config = config
         # TODO more accurate ree config
+        base_model = 'small' if self.config.hidden_size == 384 else "tiny"
         self.accumulator = Ree(
             recurrent_steps=1,
             heads=8,
             modulation=True,
             exit_head='normlinear',
             mode='add',
-            base_model='small',
+            base_model=base_model,
             num_classes=100,
             adapter=None,
             depth=1,

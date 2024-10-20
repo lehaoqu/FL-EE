@@ -150,40 +150,40 @@ class MultiHeadedAttention(nn.Module):
         return output
 
 
-class Classifier(nn.Module):
+# class Classifier(nn.Module):
 
-    def __init__(self, config, input_size, labels_num):
-        super(Classifier, self).__init__()
-        self.input_size = input_size
-        self.cla_hidden_size = 128
-        self.cla_heads_num = 2
-        self.labels_num = labels_num
-        self.output_layer_0 = nn.Linear(input_size, self.cla_hidden_size)
-        classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
-        )
-        self.self_atten = MultiHeadedAttention(self.cla_hidden_size, self.cla_heads_num, classifier_dropout)
-        self.output_layer_1 = nn.Linear(self.cla_hidden_size, self.cla_hidden_size)
-        self.output_layer_2 = nn.Linear(self.cla_hidden_size, labels_num)
+#     def __init__(self, config, input_size, labels_num):
+#         super(Classifier, self).__init__()
+#         self.input_size = input_size
+#         self.cla_hidden_size = 128
+#         self.cla_heads_num = 2
+#         self.labels_num = labels_num
+#         self.output_layer_0 = nn.Linear(input_size, self.cla_hidden_size)
+#         classifier_dropout = (
+#             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+#         )
+#         self.self_atten = MultiHeadedAttention(self.cla_hidden_size, self.cla_heads_num, classifier_dropout)
+#         self.output_layer_1 = nn.Linear(self.cla_hidden_size, self.cla_hidden_size)
+#         self.output_layer_2 = nn.Linear(self.cla_hidden_size, labels_num)
 
-        self.dropout = nn.Dropout(classifier_dropout)
+#         self.dropout = nn.Dropout(classifier_dropout)
 
-    def forward(self, hidden, mask):
-        mask = (mask > 0). \
-                unsqueeze(1). \
-                repeat(1, mask.shape[-1], 1). \
-                unsqueeze(1)
-        mask = mask.float()
-        mask = (1.0 - mask) * -10000.0
+#     def forward(self, hidden, mask):
+#         mask = (mask > 0). \
+#                 unsqueeze(1). \
+#                 repeat(1, mask.shape[-1], 1). \
+#                 unsqueeze(1)
+#         mask = mask.float()
+#         mask = (1.0 - mask) * -10000.0
 
-        hidden = torch.tanh(self.output_layer_0(hidden))
-        hidden = self.self_atten(hidden, hidden, hidden, mask)
+#         hidden = torch.tanh(self.output_layer_0(hidden))
+#         hidden = self.self_atten(hidden, hidden, hidden, mask)
 
-        hidden = hidden[:, 0]
+#         hidden = hidden[:, 0]
 
-        output_1 = torch.tanh(self.dropout(self.output_layer_1(hidden)))
-        logits = self.output_layer_2(self.dropout(output_1))
-        return logits
+#         output_1 = torch.tanh(self.dropout(self.output_layer_1(hidden)))
+#         logits = self.output_layer_2(self.dropout(output_1))
+#         return logits
 
 
 class BertExitLayer(nn.Module):
@@ -193,7 +193,9 @@ class BertExitLayer(nn.Module):
         self.layer_index = index
         self.exit = True if index in config.exits else False
         if self.exit:
-            self.classifier = Classifier(config, config.hidden_size, config.num_labels)
+            self.pooler = BertPooler(config)
+            self.dropout = nn.Dropout(config.hidden_dropout_prob)
+            self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
         self.attention = BertAttention(config)
@@ -264,20 +266,22 @@ class BertExitLayer(nn.Module):
         layer_output = apply_chunking_to_forward(
             self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
         )
-        
+        f = None
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
             if self.config.policy == 'base' or self.config.policy == 'l2w':
-                logits = self.classifier(layer_output, o_attention_mask)
+                f = self.dropout(self.pooler(layer_output))
+                logits = self.classifier(f)
             elif self.config.policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
-                logits = self.classifier(layer_output, o_attention_mask)
+                f = self.dropout(self.pooler(layer_output))
+                logits = self.classifier(f)
                 layer_output = gradient_rescale(layer_output, len(self.config.exits) - exit_idx - 1)
             
         
-            outputs = (layer_output, logits, outputs)
+            outputs = (layer_output, logits, outputs, f)
         else:
-            outputs = (layer_output, None, outputs)
+            outputs = (layer_output, None, outputs, f)
         return outputs
 
     def feed_forward_chunk(self, attention_output):
@@ -323,10 +327,10 @@ class BertExitEncoder(nn.Module):
                 past_key_value,
             )
 
-            hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+            hidden_states, exit_logits, f = layer_outputs[0], layer_outputs[1], layer_outputs[3]
             if layer_module.exit:
                 exits_logits += (exit_logits, )
-                exits_feature += (hidden_states[:, 0], )
+                exits_feature += (f, )
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
         return exits_logits, exits_feature
@@ -382,8 +386,10 @@ class BertExitEncoderRee(nn.Module):
                 encoder_attention_mask,
                 past_key_value,
             )
-
+            
             hidden_states = layer_outputs[0]
+            # hidden_states = gradient_rescale(hidden_states, 1.0/(len(self.config.exits) - i))
+            
             cls_token_batch = hidden_states[:, 0][:, None, :]
             cls_tokens.append(cls_token_batch)
             mod_tokens = None
@@ -406,6 +412,8 @@ class BertExitEncoderRee(nn.Module):
                     mod_tokens = self.accumulator(torch.cat((cls_tokens), 1))
                     hidden_states[:, 0] = mod_tokens[:, -1]
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
+
+            # hidden_states = gradient_rescale(hidden_states, len(self.config.exits) - i - 1)
 
         return exits_logits, exits_feature
 

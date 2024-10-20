@@ -35,6 +35,7 @@ def add_args(parser):
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
+
 class Client(BaseClient):
     
     def train(self):
@@ -183,14 +184,16 @@ class Server(BaseServer):
             attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
             y_distribute = [sum(column) for column in zip(*[[y*self.eq_num[eq] for y in self.eq_y[eq]] for eq in attend_eq])]
             y_distribute = [y/sum(y_distribute) for y in y_distribute]
+            
 
-            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=int(self.args.bs/2)), dtype=torch.long).to(self.device)
+            y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             if self.args.dataset in GLUE:
                 # TODO two classes for GLUE
                 y_sl_distribute = {y:[sum(column) for column in zip(*[[sl*self.eq_num[eq] for sl in self.eq_y_sl[eq][y]] for eq in attend_eq])] for y in range(0,2)}
                 y_sl_distribute = {y: [sl/sum(y_sl_distribute[y]) for sl in y_sl_distribute[y]] for y in range(0, 2)}
+            
                 attention_mask = ()
-                for i in range(int(self.args.bs/2)):
+                for i in range(self.args.bs):
                     y = y_input.cpu().tolist()[i]
                     sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
                     mask = torch.zeros(128)

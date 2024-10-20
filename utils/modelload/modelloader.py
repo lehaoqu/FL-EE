@@ -9,6 +9,7 @@ from utils.train_utils import *
 MNIST = 'mnist'
 CIFAR10 = 'cifar10'
 CIFAR100 = 'cifar100'
+SVHN = 'svhn'
 GLUE = ['sst2', 'mrpc', 'qnli', 'qqp', 'rte', 'wnli']
 
 MLP = 'mlp'
@@ -35,7 +36,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     if CIFAR10 in dataset_arg:
         if CNN in model_arg:
             model = CNNCifar(args=args, dim_out=class_num)
-    if CIFAR100 in dataset_arg or dataset_arg in GLUE:
+    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE:
         
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
         
@@ -43,7 +44,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         pre_model = based_model.Model.from_pretrained(pretrained_model_name_or_path=config_path)
         eq_config = copy.deepcopy(pre_model.config)
         
-        num_labels = 100 if CIFAR100 in dataset_arg else 2
+        num_labels = 100 if CIFAR100 in dataset_arg else 10 if SVHN in dataset_arg else 2
         
         if is_scalefl:
             if args.alg == 'heterofl':
@@ -102,7 +103,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
 def load_model_eval(args, model_path, config_path=None):
     model_arg = args.model
     dataset_arg = args.dataset
-    if CIFAR100 in dataset_arg or dataset_arg in GLUE:
+    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE:
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
            
         exit_config = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)

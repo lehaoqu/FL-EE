@@ -13,7 +13,6 @@ transformers.logging.set_verbosity_error()
 class GLUEClassificationDataset(Dataset):
     def __init__(self, args=None, path=None, tokenizer=None, need_process=False, eval_valids=False):
         self.path = path
-        
         if eval_valids:
             dict_all = [load_pkl(f'{path}{i}.pkl') for i in range(args.total_num)]
             total_data = {}

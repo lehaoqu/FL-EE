@@ -3,13 +3,17 @@ import torch
 import torch.nn as nn
 import math
 import importlib
+from PIL import Image
+import numpy as np
 
 from tqdm import tqdm
+from transformers import BertTokenizer
 
 from utils.options import args_parser
 from utils.dataloader_utils import load_dataset_loader
 from utils.modelload.modelloader import load_model_eval
 from dataset.cifar100_dataset import CIFARClassificationDataset
+from dataset.svhn_dataset import SVHNClassificationDataset
 
 
 
@@ -19,13 +23,24 @@ class Eval():
         self.if_mode = args.if_mode
         self.device = args.device
         args.valid_ratio = 0.2
-        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
-        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test')
+        self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True, shuffle=False)
+        self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test', shuffle=False)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'a')
+        self.img_dir = args.img_dir
+  
         
         
     def eval(self, model_path, config_path):
+        if 'cifar' in args.dataset:
+            if not os.path.exists(self.img_dir):
+                os.makedirs(self.img_dir)
+        
+        base_name = os.path.basename(model_path)
+        name_without_extension = os.path.splitext(base_name)[0]
+        self.model_path = name_without_extension
+        
+        
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
         self.n_exits = len(self.model.config.exits)
@@ -33,10 +48,18 @@ class Eval():
         self.model.to(self.device)
         self.tester = Tester(self.model, self.args)
         
-        self.test_exits_preds, self.test_targets = self.tester.calc_logtis(self.test_dataloader)
-        self.valid_exits_preds, self.valid_targets = self.tester.calc_logtis(self.valid_dataloader)
+        self.test_exits_preds, self.test_targets, self.test_all_sample_exits_logits = self.tester.calc_logtis(self.test_dataloader)
+        self.valid_exits_preds, self.valid_targets, self.valid_all_sample_exits_logits  = self.tester.calc_logtis(self.valid_dataloader)
         
         self.eval_output.write('logits calc compeleted\n')
+        
+        if self.args.cosine is True:
+            self.test_cos_exits, self.test_all_sample_cos_exits = self.cos_similiarity(self.test_all_sample_exits_logits)
+            # self.valid_cos_exits, self.valid_all_sample_cos_exits = self.cos_similiarity(self.valid_all_sample_exits_logits)
+            
+            self.sort(self.test_all_sample_cos_exits, self.test_dataset)
+            # self.sort(self.valid_all_sample_cos_exits, self.valid_dataset)
+            
         
         if self.args.if_mode == 'anytime':
             self.anytime()
@@ -49,7 +72,6 @@ class Eval():
     
     def anytime(self,):
         crt_list = [0 for _ in range(self.n_exits)]
-        
         for i in range(self.n_exits):
             _, predicted = torch.max(self.test_exits_preds[i], 1)
             crt_list[i] += (predicted == self.test_targets).sum().item()
@@ -60,9 +82,11 @@ class Eval():
         
     
     def budgeted(self,):
-        rnd = 40
+        rnd = 20
         # TODO flops need to be measured
         flops = [i+1 for i in range(self.n_exits)]
+        acc_test_list = ''
+        exp_flops_list = ''
         for p in range(1, rnd):
             # self.eval_output.write("\n*********************\n")
             _p = torch.tensor([p * (1.0/(rnd/2))], dtype=torch.float32).to(self.device)
@@ -71,9 +95,65 @@ class Eval():
             
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
             acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
+            acc_test_list += (str(acc_test)+'\n')
+            exp_flops_list += (str(exp_flops.cpu().item())+'\n')
             self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
+        self.eval_output.write(acc_test_list)
+        self.eval_output.write(exp_flops_list)
+        self.eval_output.flush()
+            
+    def cos_similiarity(self, all_sample_exits_logits):
+        sample_num = all_sample_exits_logits[0].size(0)
+        all_sample_cos_exits = [[] for _ in range(sample_num)]
+        
+        for i in range(sample_num):
+            last_logits = all_sample_exits_logits[-1][i].unsqueeze(0)
+            for exit_idx in range(self.n_exits):
+                exit_logits = all_sample_exits_logits[exit_idx][i].unsqueeze(0)
+                cos_similar = nn.functional.cosine_similarity(exit_logits, last_logits, dim=1).cpu().item()
+                all_sample_cos_exits[i].append(cos_similar)
+        print(len(all_sample_cos_exits), len(all_sample_cos_exits[0]))
+        cos_exits_array = np.array(all_sample_cos_exits).transpose()
+        cos_exits_means = np.mean(cos_exits_array, axis=1)
+        print(cos_exits_means)
+        self.eval_output.write(str(cos_exits_means)+"\n")
+        self.eval_output.flush()
+        return cos_exits_means, all_sample_cos_exits
+    
+    
+    def sort(self, all_sample_cos_exits, dataset):
+        
+        all_sample_score = [sum(cos_exits) for cos_exits in all_sample_cos_exits]
+        score_array = np.array(all_sample_score)
+        indices = np.argsort(-score_array)
+        
+        n = 5
+        div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
+        
+        if 'cifar' in self.args.dataset:
+            for dlevel, level_idx in enumerate(div_points):
+                label = dataset[indices[level_idx]]['labels']
+                sample = dataset[indices[level_idx]]['pixel_values']
+
+                sample = sample.numpy().reshape(3,32,32) if isinstance(sample, torch.Tensor) else sample.reshape(3,32,32)
+                array = np.transpose(sample, (1, 2, 0))
+                img = Image.fromarray(array.astype(np.uint8))
+                img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
+                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+        else:
+            for dlevel, level_idx in enumerate(div_points):
+                label = dataset[indices[level_idx]]['labels'].item()
+                sample = dataset[indices[level_idx]]['input_ids']
+
+                tokenizer = BertTokenizer.from_pretrained('./models/google-bert/bert-12-uncased')
+                detokenized_tokens = tokenizer.convert_ids_to_tokens(sample)
+                filtered_tokens = [token for token in detokenized_tokens if token not in ("[CLS]", "[PAD]")]
+                detokenized_text = " ".join(filtered_tokens)
+                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+                self.eval_output.write(f'label: {label}, sample: {detokenized_text}' + "\n")
+    
             
             
 class Tester(object):
@@ -94,7 +174,10 @@ class Tester(object):
         for key in data.keys():
             batch[key] = data[key].to(self.device)
             if key == 'pixel_values':
-                batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+                if 'cifar' in self.args.dataset:
+                    batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+                else:
+                    batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
         label = batch['labels'].view(-1)
         return batch, label
     
@@ -110,8 +193,9 @@ class Tester(object):
             with torch.no_grad():
                 exits_logits = self.policy(self.model(**batch))
                 for i, exit_logits in enumerate(exits_logits):
-                    _t = self.softmax(exit_logits)
-                    all_sample_exits_logits[i].append(_t)
+                    # _t = self.softmax(exit_logits)
+                    # all_sample_exits_logits[i].append(_t)
+                    all_sample_exits_logits[i].append(exit_logits)
         
         for i in range(self.n_exits):
             all_sample_exits_logits[i] = torch.cat(all_sample_exits_logits[i], dim=0)
@@ -122,7 +206,7 @@ class Tester(object):
             ts_preds[i] = all_sample_exits_logits[i]
             
         all_sample_targets = torch.cat(all_sample_targets, dim=0)
-        return ts_preds, all_sample_targets
+        return ts_preds, all_sample_targets, all_sample_exits_logits
     
     def dynamic_eval_find_threshold(self, preds, targets, p, flops):
         """
@@ -196,11 +280,14 @@ class Tester(object):
     
 if __name__ == '__main__':
     args = args_parser()
-    eval = Eval(args=args)
     eval_dir = args.suffix
+    args.img_dir = eval_dir + "/img"
+    eval = Eval(args=args)
+
     file_names = os.listdir(eval_dir)
-    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f]))
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if 'G' not in model_path:
-            eval.eval(model_path+'.pth', model_path+'.json')
+        print(model_path)
+        # if 'l2w' in model_path:
+        eval.eval(model_path+'.pth', model_path+'.json')
