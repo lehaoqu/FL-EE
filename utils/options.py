@@ -41,7 +41,6 @@ def args_parser():
     # ===== Other Setting =====
     # Asynchronous aggregation
     parser.add_argument('--alpha', type=float, default=0.3, help='Weight decay')
-    parser.add_argument('--seed', type=int, default=1117, help="random seed")
     
     # ===== Eval Setting =====
     parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')
