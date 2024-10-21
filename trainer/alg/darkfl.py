@@ -158,6 +158,7 @@ class Server(BaseServer):
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
         self.p=15
+    
      
     def get_batch(self, gen_latent, y_input):
         batch = {}
@@ -228,7 +229,7 @@ class Server(BaseServer):
             # == train global model utilize generators ==
             gen_latent_g = {}
             for eq_depth in self.eq_depths:
-                gen_latent = self.generators[eq_depth][0](y_input_g[eq_depth], eps_g[eq_depth])
+                gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
                 gen_latent_g[eq_depth] = gen_latent.detach()
             if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
                 self.finetune_global_model(diff_g, y_input_g, gen_latent_g)
@@ -324,11 +325,13 @@ class Server(BaseServer):
     def teach_global_model(self, gs, n_iters, diff_g, y_input_g, gen_latent_g):
         
         def get_all(dic):
-            if isinstance(dic.values()[0], tuple):
-                all = (torch.tensor([]).to(self.device), torch.tensor([]).to(self.device))
+            first_value = next(iter(dic.values()))
+            if isinstance(first_value, tuple):
+                all = [torch.tensor([]).to(self.device)] * len(first_value)
                 for item in dic.values():
-                    all[0] = torch.cat((all[0], item[0]), dim=0)
-                    all[1] = torch.cat((all[1], item[1]), dim=0)
+                    for i in range(len(item)):
+                        all[i] = torch.cat((all[i], item[i]), dim=0)
+                all = tuple(all)
             else:
                 all = torch.tensor([]).to(self.device)
                 for item in dic.values():
@@ -351,10 +354,9 @@ class Server(BaseServer):
             for exit_idx in range(global_n_exits):
                 selected_index = selected_index_list[exit_idx]
                 global_diff_exits.append(all_diff[selected_index])
-            
             # == super-sub model teach global model ==
             def diff_distance(local_diff):
-                exits_dis = torch.tensor([]).to(self.device)
+                exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
                 for i, global_diff in enumerate(global_diff_exits):
                     exits_dis[i] = F.pairwise_distance(local_diff, global_diff)
                 return exits_dis/sum(exits_dis)
@@ -373,22 +375,23 @@ class Server(BaseServer):
                 for exit_idx in range(exits_num):
                     selected_index = selected_index_list[exit_idx]
                     
-                    weight_t_exits = [1.0] * global_n_exits
+                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
                     for sample_index in selected_index:
-                        samples_distance[sample_index] = diff_distance(diff[sample_index])
-                        weight_t_exits = [weight_t_exits[t_exit] * samples_distance[sample_index][t_exit] for t_exit in range(len(weight_t_exits))]
+                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0))
+                        for t_exit in range(global_n_exits):
+                            weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
                     
-                    total_sum = np.sum(weight_t_exits)
-                    weight_t_exits = [x / total_sum for x in weight_t_exits]
+                    weight_t_exits = F.softmax(-weight_t_exits/sum(weight_t_exits), dim=0)
+                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
                         
-                    t_y_input = y_input[selected_index]
+                    t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
                     t_logits = exits_logits[exit_idx][selected_index]
                     
                     s_exits_logits, s_exits_feature = self.global_model(**self.get_batch(t_gen_latent, t_y_input), is_latent=self.is_latent, rt_feature=True)
                     for s_exit_idx in range(global_n_exits):
                         
-                        s_logits = self.eq_policy[max(self.eq_depths)](s_exits_logits[:s_exit_idx+1])
+                        s_logits = self.eq_policy[max(self.eq_depths)].sf(s_exits_logits[:s_exit_idx+1])
                         Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s_logits, t_logits) + self.kd_angle_ratio*self.angle_criterion(s_logits, t_logits) + self.kd_dark_ratio*self.dark_criterion(s_logits, t_logits))
             
             Loss.backward()

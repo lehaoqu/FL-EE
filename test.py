@@ -10,10 +10,6 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 import torch
 import torch.nn.functional as F
 
-# 创建两个张量
-tensor1 = torch.tensor([1])  # 假设有5个样本，每个样本3个特征
-tensor2 = torch.tensor([1,2,3])
+t = torch.zeros(4)
 
-# 计算欧氏距离
-euclidean_distance = F.pairwise_distance(tensor1, tensor2)
-print("Euclidean Distance:", euclidean_distance)
+print(t)
