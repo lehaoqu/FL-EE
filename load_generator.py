@@ -8,7 +8,7 @@ from utils.options import args_parser
 import torch.nn.functional as F
 import random
 import math
-from trainer.alg.darkfl import calc_target_probs
+from utils.train_utils import calc_target_probs
 
 #  python load_generator.py depthfl boosted --dataset cifar100-224-d03 --model vit
 

@@ -86,6 +86,69 @@ class AdamW(Optimizer):
 
         return loss
 
+
+class HardDarkRank(nn.Module):
+    def __init__(self, alpha=2, beta=3, permute_len=3):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.permute_len = permute_len
+
+    def forward(self, student, teacher):
+        score_teacher = -1 * self.alpha * pdist(teacher, squared=False).pow(self.beta)
+        score_student = -1 * self.alpha * pdist(student, squared=False).pow(self.beta)
+
+        permute_idx = score_teacher.sort(dim=1, descending=True)[1][:, 1:(self.permute_len+1)]
+        ordered_student = torch.gather(score_student, 1, permute_idx)
+
+        log_prob = (ordered_student - torch.stack([torch.logsumexp(ordered_student[:, i:], dim=1) for i in range(permute_idx.size(1))], dim=1)).sum(dim=1)
+        loss = (-1 * log_prob).mean()
+
+        return loss
+
+
+class AttentionTransfer(nn.Module):
+    def forward(self, student, teacher):
+        s_attention = F.normalize(student.pow(2).mean(1).view(student.size(0), -1))
+
+        with torch.no_grad():
+            t_attention = F.normalize(teacher.pow(2).mean(1).view(teacher.size(0), -1))
+
+        return (s_attention - t_attention).pow(2).mean()
+
+
+class RKdAngle(nn.Module):
+    def forward(self, student, teacher):
+        # N x C
+        # N x N x C
+
+        with torch.no_grad():
+            td = (teacher.unsqueeze(0) - teacher.unsqueeze(1))
+            norm_td = F.normalize(td, p=2, dim=2)
+            t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2)).view(-1)
+
+        sd = (student.unsqueeze(0) - student.unsqueeze(1))
+        norm_sd = F.normalize(sd, p=2, dim=2)
+        s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
+        loss = F.smooth_l1_loss(s_angle, t_angle, reduction='mean')
+        return loss
+
+
+class RkdDistance(nn.Module):
+    def forward(self, student, teacher):
+        with torch.no_grad():
+            t_d = pdist(teacher, squared=False)
+            mean_td = t_d[t_d>0].mean()
+            t_d = t_d / mean_td
+
+        d = pdist(student, squared=False)
+        mean_d = d[d>0].mean()
+        d = d / mean_d
+
+        loss = F.smooth_l1_loss(d, t_d, reduction='mean')
+        return loss
+
+
 def get_layer_idx(name):
     layer_idx = 0
     if 'vit.encoder.layer' in name or 'bert.encoder.layer' in name:
@@ -153,10 +216,6 @@ def aggregate_scale_tensors(tensors, samples, device):
     return global_tensor
         
 
-
-# __all__ = ['L1Triplet', 'L2Triplet', 'ContrastiveLoss', 'RkdDistance', 'RKdAngle', 'HardDarkRank']
-
-
 def pdist(e, squared=False, eps=1e-12):
     e_square = e.pow(2).sum(dim=1)
     prod = e @ e.t()
@@ -170,63 +229,41 @@ def pdist(e, squared=False, eps=1e-12):
     return res
 
 
-class HardDarkRank(nn.Module):
-    def __init__(self, alpha=2, beta=3, permute_len=3):
-        super().__init__()
-        self.alpha = alpha
-        self.beta = beta
-        self.permute_len = permute_len
-
-    def forward(self, student, teacher):
-        score_teacher = -1 * self.alpha * pdist(teacher, squared=False).pow(self.beta)
-        score_student = -1 * self.alpha * pdist(student, squared=False).pow(self.beta)
-
-        permute_idx = score_teacher.sort(dim=1, descending=True)[1][:, 1:(self.permute_len+1)]
-        ordered_student = torch.gather(score_student, 1, permute_idx)
-
-        log_prob = (ordered_student - torch.stack([torch.logsumexp(ordered_student[:, i:], dim=1) for i in range(permute_idx.size(1))], dim=1)).sum(dim=1)
-        loss = (-1 * log_prob).mean()
-
-        return loss
+def calc_target_probs(exits_num):
+    for p in range(1, 40):
+        _p = torch.FloatTensor(1).fill_(p * 1.0 / 20)
+        probs = torch.exp(torch.log(_p) * torch.arange(1, exits_num+1))
+        probs /= probs.sum()
+        if p == 1:
+            probs_list = probs.unsqueeze(0)
+        else:
+            probs_list = torch.cat((probs_list, probs.unsqueeze(0)), 0)
+    
+    return probs_list
 
 
-class AttentionTransfer(nn.Module):
-    def forward(self, student, teacher):
-        s_attention = F.normalize(student.pow(2).mean(1).view(student.size(0), -1))
-
+def exit_policy(exits_num, exits_logits, target_probs):
+    used_index, selected_index_list = [], []
+    for j in range(exits_num):
         with torch.no_grad():
-            t_attention = F.normalize(teacher.pow(2).mean(1).view(teacher.size(0), -1))
-
-        return (s_attention - t_attention).pow(2).mean()
-
-
-class RKdAngle(nn.Module):
-    def forward(self, student, teacher):
-        # N x C
-        # N x N x C
-
-        with torch.no_grad():
-            td = (teacher.unsqueeze(0) - teacher.unsqueeze(1))
-            norm_td = F.normalize(td, p=2, dim=2)
-            t_angle = torch.bmm(norm_td, norm_td.transpose(1, 2)).view(-1)
-
-        sd = (student.unsqueeze(0) - student.unsqueeze(1))
-        norm_sd = F.normalize(sd, p=2, dim=2)
-        s_angle = torch.bmm(norm_sd, norm_sd.transpose(1, 2)).view(-1)
-        loss = F.smooth_l1_loss(s_angle, t_angle, reduction='mean')
-        return loss
-
-
-class RkdDistance(nn.Module):
-    def forward(self, student, teacher):
-        with torch.no_grad():
-            t_d = pdist(teacher, squared=False)
-            mean_td = t_d[t_d>0].mean()
-            t_d = t_d / mean_td
-
-        d = pdist(student, squared=False)
-        mean_d = d[d>0].mean()
-        d = d / mean_d
-
-        loss = F.smooth_l1_loss(d, t_d, reduction='mean')
-        return loss
+            confidence_target = F.softmax(exits_logits[j], dim=1)  
+            max_preds_target, _ = confidence_target.max(dim=1, keepdim=False)  
+            _, sorted_idx = max_preds_target.sort(dim=0, descending=True)  
+            n_target = sorted_idx.shape[0]
+            
+            if j == 0:
+                selected_index = sorted_idx[: math.floor(n_target * target_probs[j])]
+                selected_index = selected_index.tolist()
+                used_index.extend(selected_index)
+            elif j < exits_num - 1:
+                filter_set = set(used_index)
+                unused_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
+                selected_index = unused_index[: math.floor(n_target * target_probs[j])]  
+                used_index.extend(selected_index)
+            else:
+                filter_set = set(used_index)
+                selected_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
+        
+        if len(selected_index) > 0:
+            selected_index_list.append(selected_index)
+    return selected_index_list

@@ -7,8 +7,7 @@ import math
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
-from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
-
+from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy
 
 
 def add_args(parser):
@@ -37,17 +36,7 @@ def add_args(parser):
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
-def calc_target_probs(exits_num):
-    for p in range(1, 40):
-        _p = torch.FloatTensor(1).fill_(p * 1.0 / 20)
-        probs = torch.exp(torch.log(_p) * torch.arange(1, exits_num+1))
-        probs /= probs.sum()
-        if p == 1:
-            probs_list = probs.unsqueeze(0)
-        else:
-            probs_list = torch.cat((probs_list, probs.unsqueeze(0)), 0)
-    
-    return probs_list
+
 
 
 class Client(BaseClient):
@@ -292,32 +281,12 @@ class Server(BaseServer):
             
             # == Loss for y_input utilize eq_depth super-local model == 
             exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-            used_index, ce_loss = [], 0.0
-            for j in range(exits_num):
-                with torch.no_grad():
-                    confidence_target = F.softmax(exits_logits[j], dim=1)  
-                    max_preds_target, _ = confidence_target.max(dim=1, keepdim=False)  
-                    _, sorted_idx = max_preds_target.sort(dim=0, descending=True)  
-                    n_target = sorted_idx.shape[0]
-                    
-                    if j == 0:
-                        selected_index = sorted_idx[: math.floor(n_target * target_probs[j])]
-                        selected_index = selected_index.tolist()
-                        used_index.extend(selected_index)
-                    elif j < exits_num - 1:
-                        filter_set = set(used_index)
-                        unused_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
-                        selected_index = unused_index[: math.floor(n_target * target_probs[j])]  
-                        used_index.extend(selected_index)
-                    else:
-                        filter_set = set(used_index)
-                        selected_index = [x.item() for x in sorted_idx if x.item() not in filter_set]
-                
-                if len(selected_index) > 0:
-                    exit_logits = exits_logits[j][selected_index]
-                    labels = y_input[0][selected_index].long()
-                    ce_loss += self.ce_criterion(exit_logits, labels) * len(selected_index)
-            # print(ce_loss.cpu().item())
+            selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits)
+            ce_loss = 0.0
+            for exit_idx, selected_index in enumerate(selected_index_list):
+                exit_logits = exits_logits[exit_idx][selected_index]
+                labels = y_input[0][selected_index].long()
+                ce_loss += self.ce_criterion(exit_logits, labels) * len(selected_index)
             ce_loss = self.g_alpha * ce_loss / batch_size
             
             # == total loss for backward ==
