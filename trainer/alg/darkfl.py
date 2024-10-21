@@ -358,7 +358,7 @@ class Server(BaseServer):
             def diff_distance(local_diff):
                 exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
                 for i, global_diff in enumerate(global_diff_exits):
-                    exits_dis[i] = F.pairwise_distance(local_diff, global_diff)/global_diff.shape[0]
+                    exits_dis[i] = F.pairwise_distance(local_diff, torch.mean(global_diff))
                 return exits_dis/sum(exits_dis)
                     
             

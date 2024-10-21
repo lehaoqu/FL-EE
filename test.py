@@ -10,6 +10,7 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, AdamW
 import torch
 import torch.nn.functional as F
 
-t = torch.zeros(4)
+t = torch.tensor([1.1,2.2,3.3])
 
-print(t)
+
+print(torch.mean(t))
