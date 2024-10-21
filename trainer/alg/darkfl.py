@@ -37,6 +37,18 @@ def add_args(parser):
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
+def calc_target_probs(exits_num):
+    for p in range(1, 40):
+        _p = torch.FloatTensor(1).fill_(p * 1.0 / 20)
+        probs = torch.exp(torch.log(_p) * torch.arange(1, exits_num+1))
+        probs /= probs.sum()
+        if p == 1:
+            probs_list = probs.unsqueeze(0)
+        else:
+            probs_list = torch.cat((probs_list, probs.unsqueeze(0)), 0)
+    
+    return probs_list
+
 
 class Client(BaseClient):
     
@@ -157,19 +169,6 @@ class Server(BaseServer):
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
     
      
-    def calc_target_probs(self, exits_num):
-        for p in range(1, 40):
-            _p = torch.FloatTensor(1).fill_(p * 1.0 / 20)
-            probs = torch.exp(torch.log(_p) * torch.arange(1, exits_num+1))
-            probs /= probs.sum()
-            if p == 1:
-                probs_list = probs.unsqueeze(0)
-            else:
-                probs_list = torch.cat((probs_list, probs.unsqueeze(0)), 0)
-        
-        return probs_list
-     
-     
     def get_batch(self, gen_latent, y_input):
         batch = {}
         if 'cifar' in self.args.dataset:
@@ -236,6 +235,10 @@ class Server(BaseServer):
             for eq_depth, y_input in y_input_g.items():
                 if isinstance(y_input, tuple): y_input_g[eq_depth] = tuple(tensor.detach() for tensor in y_input)
                 
+            # == train global model utilize generators ==
+            if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+                self.finetune_global_model(diff_g, y_input_g, gen_latent_g, eps_g)
+                
     
     def train_generators(self, diff_g, y_input_g, gen_latent_g, eps_g):
         for g in self.generators.values():
@@ -259,7 +262,7 @@ class Server(BaseServer):
         generator = g[0]
         optimizer = g[1]
         exits_num = len(self.eq_exits[eq_depth])
-        target_probs = self.calc_target_probs(exits_num)[15-1]
+        target_probs = calc_target_probs(exits_num)[15-1]
         # print(target_probs)
         
         for i in range(n_iters):
@@ -330,32 +333,25 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}, diff_loss: {DIFF_LOSS/n_iters}')
     
         
-    def finetune_global_model(self, y_input_g, gen_latent_g):
+    def finetune_global_model(self, diff_g, y_input_g, gen_latent_g):
         # == finetune global model , multi teacher to teach each exit ==
-        for g in self.generators:
+        for g in self.generators.values():
             g[0].eval()
         for eq_model in self.eq_model.values():
             eq_model.to(self.device)
             eq_model.eval() 
         self.global_model.train()
         
-        self.teach_global_model(self.generators, self.kd_n_iters, y_input_g, gen_latent_g)
+        self.teach_global_model(self.generators, self.kd_n_iters, diff_g, y_input_g, gen_latent_g)
 
     
-    def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
+    def teach_global_model(self, gs, n_iters, diff_g, y_input_g, gen_latent_g):
         
         t_logits_g, t_feature_g = {}, {}
         
         for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
             # == new y based y_distribute ==
             attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
-            # y_distribute = [sum(column) for column in zip(*[[y*self.eq_num[eq] for y in self.eq_y[eq]] for eq in attend_eq])]
-            # y_distribute = [y/sum(y_distribute) for y in y_distribute]
-            # y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
-            
-            # # == data ==
-            # gen_latent, eps = gs[t_exit][0](y_input, )
-            # gen_latents[t_exit] = gen_latent.detach()
             
             y_input, gen_latent = y_input_g[t_exit], gen_latent_g[t_exit]
 
