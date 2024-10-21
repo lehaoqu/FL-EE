@@ -358,7 +358,7 @@ class Server(BaseServer):
             def diff_distance(local_diff):
                 exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
                 for i, global_diff in enumerate(global_diff_exits):
-                    exits_dis[i] = F.pairwise_distance(local_diff, global_diff)
+                    exits_dis[i] = F.pairwise_distance(local_diff, global_diff)/global_diff.shape[0]
                 return exits_dis/sum(exits_dis)
                     
             
@@ -381,7 +381,7 @@ class Server(BaseServer):
                         for t_exit in range(global_n_exits):
                             weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
                     
-                    weight_t_exits = F.softmax(-weight_t_exits/sum(weight_t_exits), dim=0)
+                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
                     print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
                         
                     t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
