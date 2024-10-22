@@ -32,7 +32,7 @@ def add_args(parser):
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
-    parser.add_argument('--g_gamma', default=1, type=float)
+    parser.add_argument('--g_gamma', default=10, type=float)
     parser.add_argument('--g_lr', default=1e-2, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
@@ -92,16 +92,16 @@ class Server(BaseServer):
     def train_distribute(self):
         # == statistic loss for G ==
         if self.is_latent is False:
-            self.train_mean = torch.tensor([0.0, 0.0, 0.0]).to(self.device)
-            self.train_std = torch.tensor([1.0, 1.0, 1.0]).to(self.device)
+            self.train_mean = {eq_depth: torch.tensor([0.0, 0.0, 0.0]).to(self.device) for eq_depth in self.eq_depths}
+            self.train_std = {eq_depth: torch.tensor([1.0, 1.0, 1.0]).to(self.device) for eq_depth in self.eq_depths}
         else:
-            self.clients_embeddings = []
+            self.clients_embeddings = {eq_depth: [] for eq_depth in self.eq_depths}
             for client in self.sampled_clients:
-                self.clients_embeddings.extend(client.get_embedding())
+                self.clients_embeddings[client.eq_depth].extend(client.get_embedding())
             self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
             
-            self.train_mean = torch.mean(self.clients_embeddings, dim=0)
-            self.train_std = None
+            self.train_mean = {eq_depth: torch.mean(self.clients_embeddings[eq_depth], dim=0) for eq_depth in self.eq_depths}
+            self.train_std = {eq_depth: None for eq_depth in self.eq_depths}
             # self.train_mean = self.clients_embeddings.mean([0,2], keepdim=True)
             # self.train_std = self.clients_embeddings.std([0,2], keepdim=True)
             del self.clients_embeddings
@@ -265,9 +265,9 @@ class Server(BaseServer):
             diff, y_input, gen_latent, eps = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth], eps_g[eq_depth]
             
             # == LOSS for div sst for G ==
-            # div_loss = self.g_beta * generator.diversity_loss(eps, gen_latent)
-            # stt_loss = self.g_gamma * generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
-            div_loss, stt_loss = 0.0, 0.0
+            div_loss = self.g_beta * generator.diversity_loss(eps, gen_latent)
+            stt_loss = self.g_gamma * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
+            # div_loss, stt_loss = 0.0, 0.0
             
             # == Loss for diff utilize global model ==
             exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
