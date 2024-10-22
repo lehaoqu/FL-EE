@@ -369,17 +369,18 @@ class Server(BaseServer):
             return all
         
         # == exit policy for generator with all pesudo data ==
-        all_diff, all_y_input, all_gen_latent = get_all(diff_g), get_all(y_input_g), get_all(gen_latent_g)
         global_n_exits = len(self.eq_exits[max(self.eq_depths)])
-        target_probs = calc_target_probs(global_n_exits)[self.p-1]
-        exits_logits, exits_feature = self.global_model(**self.get_batch(all_gen_latent, all_y_input), is_latent=False, rt_feature=True)
-        exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
-        selected_index_list = exit_policy(exits_num=global_n_exits, exits_logits=exits_logits, target_probs=target_probs)
-        # get diff distribution of each global model exit: diff_exits
-        global_diff_exits = []
-        for exit_idx in range(global_n_exits):
-            selected_index = selected_index_list[exit_idx]
-            global_diff_exits.append(all_diff[selected_index])
+        global_diff_exits = [[] for _ in range(global_n_exits)]
+        for eq_depth in self.eq_depths:
+            diff, y_input, gen_latent = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth]
+            exits_num = len(self.eq_exits[eq_depth])
+            exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
+            target_probs = calc_target_probs(exits_num)[self.p-1]
+            selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
+            for exit_idx in range(exits_num):
+                selected_index = selected_index_list[exit_idx]
+                global_diff_exits[exit_idx].append(diff[selected_index])
+        global_diff_exits = [torch.cat(list, dim=0) for list in global_diff_exits]
         
         # == finetune global model
         Losses = []
