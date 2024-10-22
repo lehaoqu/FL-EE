@@ -395,7 +395,8 @@ class Server(BaseServer):
                     for s_exit_idx in range(global_n_exits):
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(s_exits_logits[:s_exit_idx+1])
                         s_feature = s_exits_feature[exit_idx]
-                        s, t = s_feature, t_feature if self.is_feature else s_logits, t_logits
+                        if self.is_feature: s, t = s_feature, t_feature
+                        else: s, t = s_logits, t_logits
                         Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t) + self.kd_dark_ratio*self.dark_criterion(s, t))
                             
                        
