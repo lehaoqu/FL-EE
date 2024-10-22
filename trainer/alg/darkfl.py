@@ -12,8 +12,8 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 
 
 def add_args(parser):
-    parser.add_argument('--is_latent', default=False, type=bool)
-    parser.add_argument('--is_feature', default=False, type=bool)
+    parser.add_argument('--is_latent', default=True, type=bool)
+    parser.add_argument('--is_feature', default=True, type=bool)
     
     parser.add_argument('--s_epoches', default=5, type=int)
     
@@ -383,8 +383,7 @@ class Server(BaseServer):
                             weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
                     
                     weight_t_exits = F.softmax(-weight_t_exits, dim=0)
-                    print(weight_t_exits)
-                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()]) if eq_depth == max(self.eq_depths) else None
+                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if eq_depth == max(self.eq_depths) and exit_idx == exits_num-1 else None
                         
                     t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
