@@ -13,7 +13,7 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 
 
 def add_args(parser):
-    parser.add_argument('--is_latent', default=True, type=bool)
+    parser.add_argument('--is_latent', default=False, type=bool)
     parser.add_argument('--is_feature', default=True, type=bool)
     
     parser.add_argument('--s_epoches', default=5, type=int)
@@ -81,6 +81,7 @@ class Client(BaseClient):
 class Server(BaseServer):
     def run(self):
         self.sample()
+        self.get_rawdata()
         self.downlink()
         self.client_update()
         self.train_distribute()
@@ -159,7 +160,6 @@ class Server(BaseServer):
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
         self.p=15
-        self.get_rawdata()
     
     
     def get_rawdata(self):
@@ -330,7 +330,7 @@ class Server(BaseServer):
             eq_model.eval() 
         self.global_model.train()
         
-        diff_g, y_input_g, gen_latent_g = {}, {}
+        diff_g, y_input_g, gen_latent_g = {}, {}, {}
         with torch.no_grad():
             for eq_depth in self.eq_depths:
                 data = next(self.eq_loader[eq_depth])
@@ -346,7 +346,7 @@ class Server(BaseServer):
                         diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
                     diff_preds[sample_index] = (1-diff_pred/len(exits_logits))*10
                 diff_g[eq_depth] = diff_preds
-                gen_latent_g[eq_depth] = data
+                gen_latent_g[eq_depth] = batch['pixel_values']
                 y_input_g[eq_depth] = label
 
         self.teach_global_model(self.generators, self.kd_n_iters, diff_g, y_input_g, gen_latent_g)
