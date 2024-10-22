@@ -383,7 +383,7 @@ class Server(BaseServer):
                             weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
                     
                     weight_t_exits = F.softmax(-weight_t_exits, dim=0)
-                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if eq_depth == max(self.eq_depths) and exit_idx == exits_num-1 else None
+                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if eq_depth == max(self.eq_depths) and _==n_iters-1 else None
                         
                     t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
