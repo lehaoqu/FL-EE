@@ -11,9 +11,8 @@ bs=32
 optim=sgd
 lr=5e-2
 
-policies=(base boosted l2w)
 
-datasets=(sst2 qnli qqp)
+datasets=(qnli qqp sst2)
 ply=$3
 
 for ds in "${datasets[@]}"
