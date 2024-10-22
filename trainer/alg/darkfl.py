@@ -98,7 +98,7 @@ class Server(BaseServer):
             self.clients_embeddings = {eq_depth: [] for eq_depth in self.eq_depths}
             for client in self.sampled_clients:
                 self.clients_embeddings[client.eq_depth].extend(client.get_embedding())
-            self.clients_embeddings = torch.cat(self.clients_embeddings, dim=0)
+            self.clients_embeddings = {eq_depth: torch.cat(self.clients_embeddings[eq_depth], dim=0) for eq_depth in self.eq_depths}
             
             self.train_mean = {eq_depth: torch.mean(self.clients_embeddings[eq_depth], dim=0) for eq_depth in self.eq_depths}
             self.train_std = {eq_depth: None for eq_depth in self.eq_depths}
