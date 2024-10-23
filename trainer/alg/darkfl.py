@@ -373,9 +373,10 @@ class Server(BaseServer):
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits, target_probs=target_probs)
                 
                 for exit_idx in range(exits_num):
-                    # # diff bsaed weight
+                    selected_index = selected_index_list[exit_idx]
+                    
+                    # == diff bsaed weight == 
                     # samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-                    # selected_index = selected_index_list[exit_idx]
                     # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
                     # for sample_index in selected_index:
                     #     samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0))
