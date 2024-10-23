@@ -403,10 +403,9 @@ class Server(BaseServer):
                 exits_logits = self.eq_policy[eq_depth](exits_logits)
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits, target_probs=target_probs)
                 
-                samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
                 for exit_idx in range(exits_num):
-                    
                     # # diff bsaed weight
+                    # samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
                     # selected_index = selected_index_list[exit_idx]
                     # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
                     # for sample_index in selected_index:
@@ -422,10 +421,9 @@ class Server(BaseServer):
                         if exit_idx == len(self.eq_exits[eq_depth])-1:
                             weight_t_exits[exit_idx] = weight_t_exits[exit_idx+1] = 1
                             
-
                     print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
-                    t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
+                    t_y_input = (y_input[i][selected_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
                     t_logits = exits_logits[exit_idx][selected_index]
                     t_feature = exits_feature[exit_idx][selected_index]
