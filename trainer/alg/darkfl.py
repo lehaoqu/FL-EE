@@ -19,7 +19,7 @@ def add_args(parser):
     
     parser.add_argument('--kd_gap', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
+    parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
@@ -33,7 +33,7 @@ def add_args(parser):
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
     parser.add_argument('--g_gamma', default=10, type=float)
-    parser.add_argument('--g_lr', default=1e-2, type=float)
+    parser.add_argument('--g_lr', default=1e-3, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
