@@ -405,17 +405,25 @@ class Server(BaseServer):
                 
                 samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
                 for exit_idx in range(exits_num):
-                    selected_index = selected_index_list[exit_idx]
                     
+                    # # diff bsaed weight
+                    # selected_index = selected_index_list[exit_idx]
+                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    # for sample_index in selected_index:
+                    #     samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0))
+                    #     for t_exit in range(global_n_exits):
+                    #         weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
+                    # weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                    # weight_t_exits = torch.where(weight_t_exits == torch.max(weight_t_exits), torch.tensor(1), torch.tensor(0))
+                    
+                    # hard weight
                     weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    for sample_index in selected_index:
-                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0))
-                        for t_exit in range(global_n_exits):
-                            weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
-                    
-                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
-                    weight_t_exits = torch.where(weight_t_exits == torch.max(weight_t_exits), torch.tensor(1), torch.tensor(0))
-                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if eq_depth == max(self.eq_depths) and _==n_iters-1 else None
+                    if eq_depth != max(self.eq_depths):
+                        if exit_idx == len(self.eq_exits[eq_depth])-1:
+                            weight_t_exits[exit_idx] = weight_t_exits[exit_idx+1] = 1
+                            
+
+                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
                     t_y_input = (y_input[i][sample_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
