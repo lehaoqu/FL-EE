@@ -5,6 +5,7 @@ import math
 import importlib
 from PIL import Image
 import numpy as np
+import argparse
 
 from tqdm import tqdm
 from transformers import BertTokenizer
@@ -43,6 +44,16 @@ class Eval():
         
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
+
+        # parser = argparse.ArgumentParser()
+        # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
+        # parser = policy_module.add_args(parser)
+        # policy_args = parser.parse_args()
+        
+        # for arg in vars(policy_args):
+        #     self.args[arg] = policy_args[arg]
+             
+        self.args.policy = self.model.config.policy
         self.n_exits = len(self.model.config.exits)
         self.args.n_exits = self.n_exits
         self.model.to(self.device)
@@ -56,8 +67,9 @@ class Eval():
         if self.args.cosine is True:
             self.test_cos_exits, self.test_all_sample_cos_exits = self.cos_similiarity(self.test_all_sample_exits_logits)
             # self.valid_cos_exits, self.valid_all_sample_cos_exits = self.cos_similiarity(self.valid_all_sample_exits_logits)
-            
-            self.sort(self.test_all_sample_cos_exits, self.test_dataset)
+            spec_labels = [8, 13]
+            for spec_label in spec_labels:
+                self.sort(self.test_all_sample_cos_exits, self.test_dataset, spec_label)
             # self.sort(self.valid_all_sample_cos_exits, self.valid_dataset)
             
         
@@ -123,19 +135,27 @@ class Eval():
         return cos_exits_means, all_sample_cos_exits
     
     
-    def sort(self, all_sample_cos_exits, dataset):
-        
-        all_sample_score = [sum(cos_exits) for cos_exits in all_sample_cos_exits]
-        score_array = np.array(all_sample_score)
-        indices = np.argsort(-score_array)
-        
-        n = 5
-        div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
+    def sort(self, all_sample_cos_exits, dataset, spec_label):
         
         if 'cifar' in self.args.dataset:
+        
+            label_list = []
+            for i in range(len(dataset)):
+                if dataset[i]['labels'].cpu().item() == spec_label:
+                    label_list.append(i)
+            dataset_label = [{'labels':dataset[i]['labels'], 'pixel_values':dataset[i]['pixel_values']} for i in label_list]
+            
+            label_sample_cos_exits = [all_sample_cos_exits[i] for i in label_list]
+            all_sample_score = [sum(cos_exits) for i, cos_exits in enumerate(label_sample_cos_exits)]
+            score_array = np.array(all_sample_score)
+            indices = np.argsort(-score_array)
+            
+            n = 5
+            div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
+            
             for dlevel, level_idx in enumerate(div_points):
-                label = dataset[indices[level_idx]]['labels']
-                sample = dataset[indices[level_idx]]['pixel_values']
+                label  = dataset_label[indices[level_idx]]['labels']
+                sample = dataset_label[indices[level_idx]]['pixel_values']
 
                 sample = sample.numpy().reshape(3,32,32) if isinstance(sample, torch.Tensor) else sample.reshape(3,32,32)
                 array = np.transpose(sample, (1, 2, 0))
@@ -143,9 +163,24 @@ class Eval():
                 img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
                 self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
         else:
+        
+            label_list = []
+            for i in range(len(dataset)):
+                if dataset[i]['labels'].cpu().item() == spec_label:
+                    label_list.append(i)
+            dataset_label = [{'labels':dataset[i]['labels'], 'input_ids':dataset[i]['input_ids']} for i in label_list]
+            
+            label_sample_cos_exits = [all_sample_cos_exits[i] for i in label_list]
+            all_sample_score = [sum(cos_exits) for i, cos_exits in enumerate(label_sample_cos_exits)]
+            score_array = np.array(all_sample_score)
+            indices = np.argsort(-score_array)
+            
+            n = 5
+            div_points = np.linspace(0, len(all_sample_score)-1, n).astype(np.uint).tolist()
+            
             for dlevel, level_idx in enumerate(div_points):
-                label = dataset[indices[level_idx]]['labels'].item()
-                sample = dataset[indices[level_idx]]['input_ids']
+                label = dataset_label[indices[level_idx]]['labels'].item()
+                sample = dataset_label[indices[level_idx]]['input_ids']
 
                 tokenizer = BertTokenizer.from_pretrained('./models/google-bert/bert-12-uncased')
                 detokenized_tokens = tokenizer.convert_ids_to_tokens(sample)
@@ -289,5 +324,5 @@ if __name__ == '__main__':
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
         print(model_path)
-        # if 'l2w' in model_path:
+        # if 'largefl' in model_path and 'base' in model_path:
         eval.eval(model_path+'.pth', model_path+'.json')
