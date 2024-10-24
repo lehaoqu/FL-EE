@@ -321,6 +321,22 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}, diff_loss: {DIFF_LOSS/n_iters}')
     
         
+    def difficulty_measure(self, exits_logits, label=None, metric='loss'):
+        with torch.no_grad():
+            if metric == 'loss':
+                exits_loss = self.eq_policy[max(self.eq_depths)].difficulty_measure(exits_logits, label)
+                diff_pred = sum(exits_loss)
+                
+            elif metric == 'cosine':
+                last_logits = exits_logits[-1].unsqueeze(0)
+                diff_pred = 0
+                for exit_idx in range(len(exits_logits)):
+                    exit_logits = exits_logits[exit_idx].unsqueeze(0)
+                    diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
+                diff_pred = (1-diff_pred/len(exits_logits))*10
+            return diff_pred
+        
+        
     def finetune_global_model(self):
         # == finetune global model , multi teacher to teach each exit ==
         for g in self.generators.values():
@@ -339,12 +355,7 @@ class Server(BaseServer):
                 batch_size = label.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
-                    last_logits = exits_logits[-1][sample_index].unsqueeze(0)
-                    diff_pred = 0
-                    for exit_idx in range(len(exits_logits)):
-                        exit_logits = exits_logits[exit_idx][sample_index].unsqueeze(0)
-                        diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
-                    diff_preds[sample_index] = (1-diff_pred/len(exits_logits))*10
+                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=label[sample_index], metric='loss')
                 diff_g[eq_depth] = diff_preds
                 gen_latent_g[eq_depth] = batch['pixel_values']
                 y_input_g[eq_depth] = label
@@ -368,32 +379,35 @@ class Server(BaseServer):
                     all = torch.cat((all, item), dim=0)
             return all
         
-        # == exit policy for generator with all pesudo data ==
-        global_n_exits = len(self.eq_exits[max(self.eq_depths)])
-        global_diff_exits = [[] for _ in range(global_n_exits)]
-        for eq_depth in self.eq_depths:
-            diff, y_input, gen_latent = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth]
-            exits_num = len(self.eq_exits[eq_depth])
-            exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
-            target_probs = calc_target_probs(exits_num)[self.p-1]
-            selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
-            for exit_idx in range(exits_num):
-                selected_index = selected_index_list[exit_idx]
-                global_diff_exits[exit_idx].append(diff[selected_index])
-        global_diff_exits = [torch.cat(list, dim=0) for list in global_diff_exits]
+                    
+        def diff_distance(local_diff, global_diff_exits):
+            exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
+            for i, global_diff in enumerate(global_diff_exits):
+                exits_dis[i] = F.pairwise_distance(local_diff, torch.mean(global_diff))
+            return exits_dis/sum(exits_dis)
+
         
         # == finetune global model
         Losses = []
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()
-        
-            # == super-sub model teach global model ==
-            def diff_distance(local_diff):
-                exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
-                for i, global_diff in enumerate(global_diff_exits):
-                    exits_dis[i] = F.pairwise_distance(local_diff, torch.mean(global_diff))
-                return exits_dis/sum(exits_dis)
-                    
+
+            # == exit policy for generator with all pesudo data ==
+            global_n_exits = len(self.eq_exits[max(self.eq_depths)])
+            global_diff_exits = [[] for _ in range(global_n_exits)]
+            for eq_depth in self.eq_depths:
+                diff, y_input, gen_latent = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth]
+                exits_num = len(self.eq_exits[eq_depth])
+                exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
+                target_probs = calc_target_probs(exits_num)[self.p-1]
+                selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
+                for exit_idx in range(exits_num):
+                    selected_index = selected_index_list[exit_idx]
+                    global_diff_exits[exit_idx].append(diff[selected_index])
+            global_diff_exits = [torch.cat(list, dim=0) for list in global_diff_exits]
+            # print(global_diff_exits)
+
+            # == super-sub model teach global model ==   
             Loss = 0.0
             for eq_depth in self.eq_depths:
                 gen_latent, y_input, diff = gen_latent_g[eq_depth], y_input_g[eq_depth], diff_g[eq_depth]
@@ -402,26 +416,28 @@ class Server(BaseServer):
                 exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                 exits_logits = self.eq_policy[eq_depth](exits_logits)
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits, target_probs=target_probs)
+                # print(eq_depth, selected_index_list)
                 
                 for exit_idx in range(exits_num):
-                    # # diff bsaed weight
-                    # samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-                    # selected_index = selected_index_list[exit_idx]
-                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    # for sample_index in selected_index:
-                    #     samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0))
-                    #     for t_exit in range(global_n_exits):
-                    #         weight_t_exits[t_exit] = weight_t_exits[t_exit] + samples_distance[sample_index][t_exit]
-                    # weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                    # # weight based difficulty distribution
+                    samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
+                    selected_index = selected_index_list[exit_idx]
+                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    for sample_index in selected_index:
+                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
+                        for t_exit in range(global_n_exits):
+                            weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
+                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
                     # weight_t_exits = torch.where(weight_t_exits == torch.max(weight_t_exits), torch.tensor(1), torch.tensor(0))
+                    # print(weight_t_exits)
                     
                     # hard weight
-                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    if eq_depth != max(self.eq_depths):
-                        if exit_idx == len(self.eq_exits[eq_depth])-1:
-                            weight_t_exits[exit_idx+1] = 1
+                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    # if eq_depth != max(self.eq_depths):
+                    #     if exit_idx == len(self.eq_exits[eq_depth])-1:
+                    #         weight_t_exits[exit_idx+1] = 1
                             
-                    # print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
+                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
                     t_y_input = (y_input[i][selected_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
@@ -429,12 +445,13 @@ class Server(BaseServer):
                     t_feature = exits_feature[exit_idx][selected_index]
                     
                     s_exits_logits, s_exits_feature = self.global_model(**self.get_batch(t_gen_latent, t_y_input), is_latent=self.is_latent, rt_feature=True)
+
                     for s_exit_idx in range(global_n_exits):
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(s_exits_logits[:s_exit_idx+1])
                         s_feature = s_exits_feature[exit_idx]
                         if self.is_feature: s, t = s_feature, t_feature
                         else: s, t = s_logits, t_logits
-                        Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t) + self.kd_dark_ratio*self.dark_criterion(s, t))
+                        Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t))
                             
                        
                         # Loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s_logits, t_logits)

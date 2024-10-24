@@ -14,6 +14,7 @@ class Policy():
         self.exits_num = self.args.exits_num
         self.loss_func = nn.CrossEntropyLoss()
     
+    
     def train(self, model, batch, label, ws=None) -> torch.tensor:
         exits_logits = model(**batch)
         
@@ -30,6 +31,14 @@ class Policy():
     def __call__(self, exits_logits):
         return exits_logits
     
+    
     # == for finetune in server == 
     def sf(self, exits_logits):
         return exits_logits[-1]
+    
+    
+    def difficulty_measure(exits_logits, label):
+        exits_loss = ()
+        for i, exit_logits in enumerate(exit_logits):
+            exits_loss += (self.loss_func(exit_logits, label), )
+        return exits_loss     

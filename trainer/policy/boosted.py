@@ -43,6 +43,7 @@ class Policy():
         ensemble_exits_logits = pred_ensembels[1:]
         return ensemble_exits_logits
     
+    
     # == for finetune in server == 
     def sf(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]
@@ -54,3 +55,17 @@ class Policy():
         pred_final = exits_logits[-1] + former_ensemble.detach()
 
         return pred_final
+    
+    
+    def difficulty_measure(self, exits_logits, label):
+        pred_ensembels = [torch.zeros(1).to(self.device)]
+        for i, logits in enumerate(exits_logits):
+            tmp = (logits + pred_ensembels[-1]) * self.reweight[i]
+            pred_ensembels.append(tmp)
+            
+        exits_loss = ()
+        for i, logits in enumerate(exits_logits):
+            pred_ensembel = pred_ensembels[i].detach()
+            pred_final = pred_ensembel + logits
+            exits_loss += (self.loss_func(pred_final, label),)
+        return exits_loss
