@@ -164,11 +164,13 @@ class Server(BaseServer):
     
     def get_rawdata(self):
         self.eq_loader = {}
+        self.eq_dataset = {}
         for eq_depth, clients in self.sampled_eq_clients.items():
             eq_dataset = []
             for client in clients:
                 eq_dataset.append(client.dataset_train)    
-            self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(ConcatDataset(eq_dataset), batch_size=self.args.bs, shuffle=True, collate_fn=None))
+            self.eq_dataset[eq_depth] = ConcatDataset(eq_dataset)
+            self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(self.eq_dataset[eq_depth], batch_size=self.args.bs, shuffle=False, collate_fn=None))
             
      
     def get_batch(self, gen_latent, y_input):
@@ -353,40 +355,21 @@ class Server(BaseServer):
             eq_model.eval() 
         self.global_model.train()
         
-        diff_g, y_input_g, gen_latent_g = {}, {}, {}
+        y_input_g, gen_latent_g = {}, {}
         with torch.no_grad():
             for eq_depth in self.eq_depths:
                 data = next(self.eq_loader[eq_depth])
+                self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(self.eq_dataset[eq_depth], batch_size=self.args.bs, shuffle=False, collate_fn=None))
                 batch, label = self.adapt_batch(data)
-                exits_logits = self.global_model(**batch, is_latent=False)
-                batch_size = label.shape[0]
-                diff_preds = torch.zeros(batch_size, 1).to(self.device)
-                for sample_index in range(batch_size):
-                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=label[sample_index], metric='confidence')
-                diff_g[eq_depth] = diff_preds
                 gen_latent_g[eq_depth] = batch['pixel_values']
                 y_input_g[eq_depth] = label
 
-        self.teach_global_model(self.generators, self.kd_n_iters, diff_g, y_input_g, gen_latent_g)
+        self.teach_global_model(self.generators, self.kd_n_iters, y_input_g, gen_latent_g)
 
     
-    def teach_global_model(self, gs, n_iters, diff_g, y_input_g, gen_latent_g):
+    def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
         
-        def get_all(dic):
-            first_value = next(iter(dic.values()))
-            if isinstance(first_value, tuple):
-                all = [torch.tensor([]).to(self.device)] * len(first_value)
-                for item in dic.values():
-                    for i in range(len(item)):
-                        all[i] = torch.cat((all[i], item[i]), dim=0)
-                all = tuple(all)
-            else:
-                all = torch.tensor([]).to(self.device)
-                for item in dic.values():
-                    all = torch.cat((all, item), dim=0)
-            return all
-        
-                    
+
         def diff_distance(local_diff, global_diff_exits):
             exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
             for i, global_diff in enumerate(global_diff_exits):
@@ -399,21 +382,29 @@ class Server(BaseServer):
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()
 
+            # == diff measure used global model ==
             # == exit policy for generator with all pesudo data ==
             global_n_exits = len(self.eq_exits[max(self.eq_depths)])
             global_diff_exits = [[] for _ in range(global_n_exits)]
-            sample_num = 0
+            sample_num, diff_g = 0, {}
             for eq_depth in self.eq_depths:
-                diff, y_input, gen_latent = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth]
+                y_input, gen_latent = y_input_g[eq_depth], gen_latent_g[eq_depth]
                 
                 exits_num = len(self.eq_exits[eq_depth])
                 exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
+                
+                batch_size = y_input.shape[0]
+                diff_preds = torch.zeros(batch_size, 1).to(self.device)
+                for sample_index in range(batch_size):
+                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='confidence')
+                diff_g [eq_depth] = diff_preds
+                
                 target_probs = calc_target_probs(exits_num)[self.p-1]
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
                 for exit_idx in range(exits_num):
                     selected_index = selected_index_list[exit_idx]
                     sample_num += len(selected_index)
-                    global_diff_exits[exit_idx].append(diff[selected_index])
+                    global_diff_exits[exit_idx].append(diff_preds[selected_index])
             global_diff_exits = [torch.cat(list, dim=0) for list in global_diff_exits]
             # print(global_diff_exits)
             avg_diff = 0.0
@@ -433,26 +424,26 @@ class Server(BaseServer):
                 
                 for exit_idx in range(exits_num):
                     # # weight based difficulty distribution
-                    samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-                    selected_index = selected_index_list[exit_idx]
-                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    for sample_index in selected_index:
-                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
-                        for t_exit in range(global_n_exits):
-                            weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
-                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                    # samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
+                    # selected_index = selected_index_list[exit_idx]
+                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    # for sample_index in selected_index:
+                    #     samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
+                    #     for t_exit in range(global_n_exits):
+                    #         weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
+                    # weight_t_exits = F.softmax(-weight_t_exits, dim=0)
                     # weight_t_exits = torch.where(weight_t_exits == torch.max(weight_t_exits), torch.tensor(1), torch.tensor(0))
                     # print(weight_t_exits)
                     
                     # hard weight
-                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    # if eq_depth != max(self.eq_depths):
-                    #     if exit_idx == len(self.eq_exits[eq_depth])-1:
-                    #         weight_t_exits[exit_idx+1] = 1
+                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    if eq_depth != max(self.eq_depths):
+                        if exit_idx == len(self.eq_exits[eq_depth])-1:
+                            weight_t_exits[exit_idx+1] = 1
                             
-                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
+                    # print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
-                    t_y_input = (y_input[i][selected_index] for i in range(len(y_input)))
+                    t_y_input = y_input[selected_index]
                     t_gen_latent = gen_latent[selected_index]
                     t_logits = exits_logits[exit_idx][selected_index]
                     t_feature = exits_feature[exit_idx][selected_index]
@@ -465,6 +456,7 @@ class Server(BaseServer):
                         if self.is_feature: s, t = s_feature, t_feature
                         else: s, t = s_logits, t_logits
                         Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t))
+                        # Loss += weight_t_exits[s_exit_idx]*(self.ce_criterion(s, t_y_input))
                             
                        
                         # Loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s_logits, t_logits)
