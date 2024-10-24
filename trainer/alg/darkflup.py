@@ -327,6 +327,13 @@ class Server(BaseServer):
                 exits_loss = self.eq_policy[max(self.eq_depths)].difficulty_measure(exits_logits, label)
                 diff_pred = sum(exits_loss)
                 
+            elif metric == 'confidence':
+                confidences = 0
+                for exit_idx in range(len(exits_logits)):
+                    confidence, _ = F.softmax(exits_logits[exit_idx], dim=0).max(dim=0, keepdim=False)
+                    confidences += confidence
+                diff_pred = (1-confidences/len(exits_logits))*10
+                
             elif metric == 'cosine':
                 last_logits = exits_logits[-1].unsqueeze(0)
                 diff_pred = 0
@@ -355,7 +362,7 @@ class Server(BaseServer):
                 batch_size = label.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
-                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=label[sample_index], metric='loss')
+                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=label[sample_index], metric='confidence')
                 diff_g[eq_depth] = diff_preds
                 gen_latent_g[eq_depth] = batch['pixel_values']
                 y_input_g[eq_depth] = label
@@ -395,17 +402,23 @@ class Server(BaseServer):
             # == exit policy for generator with all pesudo data ==
             global_n_exits = len(self.eq_exits[max(self.eq_depths)])
             global_diff_exits = [[] for _ in range(global_n_exits)]
+            sample_num = 0
             for eq_depth in self.eq_depths:
                 diff, y_input, gen_latent = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth]
+                
                 exits_num = len(self.eq_exits[eq_depth])
                 exits_logits, exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
                 target_probs = calc_target_probs(exits_num)[self.p-1]
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
                 for exit_idx in range(exits_num):
                     selected_index = selected_index_list[exit_idx]
+                    sample_num += len(selected_index)
                     global_diff_exits[exit_idx].append(diff[selected_index])
             global_diff_exits = [torch.cat(list, dim=0) for list in global_diff_exits]
             # print(global_diff_exits)
+            avg_diff = 0.0
+            for global_diff in global_diff_exits: avg_diff += (sum(global_diff).cpu().item()) / sample_num
+            print(avg_diff, [torch.mean(global_diff).cpu().item() for global_diff in global_diff_exits])
 
             # == super-sub model teach global model ==   
             Loss = 0.0
