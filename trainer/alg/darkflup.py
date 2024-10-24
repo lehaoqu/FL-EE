@@ -14,12 +14,12 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 
 def add_args(parser):
     parser.add_argument('--is_latent', default=False, type=bool)
-    parser.add_argument('--is_feature', default=True, type=bool)
+    parser.add_argument('--is_feature', default=False, type=bool)
     
-    parser.add_argument('--s_epoches', default=5, type=int)
+    parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
-    parser.add_argument('--kd_begin', default=0, type=int)
+    parser.add_argument('--kd_begin', default=50, type=int)
     parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
@@ -159,7 +159,7 @@ class Server(BaseServer):
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
-        self.p=15
+        self.p=30
     
     
     def get_rawdata(self):
@@ -336,7 +336,7 @@ class Server(BaseServer):
                 data = next(self.eq_loader[eq_depth])
                 batch, label = self.adapt_batch(data)
                 exits_logits = self.global_model(**batch, is_latent=False)
-                batch_size = self.args.bs
+                batch_size = label.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
                     last_logits = exits_logits[-1][sample_index].unsqueeze(0)
@@ -419,9 +419,9 @@ class Server(BaseServer):
                     weight_t_exits = torch.zeros(global_n_exits).to(self.device)
                     if eq_depth != max(self.eq_depths):
                         if exit_idx == len(self.eq_exits[eq_depth])-1:
-                            weight_t_exits[exit_idx] = weight_t_exits[exit_idx+1] = 1
+                            weight_t_exits[exit_idx+1] = 1
                             
-                    print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
+                    # print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
                     t_y_input = (y_input[i][selected_index] for i in range(len(y_input)))
                     t_gen_latent = gen_latent[selected_index]
