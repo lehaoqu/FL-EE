@@ -19,13 +19,13 @@ def add_args(parser):
     parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_gap', default=1, type=int)
-    parser.add_argument('--kd_begin', default=50, type=int)
+    parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
+    parser.add_argument('--kd_n_iters', default=1, type=int)
     
     
     parser.add_argument('--g_gap', default=1, type=int)
@@ -325,22 +325,26 @@ class Server(BaseServer):
         
     def difficulty_measure(self, exits_logits, label=None, metric='loss'):
         with torch.no_grad():
+            exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
             if metric == 'loss':
-                exits_loss = self.eq_policy[max(self.eq_depths)].difficulty_measure(exits_logits, label)
+                exits_loss = ()
+                loss_func = nn.CrossEntropyLoss()
+                for i, logits in enumerate(exits_logits):
+                    exits_loss += (loss_func(logits, label),)
                 diff_pred = sum(exits_loss)
                 
             elif metric == 'confidence':
                 confidences = 0
-                for exit_idx in range(len(exits_logits)):
-                    confidence, _ = F.softmax(exits_logits[exit_idx], dim=0).max(dim=0, keepdim=False)
+                for logits in exits_logits:
+                    confidence, _ = F.softmax(logits, dim=0).max(dim=0, keepdim=False)
                     confidences += confidence
                 diff_pred = (1-confidences/len(exits_logits))*10
                 
             elif metric == 'cosine':
                 last_logits = exits_logits[-1].unsqueeze(0)
                 diff_pred = 0
-                for exit_idx in range(len(exits_logits)):
-                    exit_logits = exits_logits[exit_idx].unsqueeze(0)
+                for logits in exits_logits:
+                    exit_logits = logits.unsqueeze(0)
                     diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
                 diff_pred = (1-diff_pred/len(exits_logits))*10
             return diff_pred
@@ -358,8 +362,13 @@ class Server(BaseServer):
         y_input_g, gen_latent_g = {}, {}
         with torch.no_grad():
             for eq_depth in self.eq_depths:
-                data = next(self.eq_loader[eq_depth])
-                self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(self.eq_dataset[eq_depth], batch_size=self.args.bs, shuffle=False, collate_fn=None))
+                try:
+                    data = next(self.eq_loader[eq_depth])
+                except StopIteration :
+                    self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(self.eq_dataset[eq_depth], batch_size=self.args.bs, shuffle=False, collate_fn=None))
+                    data = next(self.eq_loader[eq_depth])
+                # self.eq_loader[eq_depth] = iter(torch.utils.data.DataLoader(self.eq_dataset[eq_depth], batch_size=self.args.bs, shuffle=False, collate_fn=None))
+                
                 batch, label = self.adapt_batch(data)
                 gen_latent_g[eq_depth] = batch['pixel_values']
                 y_input_g[eq_depth] = label
@@ -396,8 +405,8 @@ class Server(BaseServer):
                 batch_size = y_input.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
-                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='confidence')
-                diff_g [eq_depth] = diff_preds
+                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
+                diff_g[eq_depth] = diff_preds
                 
                 target_probs = calc_target_probs(exits_num)[self.p-1]
                 selected_index_list = exit_policy(exits_num=exits_num, exits_logits=exits_logits[:exits_num], target_probs=target_probs)
@@ -423,23 +432,24 @@ class Server(BaseServer):
                 # print(eq_depth, selected_index_list)
                 
                 for exit_idx in range(exits_num):
-                    # # weight based difficulty distribution
-                    # samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-                    # selected_index = selected_index_list[exit_idx]
-                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    # for sample_index in selected_index:
-                    #     samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
-                    #     for t_exit in range(global_n_exits):
-                    #         weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
-                    # weight_t_exits = F.softmax(-weight_t_exits, dim=0)
-                    # weight_t_exits = torch.where(weight_t_exits == torch.max(weight_t_exits), torch.tensor(1), torch.tensor(0))
+                    # weight based difficulty distribution
+                    samples_distance = {} # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
+                    selected_index = selected_index_list[exit_idx]
+                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    for sample_index in selected_index:
+                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
+                        for t_exit in range(global_n_exits):
+                            weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
+                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                    # weight_t_exits = (weight_t_exits == weight_t_exits.max())
+                    
                     # print(weight_t_exits)
                     
-                    # hard weight
-                    weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-                    if eq_depth != max(self.eq_depths):
-                        if exit_idx == len(self.eq_exits[eq_depth])-1:
-                            weight_t_exits[exit_idx+1] = 1
+                    # # hard weight
+                    # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+                    # if eq_depth != max(self.eq_depths):
+                    #     if exit_idx == len(self.eq_exits[eq_depth])-1:
+                    #         weight_t_exits[exit_idx+1] = 1
                             
                     # print(f'eq{eq_depth}_exit{exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()]) if  _==n_iters-1 else None
                         
@@ -448,19 +458,19 @@ class Server(BaseServer):
                     t_logits = exits_logits[exit_idx][selected_index]
                     t_feature = exits_feature[exit_idx][selected_index]
                     
-                    s_exits_logits, s_exits_feature = self.global_model(**self.get_batch(t_gen_latent, t_y_input), is_latent=self.is_latent, rt_feature=True)
-
+                    s_exits_logits, s_exits_feature = self.global_model(**self.get_batch(t_gen_latent, t_y_input), is_latent=self.is_latent, rt_feature=True, frozen=True)
+                    
                     for s_exit_idx in range(global_n_exits):
                         s_logits = self.eq_policy[max(self.eq_depths)].sf(s_exits_logits[:s_exit_idx+1])
-                        s_feature = s_exits_feature[exit_idx]
+                        s_feature = s_exits_feature[s_exit_idx]
                         if self.is_feature: s, t = s_feature, t_feature
                         else: s, t = s_logits, t_logits
-                        Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t))
+                        Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t) + self.kd_dark_ratio*self.dark_criterion(s, t))
                         # Loss += weight_t_exits[s_exit_idx]*(self.ce_criterion(s, t_y_input))
-                            
-                       
-                        # Loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s_logits, t_logits)
+                        # Loss += weight_t_exits[s_exit_idx]*(self.kd_criterion(s, t))
+            
             Loss.backward()
+
             self.global_optimizer.step()
             Losses.append(Loss.cpu().item())
         print(f'Losses: {Losses}')

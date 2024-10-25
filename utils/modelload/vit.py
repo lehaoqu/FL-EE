@@ -127,13 +127,15 @@ class ViTExitLayer(nn.Module):
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
             if self.config.policy == 'base' or self.config.policy == 'l2w':
-                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
+                layer_output_cls = layer_output
+                logits = self.classifier(self.layernorm(layer_output_cls)[:, 0, :])
             elif self.config.policy == 'boosted':
-                layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
-                logits = self.classifier(self.layernorm(layer_output)[:, 0, :])
-                layer_output = gradient_rescale(layer_output, len(self.config.exits) - exit_idx - 1)
+                layer_output_cls = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
+                in_cls = self.layernorm(layer_output_cls)[:, 0, :]
+                logits = self.classifier(in_cls)
+                layer_output = gradient_rescale(layer_output_cls, len(self.config.exits) - exit_idx - 1)
                 
-            outputs = (layer_output, logits, outputs)   
+            outputs = (layer_output_cls, logits, outputs)   
         else:
             outputs = (layer_output, None, outputs)
         
@@ -152,7 +154,8 @@ class ViTExitEncoder(nn.Module):
         self,
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
-        stop_exit: Optional[int] = None
+        stop_exit: Optional[int] = None,
+        frozen: Optional[bool] = False,
     ) -> Union[tuple, BaseModelOutput, torch.Tensor]:
         
         exits_logits = ()
@@ -163,7 +166,8 @@ class ViTExitEncoder(nn.Module):
             hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
             if layer_module.exit:
                 exits_logits += (exit_logits,)
-                exits_feature += (hidden_states[:, 0], )
+                exits_feature += (hidden_states[:, 0, :], )
+                hidden_states = hidden_states.detach() if frozen is True else hidden_states
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
         return exits_logits, exits_feature
         
@@ -198,7 +202,8 @@ class ViTExitEncoderRee(nn.Module):
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
-        stop_exit: Optional[int] = None
+        stop_exit: Optional[int] = None,
+        frozen: Optional[bool] = False,
     ):
         
         cls_tokens = []
@@ -264,6 +269,7 @@ class ViTExitModel(ViTPreTrainedModel):
         interpolate_pos_encoding: Optional[bool] = None,
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
+        frozen:Optional[bool] = None,
         rt_embedding:Optional[bool] = False
     ) -> Union[Tuple, BaseModelOutputWithPooling, torch.Tensor]:
         if is_latent is False:
@@ -288,7 +294,8 @@ class ViTExitModel(ViTPreTrainedModel):
         exits_logits, exits_feature = self.encoder(
             hidden_states,
             head_mask=head_mask,
-            stop_exit=stop_exit
+            stop_exit=stop_exit,
+            frozen=frozen
         )
             
         return (exits_logits, exits_feature)
@@ -320,7 +327,8 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
         rt_embedding:Optional[bool]=False,
-        rt_feature:Optional[bool]=False
+        rt_feature:Optional[bool]=False,
+        frozen:Optional[bool]=False,
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
         outputs = self.vit(
@@ -330,6 +338,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
             stop_exit=stop_exit,
             is_latent=is_latent,
             rt_embedding=rt_embedding,
+            frozen=frozen
         )
         if rt_embedding: return outputs
         if rt_feature: return outputs
