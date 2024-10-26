@@ -165,7 +165,7 @@ class Generator_CIFAR(BaseModule):
         img = self.conv_blocks1(img)
         img = nn.functional.interpolate(img,scale_factor=2)
         img = self.conv_blocks2(img)
-        return CIFARClassificationDataset.generator_transform_tensor(images=img) if raw else img
+        return img if raw else CIFARClassificationDataset.generator_transform_tensor(images=img)
 
 
     def statistic_loss(self, g_images, train_mean, train_std):

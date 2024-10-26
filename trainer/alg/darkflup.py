@@ -9,7 +9,7 @@ from torch.utils.data import ConcatDataset
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
-from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy
+from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, diff_distance
 
 
 def add_args(parser):
@@ -34,7 +34,7 @@ def add_args(parser):
     parser.add_argument('--g_beta', default=1, type=float)
     parser.add_argument('--g_eta', default=1, type=float)
     parser.add_argument('--g_gamma', default=10, type=float)
-    parser.add_argument('--g_lr', default=1e-2, type=float)
+    parser.add_argument('--g_lr', default=1e-3, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
 
@@ -321,33 +321,6 @@ class Server(BaseServer):
             
             optimizer.step()
         print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}, diff_loss: {DIFF_LOSS/n_iters}')
-    
-        
-    def difficulty_measure(self, exits_logits, label=None, metric='loss'):
-        with torch.no_grad():
-            exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
-            if metric == 'loss':
-                exits_loss = ()
-                loss_func = nn.CrossEntropyLoss()
-                for i, logits in enumerate(exits_logits):
-                    exits_loss += (loss_func(logits, label),)
-                diff_pred = sum(exits_loss)
-                
-            elif metric == 'confidence':
-                confidences = 0
-                for logits in exits_logits:
-                    confidence, _ = F.softmax(logits, dim=0).max(dim=0, keepdim=False)
-                    confidences += confidence
-                diff_pred = (1-confidences/len(exits_logits))*10
-                
-            elif metric == 'cosine':
-                last_logits = exits_logits[-1].unsqueeze(0)
-                diff_pred = 0
-                for logits in exits_logits:
-                    exit_logits = logits.unsqueeze(0)
-                    diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
-                diff_pred = (1-diff_pred/len(exits_logits))*10
-            return diff_pred
         
         
     def finetune_global_model(self):
@@ -378,14 +351,6 @@ class Server(BaseServer):
     
     def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
         
-
-        def diff_distance(local_diff, global_diff_exits):
-            exits_dis = torch.zeros(len(global_diff_exits)).to(self.device)
-            for i, global_diff in enumerate(global_diff_exits):
-                exits_dis[i] = F.pairwise_distance(local_diff, torch.mean(global_diff))
-            return exits_dis/sum(exits_dis)
-
-        
         # == finetune global model
         Losses = []
         for _ in range(n_iters):
@@ -405,7 +370,7 @@ class Server(BaseServer):
                 batch_size = y_input.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
-                    diff_preds[sample_index] = self.difficulty_measure([exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
+                    diff_preds[sample_index] = difficulty_measure(self.eq_policy[[max(self.eq_depths)]], [exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
                 diff_g[eq_depth] = diff_preds
                 
                 target_probs = calc_target_probs(exits_num)[self.p-1]
@@ -437,10 +402,10 @@ class Server(BaseServer):
                     selected_index = selected_index_list[exit_idx]
                     weight_t_exits = torch.zeros(global_n_exits).to(self.device)
                     for sample_index in selected_index:
-                        samples_distance[sample_index] = diff_distance(diff[sample_index].unsqueeze(0), global_diff_exits)
+                        samples_distance[sample_index] = diff_distance(global_diff_exits, diff[sample_index].unsqueeze(0))
                         for t_exit in range(global_n_exits):
                             weight_t_exits[t_exit] += samples_distance[sample_index][t_exit]
-                    weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                    weight_t_exits = F.softmax(weight_t_exits, dim=0)
                     # weight_t_exits = (weight_t_exits == weight_t_exits.max())
                     
                     # print(weight_t_exits)
