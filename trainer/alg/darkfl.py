@@ -31,10 +31,10 @@ def add_args(parser):
     
     parser.add_argument('--g_gap', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_alpha', default=1, type=float)
-    parser.add_argument('--g_beta', default=1, type=float)
-    parser.add_argument('--g_gamma', default=5, type=float)
-    parser.add_argument('--g_eta', default=5, type=float)
+    parser.add_argument('--g_y', default=1, type=float)
+    parser.add_argument('--g_div', default=1, type=float)
+    parser.add_argument('--g_gap', default=10, type=float)
+    parser.add_argument('--g_diff', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-3, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
@@ -134,7 +134,7 @@ class Server(BaseServer):
         self.clients_embeddings = []
         # == args ==
         self.is_feature = args.is_feature
-        self.g_lr, self.g_alpha, self.g_beta, self.g_eta, self.g_gamma, self.g_gap, self.g_begin = args.g_lr, args.g_alpha, args.g_beta, args.g_eta, args.g_gamma, args.g_gap, args.g_begin
+        self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_gap, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_gap, args.g_begin
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99
@@ -224,7 +224,7 @@ class Server(BaseServer):
             diff_preds[sample_index] = diff_pred
         
         diff_loss = self.mse_criterion(diff_preds, diff.float().view(batch_size, -1))
-        diff_loss = self.g_eta * diff_loss
+        diff_loss = self.g_diff * diff_loss
         return diff_loss, s_exits_logits, s_exits_feature
 
 
@@ -238,7 +238,7 @@ class Server(BaseServer):
             exit_logits = t_exits_logits[exit_idx][selected_index]
             labels = y_input[0][selected_index].long()
             ce_loss += self.ce_criterion(exit_logits, labels) * len(selected_index)
-        ce_loss = self.g_alpha * ce_loss / batch_size
+        ce_loss = self.g_y * ce_loss / batch_size
         return ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list
     
     
@@ -291,7 +291,7 @@ class Server(BaseServer):
                 dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
                 gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss)
         
-        gap_loss = self.g_gamma * gap_loss
+        gap_loss = self.g_gap * gap_loss
         return gap_loss
     
     
@@ -349,8 +349,8 @@ class Server(BaseServer):
             diff, y_input, gen_latent, eps = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth], eps_g[eq_depth]
             
             # == LOSS for div sst for G ==
-            div_loss = self.g_beta * generator.diversity_loss(eps, gen_latent)
-            # stt_loss = self.g_gamma * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
+            div_loss = self.g_div * generator.diversity_loss(eps, gen_latent)
+            # stt_loss = self.g_gap * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
             
             # == Loss for diff utilize global model ==
             diff_loss, s_exits_logits, s_exits_feature = self.d_loss(gen_latent, y_input, diff)

@@ -54,6 +54,10 @@ class FedSim:
         self.output = open(output_path, 'a')
         args.output = self.output
 
+        for arg in vars(args):
+            self.output.write(f"{arg}: {getattr(args, arg)}\n")
+        self.output.flush()
+
         # === init pre-trainde model ===
         ratios = ()
         for i in range(len(args.eq_ratios)):
