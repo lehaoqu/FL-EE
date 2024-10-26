@@ -369,7 +369,7 @@ class Server(BaseServer):
             CE_LOSS += ce_loss
             GAP_LOSS += gap_loss
             DIV_LOSS += div_loss
-            STT_LOSS += stt_loss
+            # STT_LOSS += stt_loss
             
             optimizer.step()
         print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
