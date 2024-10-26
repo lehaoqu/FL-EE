@@ -33,8 +33,8 @@ def add_args(parser):
     parser.add_argument('--g_begin', default=0, type=int)
     parser.add_argument('--g_alpha', default=1, type=float)
     parser.add_argument('--g_beta', default=1, type=float)
-    parser.add_argument('--g_gamma', default=0, type=float)
-    parser.add_argument('--g_eta', default=1, type=float)
+    parser.add_argument('--g_gamma', default=5, type=float)
+    parser.add_argument('--g_eta', default=5, type=float)
     parser.add_argument('--g_lr', default=1e-3, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
     return parser
@@ -291,7 +291,7 @@ class Server(BaseServer):
                 dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
                 gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss)
         
-        gap_loss = self.g_alpha * gap_loss
+        gap_loss = self.g_gamma * gap_loss
         return gap_loss
     
     
@@ -350,7 +350,7 @@ class Server(BaseServer):
             
             # == LOSS for div sst for G ==
             div_loss = self.g_beta * generator.diversity_loss(eps, gen_latent)
-            stt_loss = self.g_gamma * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
+            # stt_loss = self.g_gamma * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
             
             # == Loss for diff utilize global model ==
             diff_loss, s_exits_logits, s_exits_feature = self.d_loss(gen_latent, y_input, diff)
