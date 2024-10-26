@@ -17,16 +17,16 @@ def add_args(parser):
     parser.add_argument('--is_latent', default=True, type=bool)
     parser.add_argument('--is_feature', default=False, type=bool)
     
-    parser.add_argument('--s_epoches', default=5, type=int)
+    parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-3, type=float)
+    parser.add_argument('--kd_lr', default=5e-2, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=1, type=int)
+    parser.add_argument('--kd_n_iters', default=5, type=int)
     
     
     parser.add_argument('--g_skip', default=1, type=int)
@@ -137,10 +137,10 @@ class Server(BaseServer):
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
-        self.gamma = 0.99
+        self.gamma = 0.998
         
         # == train for global model ==
-        self.global_optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
         self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
         
         # == relation KD loss for small to large ==
