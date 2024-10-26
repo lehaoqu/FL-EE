@@ -370,7 +370,7 @@ class Server(BaseServer):
                 batch_size = y_input.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
                 for sample_index in range(batch_size):
-                    diff_preds[sample_index] = difficulty_measure(self.eq_policy[[max(self.eq_depths)]], [exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
+                    diff_preds[sample_index] = difficulty_measure(self.eq_policy[max(self.eq_depths)], [exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
                 diff_g[eq_depth] = diff_preds
                 
                 target_probs = calc_target_probs(exits_num)[self.p-1]
@@ -430,6 +430,7 @@ class Server(BaseServer):
                         s_feature = s_exits_feature[s_exit_idx]
                         if self.is_feature: s, t = s_feature, t_feature
                         else: s, t = s_logits, t_logits
+                        print(s.shape, t.shape)
                         Loss += weight_t_exits[s_exit_idx]*(self.kd_dist_ratio*self.dist_criterion(s, t) + self.kd_angle_ratio*self.angle_criterion(s, t) + self.kd_dark_ratio*self.dark_criterion(s, t))
                         # Loss += weight_t_exits[s_exit_idx]*(self.ce_criterion(s, t_y_input))
                         # Loss += weight_t_exits[s_exit_idx]*(self.kd_criterion(s, t))

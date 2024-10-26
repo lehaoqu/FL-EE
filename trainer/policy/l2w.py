@@ -271,11 +271,5 @@ class Policy():
     
     # == for finetune in server == 
     def sf(self, exits_logits):
-        return exits_logits[-1]
-    
-
-    def difficulty_measure(self, exits_logits, label):
-        exits_loss = ()
-        for i, exit_logits in enumerate(exit_logits):
-            exits_loss += (self.loss_func(exit_logits, label), )
-        return exits_loss     
+        return exits_logits
+     
