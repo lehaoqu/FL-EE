@@ -32,7 +32,7 @@ class Policy():
             pred_ensembel = pred_ensembels[i].detach()
             pred_final = pred_ensembel + logits
             exits_loss += (self.loss_func(pred_final, label) * ws[i],)
-        return exits_loss, exits_logits
+        return exits_loss, pred_ensembel[1:]
         
 
     def __call__(self, exits_logits):

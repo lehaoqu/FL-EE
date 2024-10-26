@@ -269,9 +269,8 @@ def exit_policy(exits_num, exits_logits, target_probs):
     return selected_index_list
 
 
-def difficulty_measure(eq_policy, exits_logits, label=None, metric='loss'):
+def difficulty_measure(exits_logits, label=None, metric='loss'):
     with torch.no_grad():
-        exits_logits = eq_policy(exits_logits)
         if metric == 'loss':
             exits_loss = ()
             loss_func = nn.CrossEntropyLoss()

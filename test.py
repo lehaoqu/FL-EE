@@ -12,10 +12,5 @@ import torch.nn.functional as F
 
 import torch
 
-dist_criterion = RkdDistance()
-angle_criterion = RKdAngle()
-dark_criterion = HardDarkRank()
-
-
-t = torch.rand((1))
-print(f'{t.item():.2f}')
+a = 9.9
+print(int(a))

@@ -47,6 +47,7 @@ class Client(BaseClient):
     def train(self):
         # === train ===
         batch_loss = []
+        self.diff_distribute = [0 for _ in range(10)]
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
@@ -61,6 +62,14 @@ class Client(BaseClient):
                 ce_loss.backward()
                 self.optim.step()
                 batch_loss.append(ce_loss.detach().cpu().item())
+                
+                # eval diff distribution
+                self.server.global_model.eval()
+                exits_ce_loss, glb_exits_logits = self.server.eq_policy[max(self.server.eq_depths)].train(self.server.global_model, batch, label) 
+                for sample_index in range(label.shape[0]):
+                    diff = int(difficulty_measure([glb_exits_logits[i][sample_index] for i in range(len(glb_exits_logits))], label, metric='confidence').cpu().item())
+                    self.diff_distribute[diff] += 1
+                    
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
     
@@ -110,6 +119,15 @@ class Server(BaseServer):
             del self.clients_embeddings
             # print(self.train_mean, self.train_mean.shape)
             # print(self.train_std, self.train_std.shape)
+        
+        self.eq_diff = {}
+        for client in self.clients:
+            self.eq_diff.setdefault(client.eq_depth, []).append(client.diff_distribute)
+        
+        for eq_depth in self.eq_depths:
+            diff_distribute = [sum(column) for column in zip(*self.eq_diff[eq_depth])]
+            diff_distribute = [diff/sum(diff_distribute) for diff in diff_distribute]
+            self.eq_diff[eq_depth] = diff_distribute
    
    
     def lr_scheduler(self,):
@@ -161,6 +179,10 @@ class Server(BaseServer):
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
         self.p=30
+        
+        # global model for clients
+        for client in self.clients:
+            client.server = self
     
      
     def get_batch(self, gen_latent, y_input):
@@ -189,7 +211,9 @@ class Server(BaseServer):
             y_input = torch.tensor(random.choices(range(len(y_distribute)), weights=y_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             
             # TODO diff now is uniform distribution from 0 to 9, should be changed to client's own difficulty distribution
-            diff_distribute = [1/10 for i in range(10)]
+            diff_distribute = [sum(column) for column in zip(*[[diff*self.eq_num[eq] for diff in self.eq_diff[eq]] for eq in attend_eq])]
+            diff_distribute = [diff/sum(diff_distribute) for diff in diff_distribute]
+            
             diff = torch.tensor(random.choices(range(len(diff_distribute)), weights=diff_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
             diff_g[eq_depth] = diff
             
@@ -220,7 +244,7 @@ class Server(BaseServer):
         batch_size = s_exits_logits[0].shape[0]
         diff_preds = torch.zeros(batch_size, 1).to(self.device)
         for sample_index in range(batch_size):
-            diff_pred = difficulty_measure(self.eq_policy[max(self.eq_depths)], [s_exits_logits[i][sample_index] for i in range(len(s_exits_logits))], y_input[0][sample_index], metric='confidence')
+            diff_pred = difficulty_measure([s_exits_logits[i][sample_index] for i in range(len(s_exits_logits))], y_input[0][sample_index], metric='confidence')
             diff_preds[sample_index] = diff_pred
         
         diff_loss = self.mse_criterion(diff_preds, diff.float().view(batch_size, -1))
@@ -300,6 +324,7 @@ class Server(BaseServer):
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
             diff_g, y_input_g, eps_g = self.get_conditional()
+            print(diff_g)
             gen_latent_g = {}
             for eq_depth in self.eq_depths:
                 gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
