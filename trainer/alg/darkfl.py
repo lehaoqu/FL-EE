@@ -19,7 +19,7 @@ def add_args(parser):
     
     parser.add_argument('--s_epoches', default=5, type=int)
     
-    parser.add_argument('--kd_gap', default=1, type=int)
+    parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
@@ -29,7 +29,7 @@ def add_args(parser):
     parser.add_argument('--kd_n_iters', default=1, type=int)
     
     
-    parser.add_argument('--g_gap', default=1, type=int)
+    parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
     parser.add_argument('--g_y', default=1, type=float)
     parser.add_argument('--g_div', default=1, type=float)
@@ -134,8 +134,8 @@ class Server(BaseServer):
         self.clients_embeddings = []
         # == args ==
         self.is_feature = args.is_feature
-        self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_gap, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_gap, args.g_begin
-        self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_gap, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_gap, args.kd_begin
+        self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
+        self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99
         
@@ -304,7 +304,7 @@ class Server(BaseServer):
             for eq_depth in self.eq_depths:
                 gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
                 gen_latent_g[eq_depth] = gen_latent      
-            if self.crt_epoch % self.g_gap == 0 and self.crt_epoch >= self.g_begin:
+            if self.crt_epoch % self.g_skip == 0 and self.crt_epoch >= self.g_begin:
                 self.train_generators(diff_g, y_input_g, gen_latent_g, eps_g)
             
             for eq_depth, y_input in y_input_g.items():
@@ -315,7 +315,7 @@ class Server(BaseServer):
             for eq_depth in self.eq_depths:
                 gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
                 gen_latent_g[eq_depth] = gen_latent.detach()
-            if self.crt_epoch % self.kd_gap == 0 and self.crt_epoch >= self.kd_begin:
+            if self.crt_epoch % self.kd_skip == 0 and self.crt_epoch >= self.kd_begin:
                 self.train_global_model(diff_g, y_input_g, gen_latent_g)
                 
     
