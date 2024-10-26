@@ -26,7 +26,7 @@ def add_args(parser):
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
+    parser.add_argument('--kd_n_iters', default=1, type=int)
     
     
     parser.add_argument('--g_gap', default=1, type=int)
@@ -359,10 +359,10 @@ class Server(BaseServer):
             ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list = self.y_loss(gen_latent, y_input, self.eq_model[eq_depth], self.eq_policy[eq_depth], target_probs, t_exits_num)
             
             # == Loss for gap ==
-            gap_loss = -self.gap_loss(diff, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+            gap_loss = self.gap_loss(diff, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
             
             # == total loss for backward ==
-            loss = ce_loss + diff_loss + gap_loss + div_loss
+            loss = ce_loss + diff_loss - gap_loss + div_loss
             loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward() # avoid generated data lost in graph
             
             DIFF_LOSS += diff_loss
