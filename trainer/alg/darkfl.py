@@ -372,7 +372,7 @@ class Server(BaseServer):
             STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'ce_loss:{round(CE_LOSS/n_iters,2)}, div_loss: {round(DIV_LOSS/n_iters,2)}, diff_loss: {round(DIFF_LOSS/n_iters,2)}, gap_loss: {round(GAP_LOSS/n_iters,2)}')
+        print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
     
 
     def train_global_model(self, diff_g, y_input_g, gen_latent_g):

@@ -16,7 +16,6 @@ dist_criterion = RkdDistance()
 angle_criterion = RKdAngle()
 dark_criterion = HardDarkRank()
 
-for i in range(100):
-    t = torch.rand((32,197))
-    s = torch.rand((32,197))
-    print(angle_criterion(s, t))
+
+t = torch.rand((1))
+print(f'{t.item():.2f}')
