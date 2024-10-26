@@ -270,7 +270,7 @@ class Server(BaseServer):
                     weight_t_exits[t_exit] = weight_t_exits[t_exit] + sample_distance[t_exit]
             weight_t_exits = F.softmax(-weight_t_exits, dim=0)
             max_weight = weight_t_exits.max()
-            weight_t_exits = (weight_t_exits == max_weight).float()
+            # weight_t_exits = (weight_t_exits == max_weight).float()
                     
             # # hard weight
             # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
