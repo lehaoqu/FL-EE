@@ -270,30 +270,30 @@ def exit_policy(exits_num, exits_logits, target_probs):
 
 
 def difficulty_measure(exits_logits, label=None, metric='loss'):
-    with torch.no_grad():
-        if metric == 'loss':
-            exits_loss = ()
-            loss_func = nn.CrossEntropyLoss()
-            for i, logits in enumerate(exits_logits):
-                exits_loss += (loss_func(logits, label),)
-            diff_pred = sum(exits_loss)
-            
-        elif metric == 'confidence':
-            confidences = 0
-            for logits in exits_logits:
-                confidence, _ = F.softmax(logits, dim=0).max(dim=0, keepdim=False)
-                confidences += confidence
-            diff_pred = (1-confidences/len(exits_logits))*10
-            
-        elif metric == 'cosine':
-            last_logits = exits_logits[-1].unsqueeze(0)
-            diff_pred = 0
-            for logits in exits_logits:
-                exit_logits = logits.unsqueeze(0)
-                diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
-            diff_pred = (1-diff_pred/len(exits_logits))*10
+    if metric == 'loss':
+        exits_loss = ()
+        loss_func = nn.CrossEntropyLoss()
+        for i, logits in enumerate(exits_logits):
+            exits_loss += (loss_func(logits, label),)
+        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(9.99).to(label.device)) # TODO cifar glue
         
-        return diff_pred
+    elif metric == 'confidence':
+        confidences = 0
+        for logits in exits_logits:
+            probs = F.softmax(logits, dim=0)
+            confidence = probs.max(dim=0, keepdim=False)[0]
+            confidences += confidence
+        diff_pred = (1-confidences/len(exits_logits))*10
+        
+    elif metric == 'cosine':
+        last_logits = exits_logits[-1].unsqueeze(0)
+        diff_pred = 0
+        for logits in exits_logits:
+            exit_logits = logits.unsqueeze(0)
+            diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
+        diff_pred = (1-diff_pred/len(exits_logits))*10
+    
+    return diff_pred
 
 
 def diff_distance(global_diff_exits, local_diff):

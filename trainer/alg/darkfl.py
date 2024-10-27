@@ -21,7 +21,7 @@ def add_args(parser):
     parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_skip', default=1, type=int)
-    parser.add_argument('--kd_begin', default=100, type=int)
+    parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
@@ -32,12 +32,12 @@ def add_args(parser):
     
     parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_y', default=0, type=float)
-    parser.add_argument('--g_div', default=0, type=float)
-    parser.add_argument('--g_gap', default=0, type=float)
-    parser.add_argument('--g_diff', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-3, type=float)
-    parser.add_argument('--g_n_iters', default=1, type=int)
+    parser.add_argument('--g_y', default=1, type=float)
+    parser.add_argument('--g_div', default=1, type=float)
+    parser.add_argument('--g_gap', default=1, type=float)
+    parser.add_argument('--g_diff', default=1, type=float)
+    parser.add_argument('--g_n_iters', default=10, type=int)
     return parser
 
 
@@ -65,12 +65,12 @@ class Client(BaseClient):
                 batch_loss.append(ce_loss.detach().cpu().item())
                 
                 # eval diff distribution
-                self.server.dm.eval()
-                dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
-                dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
-                for sample_index in range(label.shape[0]):
-                    diff = int(difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], label, metric='confidence').cpu().item())
-                    self.diff_distribute[diff] += 1
+                with torch.no_grad():
+                    dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
+                    dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
+                    for sample_index in range(label.shape[0]):
+                        diff = int(difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], label[sample_index], metric='confidence').cpu().item())
+                        self.diff_distribute[diff] += 1
         print(self.diff_distribute)
                     
         # === record loss ===
@@ -205,7 +205,6 @@ class Server(BaseServer):
             g[0].train()
         diff_g = {}
         y_input_g = {}
-        eps_g = {}
         for eq_depth in self.eq_depths:
             # == new y based y_distribute ==
             attend_eq = [eq_depth]
@@ -238,9 +237,7 @@ class Server(BaseServer):
                 y_input_g[eq_depth] = (y_input, attention_mask)
             else: y_input_g[eq_depth] = (y_input, )
                 
-            eps_g[eq_depth] = torch.rand((y_input.shape[0], self.generators[eq_depth][0].noise_dim)).to(self.device)
-
-        return diff_g, y_input_g, eps_g
+        return diff_g, y_input_g
     
     
     def d_loss(self, gen_latent, y_input, diff):
@@ -329,27 +326,20 @@ class Server(BaseServer):
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
-            diff_g, y_input_g, eps_g = self.get_conditional()
-            gen_latent_g = {}
-            for eq_depth in self.eq_depths:
-                gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
-                gen_latent_g[eq_depth] = gen_latent      
+            diff_g, y_input_g = self.get_conditional()
+
             if self.crt_epoch % self.g_skip == 0 and self.crt_epoch >= self.g_begin:
-                self.train_generators(diff_g, y_input_g, gen_latent_g, eps_g)
+                self.train_generators(diff_g, y_input_g)
             
-            for eq_depth, y_input in y_input_g.items():
-                if isinstance(y_input, tuple): y_input_g[eq_depth] = tuple(tensor.detach() for tensor in y_input)
+            # for eq_depth, y_input in y_input_g.items():
+            #     if isinstance(y_input, tuple): y_input_g[eq_depth] = tuple(tensor.detach() for tensor in y_input)
                 
             # == train global model utilize generators ==
-            gen_latent_g = {}
-            for eq_depth in self.eq_depths:
-                gen_latent = self.generators[eq_depth][0](diff_g[eq_depth], y_input_g[eq_depth], eps_g[eq_depth])
-                gen_latent_g[eq_depth] = gen_latent.detach()
             if self.crt_epoch % self.kd_skip == 0 and self.crt_epoch >= self.kd_begin:
-                self.train_global_model(diff_g, y_input_g, gen_latent_g)
+                self.train_global_model(diff_g, y_input_g)
                 
     
-    def train_generators(self, diff_g, y_input_g, gen_latent_g, eps_g):
+    def train_generators(self, diff_g, y_input_g):
         for g in self.generators.values():
             g[0].to(self.device)
             g[0].train()
@@ -361,10 +351,10 @@ class Server(BaseServer):
         # == train generators ==
         for eq_depth, g in self.generators.items():
             print(f'============{eq_depth} Super-local Model============')
-            self.update_generator(g, eq_depth, self.g_n_iters, diff_g, y_input_g, gen_latent_g, eps_g)
+            self.update_generator(g, eq_depth, self.g_n_iters, diff_g, y_input_g)
     
     
-    def update_generator(self, g, eq_depth, n_iters, diff_g, y_input_g, gen_latent_g, eps_g):
+    def update_generator(self, g, eq_depth, n_iters, diff_g, y_input_g):
         
         DIFF_LOSS, CE_LOSS, GAP_LOSS, DIV_LOSS, STT_LOSS = 0, 0, 0, 0, 0
         
@@ -374,10 +364,12 @@ class Server(BaseServer):
         target_probs = calc_target_probs(t_exits_num)[self.p-1]
         # print(target_probs)
         
-        for i in range(n_iters):
+        for _ in range(n_iters):
             optimizer.zero_grad()
-            diff, y_input, gen_latent, eps = diff_g[eq_depth], y_input_g[eq_depth], gen_latent_g[eq_depth], eps_g[eq_depth]
+            diff, y_input= diff_g[eq_depth], y_input_g[eq_depth]
+            eps = torch.rand((y_input[0].shape[0], self.generators[eq_depth][0].noise_dim)).to(self.device)
             
+            gen_latent = g[0](diff, y_input, eps)
             # == LOSS for div sst for G ==
             div_loss = self.g_div * generator.diversity_loss(eps, gen_latent)
             # stt_loss = self.g_gap * generator.statistic_loss(gen_latent, self.train_mean[eq_depth], self.train_std[eq_depth])
@@ -395,7 +387,7 @@ class Server(BaseServer):
             
             # == total loss for backward ==
             loss = ce_loss + diff_loss - gap_loss + div_loss
-            loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward() # avoid generated data lost in graph
+            loss.backward() # avoid generated data lost in graph
             
             DIFF_LOSS += diff_loss
             CE_LOSS += ce_loss
@@ -407,7 +399,7 @@ class Server(BaseServer):
         print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
     
 
-    def train_global_model(self, diff_g, y_input_g, gen_latent_g):
+    def train_global_model(self, diff_g, y_input_g):
         # == finetune global model , multi teacher to teach each exit ==
         for g in self.generators.values():
             g[0].eval()
@@ -416,10 +408,10 @@ class Server(BaseServer):
             eq_model.eval() 
         self.global_model.train()
         
-        self.update_global_model(self.kd_n_iters, diff_g, y_input_g, gen_latent_g)
+        self.update_global_model(self.kd_n_iters, diff_g, y_input_g)
 
     
-    def update_global_model(self, n_iters, diff_g, y_input_g, gen_latent_g):
+    def update_global_model(self, n_iters, diff_g, y_input_g):
         
         # == finetune global model
         Losses = []
@@ -429,7 +421,9 @@ class Server(BaseServer):
             # == super-sub model teach global model ==
             Loss = 0.0
             for eq_depth in self.eq_depths:
-                gen_latent, y_input, diff = gen_latent_g[eq_depth], y_input_g[eq_depth], diff_g[eq_depth]
+                y_input, diff = y_input_g[eq_depth], diff_g[eq_depth]
+                eps = torch.rand((y_input[0].shape[0], self.generators[eq_depth][0].noise_dim)).to(self.device)
+                gen_latent = self.generators[eq_depth][0](diff, y_input, eps).detach()
                 
                 t_exits_num = len(self.eq_exits[eq_depth])
                 target_probs = calc_target_probs(t_exits_num)[self.p-1]
