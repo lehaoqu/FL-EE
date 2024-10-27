@@ -21,7 +21,7 @@ def add_args(parser):
     parser.add_argument('--s_epoches', default=10, type=int)
     
     parser.add_argument('--kd_skip', default=1, type=int)
-    parser.add_argument('--kd_begin', default=0, type=int)
+    parser.add_argument('--kd_begin', default=100, type=int)
     parser.add_argument('--kd_lr', default=1e-3, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
@@ -32,9 +32,9 @@ def add_args(parser):
     
     parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_y', default=1, type=float)
-    parser.add_argument('--g_div', default=1, type=float)
-    parser.add_argument('--g_gap', default=10, type=float)
+    parser.add_argument('--g_y', default=0, type=float)
+    parser.add_argument('--g_div', default=0, type=float)
+    parser.add_argument('--g_gap', default=0, type=float)
     parser.add_argument('--g_diff', default=1, type=float)
     parser.add_argument('--g_lr', default=1e-3, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
@@ -172,7 +172,7 @@ class Server(BaseServer):
         
         # == ce&kd loss for generator train ==
         self.ce_criterion = nn.CrossEntropyLoss()
-        self.diff_criterion = nn.SmoothL1Loss()
+        self.diff_criterion = nn.MSELoss()
         
         self.is_latent = args.is_latent
         # == train for generators (each exit has a generator) ==
