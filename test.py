@@ -12,5 +12,7 @@ import torch.nn.functional as F
 
 import torch
 
-a = 9.9
-print(int(a))
+sum = 0.0
+for i in range(10):
+    sum += i**2
+print(sum/10)
