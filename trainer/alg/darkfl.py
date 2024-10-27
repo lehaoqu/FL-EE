@@ -27,7 +27,7 @@ def add_args(parser):
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
+    parser.add_argument('--kd_n_iters', default=1, type=int)
     
     
     parser.add_argument('--g_skip', default=1, type=int)
@@ -315,11 +315,11 @@ class Server(BaseServer):
                 s_logits, s_feature = s_exits_logits[s_exit_idx][t_selected_index], s_exits_feature[s_exit_idx][t_selected_index]
                 if self.is_feature: s, t = s_feature, t_feature
                 else: s, t = s_logits, t_logits
-                # dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
-                # angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
-                # dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
-                # gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss)
-                gap_loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s,t)
+                dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
+                angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
+                dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
+                gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss)
+                # gap_loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s,t)
         
         gap_loss = self.g_gap * gap_loss
         return gap_loss
