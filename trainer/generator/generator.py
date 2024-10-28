@@ -58,12 +58,12 @@ class Generator_LATENT(BaseModule):
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
         if 'cifar' in args.dataset:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 500, 197, 192, 100, 100, 100
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 197, 192, 100, 100, 100
         else:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 500, 128, 256, 2, 2, 2
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 128, 256, 2, 2, 2
         self.latent_dim = self.token_num * self.hidden_rs
         
-        input_dim = self.noise_dim * 3 if self.embedding else self.noise_dim + self.n_class
+        input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
         self.build_network()
@@ -98,7 +98,8 @@ class Generator_LATENT(BaseModule):
             y_input = self.embedding_layer(labels)
         else:
             y_input = F.one_hot(labels, num_classes=self.n_class).float()
-        z = torch.cat((eps, y_input, diff_embedding), dim=1)
+        # z = torch.cat((eps, y_input, diff_embedding), dim=1)
+        z = torch.cat((eps, y_input), dim=1)
         
         # == FC Layers ==
         for layer in self.fc_layers:
