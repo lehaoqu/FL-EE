@@ -275,7 +275,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss'):
         loss_func = nn.CrossEntropyLoss()
         for i, logits in enumerate(exits_logits):
             exits_loss += (loss_func(logits, label),)
-        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(9.99).to(label.device)) # TODO cifar glue
+        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(4.99).to(label.device)) # TODO cifar glue
         
     elif metric == 'confidence':
         confidences = 0
@@ -283,7 +283,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss'):
             probs = F.softmax(logits, dim=0)
             confidence = probs.max(dim=0, keepdim=False)[0]
             confidences += confidence
-        diff_pred = (1-confidences/len(exits_logits))*10
+        diff_pred = (1-confidences/len(exits_logits))*5
         
     elif metric == 'cosine':
         last_logits = exits_logits[-1].unsqueeze(0)
@@ -291,7 +291,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss'):
         for logits in exits_logits:
             exit_logits = logits.unsqueeze(0)
             diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
-        diff_pred = (1-diff_pred/len(exits_logits))*10
+        diff_pred = (1-diff_pred/len(exits_logits))*5
     
     return diff_pred
 

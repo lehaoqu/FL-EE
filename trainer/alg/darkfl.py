@@ -50,7 +50,7 @@ class Client(BaseClient):
     def train(self):
         # === train ===
         batch_loss = []
-        self.diff_distribute = [0 for _ in range(10)]
+        self.diff_distribute = [0 for _ in range(5)]
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
@@ -291,25 +291,28 @@ class Server(BaseServer):
             selected_index = s_selected_index_list[i]
             global_diff_exits.append(diff.float()[selected_index])
         
+        sum = 0
         for t_exit_idx in range(t_exits_num):
             if t_exit_idx != t_exits_num-1: continue
             selected_index = t_selected_index_list[t_exit_idx]
-            # == diff bsaed weight == 
+            # == diff based weight == 
             # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-            # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-            # for sample_index in selected_index:
-            #     sample_distance = diff_distance(global_diff_exits, diff[sample_index].unsqueeze(0))
-            #     for t_exit in range(global_n_exits):
-            #         weight_t_exits[t_exit] = weight_t_exits[t_exit] + sample_distance[t_exit]
-            # weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+            weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+            for sample_index in selected_index:
+                sample_distance = diff_distance(global_diff_exits, diff[sample_index].unsqueeze(0))
+                for s_exit in range(global_n_exits):
+                    weight_t_exits[s_exit] = weight_t_exits[s_exit] + sample_distance[s_exit]
+            weight_t_exits = F.softmax(-weight_t_exits, dim=0)
             # max_weight = weight_t_exits.max()
             # weight_t_exits = (weight_t_exits == max_weight).float()
                     
-            # hard weight
-            weight_t_exits = torch.zeros(global_n_exits).to(self.device)
-            if eq_depth != max(self.eq_depths):
-                if t_exit_idx == len(self.eq_exits[eq_depth])-1:
-                    weight_t_exits[t_exit_idx+1] = 1
+            # # hard weight
+            # weight_t_exits = torch.zeros(global_n_exits).to(self.device)
+            # if eq_depth != max(self.eq_depths):
+            #     if t_exit_idx == len(self.eq_exits[eq_depth])-1:
+            #         weight_t_exits[t_exit_idx+1] = 1
+            # else:
+            #     weight_t_exits[t_exit_idx] = 1
                     
             print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()])
 
@@ -322,11 +325,12 @@ class Server(BaseServer):
                 dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
                 angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
                 dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
-                gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss)
+                gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
+                sum += s.shape[0]
                 # gap_loss += weight_t_exits[s_exit_idx]*torch.mean(torch.mean(torch.abs(s - t.detach()), dim=1))
                 # gap_loss += weight_t_exits[s_exit_idx]*self.kd_criterion(s,t)
         
-        gap_loss = self.g_gap * gap_loss
+        gap_loss = self.g_gap * gap_loss / sum
         return gap_loss
     
     
@@ -391,7 +395,7 @@ class Server(BaseServer):
             # == Loss for gap ==
             s_exits_logits, s_exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
             s_exits_logits = self.eq_policy[max(self.eq_depths)].sf(s_exits_logits)
-            gap_loss = self.gap_loss(diff, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+            gap_loss = 10 * self.gap_loss(diff, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
             
             # == total loss for backward ==
             loss = ce_loss + diff_loss - gap_loss + div_loss
