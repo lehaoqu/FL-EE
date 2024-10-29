@@ -369,8 +369,9 @@ class Server(BaseServer):
                 
                 batch_size = y_input.shape[0]
                 diff_preds = torch.zeros(batch_size, 1).to(self.device)
+                dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
                 for sample_index in range(batch_size):
-                    diff_preds[sample_index] = difficulty_measure(self.eq_policy[max(self.eq_depths)], [exits_logits[i][sample_index] for i in range(len(exits_logits))], label=y_input[sample_index], metric='loss')
+                    diff_preds[sample_index] = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[sample_index], metric=self.args.dm)
                 diff_g[eq_depth] = diff_preds
                 
                 target_probs = calc_target_probs(exits_num)[self.p-1]
