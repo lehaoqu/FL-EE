@@ -11,6 +11,7 @@ from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, diff_distance
+from utils.modelload.model import BaseModule
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
@@ -22,7 +23,7 @@ def add_args(parser):
     
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-3, type=float)
+    parser.add_argument('--kd_lr', default=1e-1, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
@@ -100,8 +101,9 @@ class Server(BaseServer):
         self.client_update()
         self.train_distribute()
         self.uplink()
-        self.aggregate()
+        self.aggregate_eq()
         self.finetune()
+        self.heterogeneous_agg()
         self.lr_scheduler()
         self.crt_epoch += 1 
    
@@ -185,7 +187,7 @@ class Server(BaseServer):
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.generators[eq_depth] = [generator, optimizer, lr_scheduler]
             
-            optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr)
+            optimizer = torch.optim.SGD(params=self.eq_model[eq_depth].parameters(), lr=self.kd_lr, weight_decay=1e-4, momentum=0.9)
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
             self.models[eq_depth] = [self.eq_model[eq_depth], optimizer, lr_scheduler]
         self.p=30
@@ -363,7 +365,7 @@ class Server(BaseServer):
             # == train global model utilize generators ==
             if self.crt_epoch % self.kd_skip == 0 and self.crt_epoch >= self.kd_begin:
                 self.progressive_train_model(diff_g, y_input_g)
-                
+                    
     
     def train_generators(self, diff_g, y_input_g):
         for g in self.generators.values():
@@ -495,6 +497,11 @@ class Server(BaseServer):
         print(f'Losses: {Losses}')
         
 
+    def sample(self):
+        super().sample()
+        self.larger_eq_total_num = {eq_depth: sum([self.eq_num[i] for i in self.eq_depths if i >= eq_depth]) for eq_depth in self.eq_depths}
+
+
     def downlink(self):
         assert (len(self.sampled_clients) > 0)
         for client in self.sampled_clients:
@@ -515,7 +522,7 @@ class Server(BaseServer):
         self.uplink_policy()
         
         
-    def aggregate(self):
+    def aggregate_eq(self):
         assert (len(self.sampled_clients) > 0)
         
         self.aggregate_policy()
@@ -529,6 +536,23 @@ class Server(BaseServer):
         
         self.dm.tensor_to_parameters(self.global_model.parameters_to_tensor(is_split=True)[0])
         
+        
+    def heterogeneous_agg(self):
+        depth_weighted_tensor:Dict[int: torch.tensor] = {}
+        eq_tensors = {}
+        for eq_depth in self.eq_depths:
+            eq_model = self.eq_model[eq_depth]
+            tensors = eq_model.parameters_to_tensor(is_split=True)
+            eq_tensors[eq_depth] = tensors
+            for idx in range(len(tensors)):
+                depth_weighted_tensor[idx] = depth_weighted_tensor.get(idx, 0.0) + tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[self.eq_depths[idx]]
+        
+        aggregated_tensors = list(depth_weighted_tensor.values())
+        for idx, eq_depth in enumerate(self.eq_depths):
+            aggregated_tensor = torch.cat(aggregated_tensors[:idx] + [eq_tensors[eq_depth][-1]], 0)
+            eq_model: BaseModule = self.eq_model[eq_depth]
+            eq_model.tensor_to_parameters(aggregated_tensor)
+            
         
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)

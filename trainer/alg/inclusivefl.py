@@ -193,6 +193,5 @@ class Server(BaseServer):
         for idx, eq_depth in enumerate(self.eq_depths):
             aggregated_tensor = torch.cat(aggregated_tensors[:idx+1] + [eq_tensors[eq_depth][-1]], 0)
             eq_model: BaseModule = self.eq_model[eq_depth]
-            length = eq_model.parameters_to_tensor().shape[0]
             eq_model.tensor_to_parameters(aggregated_tensor)
     
