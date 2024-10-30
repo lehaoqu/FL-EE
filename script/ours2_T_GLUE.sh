@@ -1,6 +1,6 @@
 set -ex
 
-cp=models/google-bert/bert-12-uncased
+cp=models/google-bert/bert-12-128-uncased
 
 # datasets=(sst2 qnli qqp)
 datasets=(sst2 qnli qqp)

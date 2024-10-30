@@ -337,6 +337,9 @@ class Ree(nn.Module):
         elif 'tiny' in self.base_model:
             self.dim = 192
             self.pos_embedding = nn.Parameter(torch.zeros(1, 12+1, self.dim))
+        elif 'bert' in self.base_model and 'tiny' in self.base_model:
+            self.dim = 128
+            self.pos_embedding = nn.Parameter(torch.zeros(1, 24+1, self.dim))
         else: # resnet
             self.dim = 512
             self.pos_embedding = nn.Parameter(torch.zeros(1, 4+1, self.dim))

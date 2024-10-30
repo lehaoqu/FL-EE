@@ -258,12 +258,12 @@ class Policy():
                 
                 meta_loss += F.cross_entropy(meta_outputs[j][selected_index], label_meta[selected_index].long(), reduction='mean')
 
-        print(f'{100*correct/(total):.2f}, {correct}, {total}')
+        # print(f'{100*correct/(total):.2f}, {correct}, {total}')
         
         self.meta_optimizer.zero_grad()
         meta_loss.backward()
         self.meta_optimizer.step()
-        print(meta_loss.cpu().item())
+        # print(meta_loss.cpu().item())
     
 
     def __call__(self, exits_logits):

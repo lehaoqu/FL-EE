@@ -1,10 +1,61 @@
+# coding=utf-8
+# Copyright 2018 The HuggingFace Inc. team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Convert BERT checkpoint."""
+
+import argparse
+
 import torch
-import torch.nn.functional as F
 
-# 创建一个二维张量
-tensor_2d = torch.tensor([[1, 1, 1], [1.0, 2.0, 3.0]])
+from transformers import BertConfig, BertForPreTraining, load_tf_weights_in_bert
+from transformers.utils import logging
 
-# 对每一行进行单位化
-normalized_tensor_2d = F.normalize(tensor_2d, p=2, dim=1)
 
-print(normalized_tensor_2d)
+logging.set_verbosity_info()
+
+
+def convert_tf_checkpoint_to_pytorch(tf_checkpoint_path, bert_config_file, pytorch_dump_path):
+    # Initialise PyTorch model
+    config = BertConfig.from_json_file(bert_config_file)
+    print(f"Building PyTorch model from configuration: {config}")
+    model = BertForPreTraining(config)
+
+    # Load weights from tf checkpoint
+    load_tf_weights_in_bert(model, config, tf_checkpoint_path)
+
+    # Save pytorch-model
+    print(f"Save PyTorch model to {pytorch_dump_path}")
+    torch.save(model.state_dict(), pytorch_dump_path)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # Required parameters
+    parser.add_argument(
+        "--tf_checkpoint_path", default='/data/qvlehao/FL-EE/models/google-bert/bert-12-128-uncased/bert_model.ckpt', type=str, help="/data/qvlehao/FL-EE/models/google-bert/bert-12-128-uncased/bert_model.ckpt"
+    )
+    parser.add_argument(
+        "--bert_config_file",
+        default='/data/qvlehao/FL-EE/models/google-bert/bert-12-128-uncased/bert_config.json',
+        type=str,
+        help=(
+            "The config json file corresponding to the pre-trained BERT model. \n"
+            "This specifies the model architecture."
+        ),
+    )
+    parser.add_argument(
+        "--pytorch_dump_path", default='/data/qvlehao/FL-EE/models/google-bert/bert-12-128-uncased/pytorch_model.bin', type=str,  help="P"
+    )
+    args = parser.parse_args()
+    convert_tf_checkpoint_to_pytorch(args.tf_checkpoint_path, args.bert_config_file, args.pytorch_dump_path)

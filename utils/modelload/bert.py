@@ -346,7 +346,7 @@ class BertExitEncoderRee(nn.Module):
             modulation=True,
             exit_head='normlinear',
             mode='add',
-            base_model='little',
+            base_model='bert-tiny',
             num_classes=100,
             adapter=None,
             depth=1,

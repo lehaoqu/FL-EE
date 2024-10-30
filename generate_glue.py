@@ -118,7 +118,7 @@ if __name__ == "__main__":
     partition = sys.argv[3] if sys.argv[3] != "-" else None
 
     tokenizer = AutoTokenizer.from_pretrained(
-            'models/google-bert/bert-12-uncased',
+            'models/google-bert/bert-12-128-uncased',
             padding_side="right",
             model_max_length=128,
             use_fast=False,
