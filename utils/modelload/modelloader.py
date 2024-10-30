@@ -98,8 +98,10 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             model.resize_token_embeddings(len(tokenizer))
     else:
         exit('Error: unrecognized model')
-    # existing_model = torch.load('exps/darkfl/fix_diff_hard_sep1/darkfl_cifar100-224-d03_vit_120c_1E_lrsgd0.05_boosted.pth')
-    # model.load_state_dict(existing_model, strict=False)
+        
+    if args.load_path != '':
+        existing_model = torch.load(args.load_path)
+        model.load_state_dict(existing_model, strict=False)
     return model
 
 def load_model_eval(args, model_path, config_path=None):
