@@ -5,5 +5,6 @@ md=bert
 
 vr=0.2
 
-python eval.py depthfl boosted --suffix $1 --device $2 --dataset $3 --model $md --valid_ratio $vr --if_mode all
-# python eval.py depthfl l2w --suffix $1 --device $2 --dataset $dts --model $md --valid_ratio $vr --if_mode anytime
+# python eval.py eefl base --suffix $1 --device $2 --dataset $3 --model $md --valid_ratio $vr --if_mode all
+python eval.py eefl boosted --suffix $1 --device $2 --dataset $3 --model $md --valid_ratio $vr --if_mode all
+# python eval.py eefl l2w --suffix $1 --device $2 --dataset $3 --model $md --valid_ratio $vr --if_mode all

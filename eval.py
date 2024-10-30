@@ -47,11 +47,16 @@ class Eval():
 
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
-        # parser = policy_module.add_args(parser)
-        # policy_args = parser.parse_args()
+        # policy_parser = parser.add_subparsers(dest='policy_parser')
+        # policy_parser = policy_module.add_args(policy_parser)
+        # policy_args = policy_parser.parse_args()
         
         # for arg in vars(policy_args):
-        #     self.args[arg] = policy_args[arg]
+        #     print(arg, getattr(policy_args, arg))
+        #     setattr(self.args, arg, getattr(policy_args, arg))
+            
+        # for arg in vars(args):
+        #     self.eval_output.write(f"{arg}: {getattr(args, arg)}\n")
              
         self.args.policy = self.model.config.policy
         self.n_exits = len(self.model.config.exits)
@@ -324,5 +329,5 @@ if __name__ == '__main__':
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
         print(model_path)
-        # if 'largefl' in model_path and 'base' in model_path:
-        eval.eval(model_path+'.pth', model_path+'.json')
+        if args.policy in model_path:
+            eval.eval(model_path+'.pth', model_path+'.json')
