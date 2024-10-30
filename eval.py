@@ -329,5 +329,5 @@ if __name__ == '__main__':
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
         print(model_path)
-        if args.policy in model_path:
+        if 'eefl' in model_path and args.policy in model_path:
             eval.eval(model_path+'.pth', model_path+'.json')
