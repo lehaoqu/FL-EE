@@ -13,6 +13,7 @@ from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
 from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, diff_distance
 from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
+from trainer.policy.l2w import MLP_tanh
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
@@ -50,6 +51,8 @@ def add_args(parser):
     
     parser.add_argument('--loss_type', default='kd', type=str)
     parser.add_argument('--diff_client_gap', default=2, type=int)
+    
+    parser.add_argument('--sw', default='dis', type=str)
     return parser
 
 
@@ -71,7 +74,7 @@ class Client(BaseClient):
                 batch, label = self.adapt_batch(data)
                 with torch.no_grad():
                     dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
-                    dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
+                    dm_exits_logits = self.server.dm_policy(dm_exits_logits)
                     for sample_index in range(label.shape[0]):
                         diff = int(difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], label[sample_index], metric=self.args.dm).cpu().item())
                         self.diff_distribute[diff] += 1
@@ -164,12 +167,14 @@ class Server(BaseServer):
         # == decay lr for generator & global model ==
         
         for eq_depth in self.eq_depths:
-            optimizer = torch.optim.Adam(params=self.generators[eq_depth][0].parameters(), lr=self.g_lr)
+            optimizer = torch.optim.Adam(params=self.generators[eq_depth][0].parameters(), lr=self.g_lr * (self.gamma ** self.round))
             self.generators[eq_depth][1] = optimizer
             
             optimizer = torch.optim.SGD(params=self.models[eq_depth][0].parameters(), lr=self.kd_lr * (self.gamma ** self.round), weight_decay=1e-3)
             self.models[eq_depth][1] = optimizer
-   
+        
+        self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3 * (self.gamma ** self.round))
+        
     
     def kd_criterion(self, pred, teacher):
         kld_loss = nn.KLDivLoss(reduction='batchmean')
@@ -184,7 +189,10 @@ class Server(BaseServer):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits)
         
         self.global_model = self.eq_model[max(self.eq_depths)]
-        self.dm = self.eq_model[min(self.eq_depths)]
+        # self.dm = self.eq_model[min(self.eq_depths)]
+        # self.dm_policy = self.eq_policy[max(self.eq_depths)]
+        self.dm = self.eq_model[max(self.eq_depths)]
+        self.dm_policy = self.eq_policy[max(self.eq_depths)]
         self.clients_embeddings = []
         # == args ==
         self.is_feature = args.is_feature
@@ -220,7 +228,11 @@ class Server(BaseServer):
         # global model for clients
         for client in self.clients:
             client.server = self
-
+        
+        self.max_exit_num = len(self.eq_exits[self.eq_depths])
+        self.sw_net = MLP_tanh(input_size=self.max_exit_num, output_size=1, hidden_size=100).to(self.device)
+        self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
+        
         
     def get_rawdata(self):
         self.eq_loader = {}
@@ -316,9 +328,28 @@ class Server(BaseServer):
         return ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list
     
     
+    def diff_distance(self, s_diff_exits, all_diff, sample_index):
+        diff, exits_diff = all_diff
+        diff = diff[sample_index]
+        exits_diff = exits_diff[sample_index]
+        
+        exits_dis = torch.zeros(len(s_diff_exits)).to(self.device)
+        if self.args.sw == 'learn':
+            t_diff = exits_diff
+            for i, s_diff in enumerate(s_diff_exits):
+                exits_dis[i] = self.sw_net(torch.abs(t_diff - torch.mean(s_diff, dim=0)))
+        else:
+            t_diff = diff
+            for i, s_diff in enumerate(s_diff_exits):
+                exits_dis[i] = F.pairwise_distance(t_diff, torch.mean(s_diff))
+        return exits_dis/sum(exits_dis)
+    
+    
     def gap_loss(self, diff, y_input, t_selected_index_list, eq_depth, t, s, direction='sl'):
         t_exits_logits, t_exits_feature = t
         s_exits_logits, s_exits_feature = s
+        # diff: 1, exits_diff: 4
+        diff, exits_diff = diff
         gap_loss = 0.0
         
         # exit policy     
@@ -335,7 +366,8 @@ class Server(BaseServer):
         s_diff_exits = []
         for i in range(s_exits_num):
             selected_index = s_selected_index_list[i]
-            s_diff_exits.append(diff.float()[selected_index])
+            if self.args.sw == 'learn': s_diff_exits.append(exits_diff[selected_index])
+            else: s_diff_exits.append(diff.float()[selected_index])
         
         sum = 0
         for t_exit_idx in range(t_exits_num):
@@ -347,7 +379,7 @@ class Server(BaseServer):
             # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
             weight_t_exits = torch.zeros(s_exits_num).to(self.device)
             for sample_index in selected_index:
-                sample_distance = diff_distance(s_diff_exits, diff[sample_index].unsqueeze(0))
+                sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
                 for s_exit_idx in range(s_exits_num):
                     weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
             weight_t_exits = F.softmax(-weight_t_exits, dim=0)
@@ -463,9 +495,11 @@ class Server(BaseServer):
         # == finetune eq model , multi teacher to teach each exit ==
         for g in self.generators.values():
             g[0].eval()
-        for eq_model in self.eq_model.values():
-            eq_model.to(self.device)
-            eq_model.train()
+        for model in self.model.values():
+            model[1].to(self.device)
+            model[1].train()
+        self.sw_net.to(self.device)
+        self.sw_net.train()
         
         self.progressive_update_model(self.kd_n_iters, diff_g, y_input_g)
 
@@ -477,6 +511,7 @@ class Server(BaseServer):
         for _ in range(n_iters):
             for model in self.models.values():
                 model[1].zero_grad()
+            self.sw_optim.zero_grad()
         
             # == super-sub model teach eq model ==
             Loss = 0.0
@@ -507,12 +542,14 @@ class Server(BaseServer):
                             dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=False, rt_feature=True)
                             batch_size = y_input.shape[0]
                             diff_preds = torch.zeros(batch_size, 1).to(self.device)
+                            exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
                             for sample_index in range(batch_size):
-                                diff_preds[sample_index] = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[sample_index], metric=self.args.dm)
-                            diff = diff_preds
+                                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[sample_index], metric=self.args.dm, exits_diff=True)
+                                diff_preds[sample_index] = diff_pred
+                                exits_diff_preds[sample_index] = exits_diff
+                            diff = (diff_preds, exits_diff_preds)
                             if batch_size == self.args.bs: break
                 
-                    
                     t_exits_num = len(self.eq_exits[eq_depth])
                     target_probs = calc_target_probs(t_exits_num)[self.p-1]
                     with torch.no_grad():
@@ -567,6 +604,7 @@ class Server(BaseServer):
             
             for model in self.models.values():
                 model[1].step()
+            self.sw_optim.step()
             Losses.append(Loss.cpu().item())
             
         # print(f'Losses: {Losses}')

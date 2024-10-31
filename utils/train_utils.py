@@ -269,21 +269,23 @@ def exit_policy(exits_num, exits_logits, target_probs):
     return selected_index_list
 
 
-def difficulty_measure(exits_logits, label=None, metric='loss'):
+def difficulty_measure(exits_logits, label=None, metric='loss', exits_diff=False):
     if metric == 'loss':
         exits_loss = ()
         loss_func = nn.CrossEntropyLoss()
         for i, logits in enumerate(exits_logits):
             exits_loss += (loss_func(logits, label),)
-        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(4.99).to(label.device)) # TODO cifar glue
+        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(9.99).to(label.device)) # TODO cifar glue
+        exits_diff = torch.tensor([min((exit_loss*2).detach(), torch.tensor(9.99).to(label.device)) for exit_loss in exits_loss]).to(label.device)
         
     elif metric == 'confidence':
-        confidences = 0
+        confidences = ()
         for logits in exits_logits:
             probs = F.softmax(logits, dim=0)
             confidence = probs.max(dim=0, keepdim=False)[0]
             confidences += confidence
-        diff_pred = (1-confidences/len(exits_logits))*5
+        diff_pred = (1-sum(confidences)/len(exits_logits))*5
+        exits_diff = torch.tensor([exit_confidence.detach() for exit_confidence in confidences]).to(exit_logits[0].device)
         
     elif metric == 'cosine':
         last_logits = exits_logits[-1].unsqueeze(0)
@@ -292,12 +294,9 @@ def difficulty_measure(exits_logits, label=None, metric='loss'):
             exit_logits = logits.unsqueeze(0)
             diff_pred += nn.functional.cosine_similarity(exit_logits, last_logits, dim=1)
         diff_pred = (1-diff_pred/len(exits_logits))*5
+        # TODO exits_diff
     
-    return diff_pred
+    if exits_diff: return (diff_pred, exits_diff)
+    else: return diff_pred
 
 
-def diff_distance(global_diff_exits, local_diff):
-    exits_dis = torch.zeros(len(global_diff_exits)).to(local_diff.device)
-    for i, global_diff in enumerate(global_diff_exits):
-        exits_dis[i] = F.pairwise_distance(local_diff, torch.mean(global_diff))
-    return exits_dis/sum(exits_dis)
