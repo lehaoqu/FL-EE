@@ -49,6 +49,7 @@ def add_args(parser):
     parser.add_argument('--agg', default='none', type=str)
     
     parser.add_argument('--loss_type', default='kd', type=str)
+    parser.add_argument('--diff_client_gap', default=2, type=int)
     return parser
 
 
@@ -56,10 +57,28 @@ def add_args(parser):
 
 class Client(BaseClient):
     
+    def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
+        super().__init__(id, args, dataset, model, depth, exits)
+        self.diff_distribute = None
+        self.client_crt_rnd = 0
+    
     def train(self):
+        
+        # eval diff distribution
+        if self.client_crt_rnd % self.args.diff_client_gap == 0:    
+            self.diff_distribute = [0 for _ in range(5)]
+            for idx, data in enumerate(self.loader_train):
+                with torch.no_grad():
+                    dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
+                    dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
+                    for sample_index in range(label.shape[0]):
+                        diff = int(difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], label[sample_index], metric=self.args.dm).cpu().item())
+                        self.diff_distribute[diff] += 1
+        else:
+            self.diff_distribute = self.diff_distribute
+                        
         # === train ===
         batch_loss = []
-        self.diff_distribute = [0 for _ in range(5)]
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
@@ -73,19 +92,12 @@ class Client(BaseClient):
                 ce_loss = sum(exits_ce_loss)
                 ce_loss.backward()
                 self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item())
-                
-                # eval diff distribution
-                with torch.no_grad():
-                    dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
-                    dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
-                    for sample_index in range(label.shape[0]):
-                        diff = int(difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], label[sample_index], metric=self.args.dm).cpu().item())
-                        self.diff_distribute[diff] += 1
+                batch_loss.append(ce_loss.detach().cpu().item()) 
         # print(self.diff_distribute)
                     
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+        self.client_crt_rnd += 1
     
     def get_embedding(self,):
         self.model.eval()
@@ -209,8 +221,6 @@ class Server(BaseServer):
             client.server = self
 
         
-        
-    
     def get_rawdata(self):
         self.eq_loader = {}
         self.eq_dataset = {}
