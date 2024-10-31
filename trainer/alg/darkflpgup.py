@@ -68,6 +68,7 @@ class Client(BaseClient):
         if self.client_crt_rnd % self.args.diff_client_gap == 0:    
             self.diff_distribute = [0 for _ in range(5)]
             for idx, data in enumerate(self.loader_train):
+                batch, label = self.adapt_batch(data)
                 with torch.no_grad():
                     dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
                     dm_exits_logits = self.server.eq_policy[min(self.server.eq_depths)].sf(dm_exits_logits)
