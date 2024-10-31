@@ -269,13 +269,13 @@ def exit_policy(exits_num, exits_logits, target_probs):
     return selected_index_list
 
 
-def difficulty_measure(exits_logits, label=None, metric='loss', exits_diff=False):
+def difficulty_measure(exits_logits, label=None, metric='loss', rt_exits_diff=False):
     if metric == 'loss':
         exits_loss = ()
         loss_func = nn.CrossEntropyLoss()
         for i, logits in enumerate(exits_logits):
             exits_loss += (loss_func(logits, label),)
-        diff_pred = min(sum(exits_loss)/len(exits_loss) * 2, torch.tensor(9.99).to(label.device)) # TODO cifar glue
+        diff_pred = min(sum(exits_loss)/len(exits_loss), torch.tensor(4.99).to(label.device)) # TODO cifar glue
         exits_diff = torch.tensor([min((exit_loss*2).detach(), torch.tensor(9.99).to(label.device)) for exit_loss in exits_loss]).to(label.device)
         
     elif metric == 'confidence':
@@ -296,7 +296,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss', exits_diff=False
         diff_pred = (1-diff_pred/len(exits_logits))*5
         # TODO exits_diff
     
-    if exits_diff: return (diff_pred, exits_diff)
+    if rt_exits_diff: return (diff_pred, exits_diff)
     else: return diff_pred
 
 

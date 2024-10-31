@@ -10,7 +10,7 @@ import copy
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
-from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, diff_distance
+from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure
 from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
 from trainer.policy.l2w import MLP_tanh
@@ -229,7 +229,7 @@ class Server(BaseServer):
         for client in self.clients:
             client.server = self
         
-        self.max_exit_num = len(self.eq_exits[self.eq_depths])
+        self.max_exit_num = len(self.eq_exits[max(self.eq_depths)])
         self.sw_net = MLP_tanh(input_size=self.max_exit_num, output_size=1, hidden_size=100).to(self.device)
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
         
@@ -386,7 +386,7 @@ class Server(BaseServer):
             max_weight = weight_t_exits.max()
             weight_t_exits = (weight_t_exits == max_weight).float()
                     
-            # print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.4f}".format(x) for x in weight_t_exits.cpu()])
+            print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
 
             t_selected_index = t_selected_index_list[t_exit_idx]
             t_logits, t_feature = t_exits_logits[t_exit_idx][t_selected_index], t_exits_feature[t_exit_idx][t_selected_index]
@@ -495,9 +495,9 @@ class Server(BaseServer):
         # == finetune eq model , multi teacher to teach each exit ==
         for g in self.generators.values():
             g[0].eval()
-        for model in self.model.values():
-            model[1].to(self.device)
-            model[1].train()
+        for model in self.models.values():
+            model[0].to(self.device)
+            model[0].train()
         self.sw_net.to(self.device)
         self.sw_net.train()
         
@@ -544,7 +544,7 @@ class Server(BaseServer):
                             diff_preds = torch.zeros(batch_size, 1).to(self.device)
                             exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
                             for sample_index in range(batch_size):
-                                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[sample_index], metric=self.args.dm, exits_diff=True)
+                                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[sample_index], metric=self.args.dm, rt_exits_diff=True)
                                 diff_preds[sample_index] = diff_pred
                                 exits_diff_preds[sample_index] = exits_diff
                             diff = (diff_preds, exits_diff_preds)
