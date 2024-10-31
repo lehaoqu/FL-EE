@@ -25,7 +25,7 @@ def add_args(parser):
     
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=1e-1, type=float)
+    parser.add_argument('--kd_lr', default=5e-2, type=float)
     parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
@@ -53,6 +53,7 @@ def add_args(parser):
     parser.add_argument('--diff_client_gap', default=2, type=int)
     
     parser.add_argument('--sw', default='dis', type=str)
+    parser.add_argument('--sw_type', default='hard', type=str)
     return parser
 
 
@@ -384,9 +385,8 @@ class Server(BaseServer):
                     weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
             weight_t_exits = F.softmax(-weight_t_exits, dim=0)
             max_weight = weight_t_exits.max()
-            weight_t_exits = (weight_t_exits == max_weight).float()
-                    
-            print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
+            weight_t_exits = (weight_t_exits == max_weight).float() if self.args.sw_type == 'hard' else weight_t_exits
+            # print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
 
             t_selected_index = t_selected_index_list[t_exit_idx]
             t_logits, t_feature = t_exits_logits[t_exit_idx][t_selected_index], t_exits_feature[t_exit_idx][t_selected_index]

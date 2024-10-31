@@ -5,28 +5,8 @@ total_num=120
 
 # dts=cifar100-224-d03
 # dts=cifar100-224-d03-1
-md=vit
-bs=32
-lr=0.05
 
-device=$1
-agg=$2
-is_feature=$3
-
-kd_directions=(sl ls sls)
-kd_knowledges=(response)
-kd_joins=(last all)
-
-for kd_direction in "${kd_directions[@]}"
-do
-    echo "$ply" 
-    for kd_knowledge in "${kd_knowledges[@]}"
-    do
-        for kd_join in "${kd_joins[@]}"
-        do
-            python main.py darkflpup boosted --suffix exps/try/darkflpup_$agg-$kd_direction-$kd_knowledge-$kd_join-$is_feature/ --agg $agg --kd_direction $kd_direction --kd_knowledge $kd_knowledge --kd_join $kd_join --device $device --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05  --s_epoches 2 --valid_gap 10 --rnd 100 --is_feature $is_feature
-        done
-        done
-    done
-    
-done
+python main.py darkflpgup boosted --suffix exps/darkflpgup_5e-2/$1_hard --agg after --kd_direction sls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type hard
+python main.py darkflpgup boosted --suffix exps/darkflpgup_5e-2/$1_soft --agg after --kd_direction sls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type soft
+python main.py darkflpgup boosted --suffix exps/darkflpgup_5e-2/$1_hard --agg after --kd_direction sls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type hard
+python main.py darkflpgup boosted --suffix exps/darkflpgup_5e-2/$1_soft --agg after --kd_direction sls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type soft
