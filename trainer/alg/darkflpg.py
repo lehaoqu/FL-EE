@@ -121,7 +121,6 @@ class Client(BaseClient):
 class Server(BaseServer):
     def run(self):
         self.sample()
-        self.get_rawdata()
         self.downlink()
         self.client_update()
         self.train_distribute()
@@ -287,7 +286,7 @@ class Server(BaseServer):
     
     def d_loss(self, gen_latent, y_input, diff):
         dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-        dm_exits_logits = self.eq_policy[min(self.eq_depths)](dm_exits_logits)
+        dm_exits_logits = self.dm_policy(dm_exits_logits)
         batch_size = dm_exits_logits[0].shape[0]
         diff_preds = torch.zeros(batch_size, 1).to(self.device)
         for sample_index in range(batch_size):
@@ -470,7 +469,7 @@ class Server(BaseServer):
                 s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
                 s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                 s_exits_logits = s_policy(s_exits_logits)
-                gap_loss = self.gap_loss(diff, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+                gap_loss = self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
             # gap_loss = torch.tensor(0).to(self.device)
             
             # == total loss for backward ==

@@ -298,7 +298,7 @@ class Server(BaseServer):
     
     def d_loss(self, gen_latent, y_input, diff):
         dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-        dm_exits_logits = self.eq_policy[min(self.eq_depths)](dm_exits_logits)
+        dm_exits_logits = self.dm_policy(dm_exits_logits)
         batch_size = dm_exits_logits[0].shape[0]
         diff_preds = torch.zeros(batch_size, 1).to(self.device)
         for sample_index in range(batch_size):
