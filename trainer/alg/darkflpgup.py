@@ -31,7 +31,7 @@ def add_args(parser):
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
     parser.add_argument('--kd_n_iters', default=5, type=int)
-    
+    parser.add_argument('--gap_kd_lambda', default=1, type=float)
     
     parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
@@ -41,19 +41,18 @@ def add_args(parser):
     parser.add_argument('--g_gap', default=1, type=float)
     parser.add_argument('--g_diff', default=1, type=float)
     parser.add_argument('--g_n_iters', default=1, type=int)
-    
-    parser.add_argument('--dm', default='loss', type=str)
-    
+
     parser.add_argument('--kd_direction', default='sl', type=str)
-    parser.add_argument('--kd_join', default='last', type=str)
+    parser.add_argument('--kd_join', default='last', type=str, help='last: only last exit of teacher can teach student model\'s exits')
     parser.add_argument('--kd_knowledge', default='relation', type=str)
-    parser.add_argument('--agg', default='none', type=str)
+    parser.add_argument('--agg', default='after', type=str)
     
-    parser.add_argument('--loss_type', default='kd', type=str)
+    parser.add_argument('--loss_type', default='ce-kd', type=str)
+    parser.add_argument('--dm', default='loss', type=str)
     parser.add_argument('--diff_client_gap', default=2, type=int)
     
-    parser.add_argument('--sw', default='dis', type=str)
-    parser.add_argument('--sw_type', default='hard', type=str)
+    parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
+    parser.add_argument('--sw_type', default='soft', type=str, help='weight [soft | hard]')
     return parser
 
 
@@ -396,23 +395,26 @@ class Server(BaseServer):
                 sum += s_logits.shape[0]
                 
                 # == ce loss ==
+                gap_ce_loss = 0.0
                 if 'ce' in self.args.loss_type:
                     s, t = s_logits, t_logits.detach()
-                    gap_loss += weight_t_exits[s_exit_idx] * self.ce_criterion(s, t_y) * s.shape[0]
+                    gap_ce_loss = weight_t_exits[s_exit_idx] * self.ce_criterion(s, t_y) * s.shape[0]
                 
                 # == kd gap loss == 
+                gap_kd_loss = 0.0
                 if 'kd' in self.args.loss_type:
                     if direction == 'sl':
                         s, t = s_feature, t_feature.detach()
                         dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
                         angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
                         dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
-                        gap_loss += weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
+                        gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
                     else:   
                         s, t = s_logits, t_logits.detach()
                         s, t = F.normalize(s, p=2, dim=1), F.normalize(t, p=2, dim=1)
-                        gap_loss += weight_t_exits[s_exit_idx]* F.mse_loss(s, t) * s.shape[0] 
-
+                        gap_kd_loss = weight_t_exits[s_exit_idx]* F.mse_loss(s, t) * s.shape[0] 
+                gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
+                
         gap_loss = self.g_gap * gap_loss / sum
         return gap_loss
     
