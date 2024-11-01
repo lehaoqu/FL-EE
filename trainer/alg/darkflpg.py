@@ -447,7 +447,7 @@ class Server(BaseServer):
         
         for _ in range(n_iters):
             optimizer.zero_grad()
-            diff, y_input = diff_g[eq_depth], y_input_g[eq_depth]
+            y_input = y_input_g[eq_depth]
             eps = torch.rand((y_input[0].shape[0], self.generators[eq_depth][0].noise_dim)).to(self.device)
             gen_latent = g[0](y_input, eps)
             
@@ -463,14 +463,26 @@ class Server(BaseServer):
             ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list = self.y_loss(gen_latent, y_input, self.eq_model[eq_depth], self.eq_policy[eq_depth], target_probs, t_exits_num)
             
             # == Loss for gap ==
-            # if eq_depth != max(self.eq_depths):
-            #     eq_idx = self.eq_depths.index(eq_depth)
-            #     s_model = self.models[self.eq_depths[eq_idx+1]][0]
-            #     s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
-            #     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-            #     s_exits_logits = s_policy(s_exits_logits)
-            #     gap_loss = self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
-            gap_loss = torch.tensor(0).to(self.device)
+            if eq_depth != max(self.eq_depths):
+                with torch.no_grad():
+                    batch_size = y_input[0].shape[0]
+                    diff_preds = torch.zeros(batch_size, 1).to(self.device)
+                    exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
+                    dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
+                    dm_exits_logits = self.dm_policy(dm_exits_logits)
+                    for sample_index in range(batch_size):
+                        diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
+                        diff_preds[sample_index] = diff_pred
+                        exits_diff_preds[sample_index] = exits_diff
+                    diff = (diff_preds, exits_diff_preds)
+                
+                eq_idx = self.eq_depths.index(eq_depth)
+                s_model = self.models[self.eq_depths[eq_idx+1]][0]
+                s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
+                s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
+                s_exits_logits = s_policy(s_exits_logits)
+                gap_loss = self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+            else: gap_loss = torch.tensor(0).to(self.device)
             
             # == total loss for backward ==
             loss = ce_loss + diff_loss - gap_loss + div_loss
