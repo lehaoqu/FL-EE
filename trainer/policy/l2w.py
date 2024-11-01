@@ -268,8 +268,4 @@ class Policy():
 
     def __call__(self, exits_logits):
         return exits_logits
-    
-    # == for finetune in server == 
-    def sf(self, exits_logits):
-        return exits_logits
      

@@ -28,24 +28,16 @@ class Policy():
             pred_ensembels.append(tmp)
             
         exits_loss = ()
+        ensembel_exits_logits = []
         for i, logits in enumerate(exits_logits):
             pred_ensembel = pred_ensembels[i].detach()
             pred_final = pred_ensembel + logits
+            ensembel_exits_logits.append(pred_final)
             exits_loss += (self.loss_func(pred_final, label) * ws[i],)
-        return exits_loss, pred_ensembels[1:]
+        return exits_loss, ensembel_exits_logits
         
 
     def __call__(self, exits_logits):
-        pred_ensembels = [torch.zeros(1).to(self.device)]
-        for i, logits in enumerate(exits_logits):
-            tmp = logits + pred_ensembels[-1] * self.reweight[i]
-            pred_ensembels.append(tmp)
-        ensemble_exits_logits = pred_ensembels[1:]
-        return ensemble_exits_logits
-    
-    
-    # == for finetune in server == 
-    def sf(self, exits_logits):
         pred_ensembels = [torch.zeros(1).to(self.device)]
         for i, logits in enumerate(exits_logits):
             tmp = (logits + pred_ensembels[-1]) * self.reweight[i]
