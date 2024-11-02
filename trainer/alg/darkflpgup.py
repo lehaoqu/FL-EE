@@ -32,6 +32,7 @@ def add_args(parser):
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
     parser.add_argument('--kd_n_iters', default=5, type=int)
     parser.add_argument('--gap_kd_lambda', default=1, type=float)
+    parser.add_argument('--kd_frozen', default=False, type=bool)
     
     parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
@@ -563,7 +564,7 @@ class Server(BaseServer):
                         t_exits_logits = t_policy(t_exits_logits)
                         t_selected_index_list = exit_policy(exits_num=t_exits_num, exits_logits=t_exits_logits, target_probs=target_probs)
                     
-                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=False)
+                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=self.args.kd_frozen)
                     s_exits_logits = s_policy(s_exits_logits)
                     sl_Loss += self.gap_loss(diff, y_input, t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
                 
