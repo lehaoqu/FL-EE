@@ -19,6 +19,7 @@ class Client(BaseClient):
         origin_hidden_size = args.origin_width[0]
         origin_intermediate_size = args.origin_width[1]
         self.origin_target = {origin_hidden_size: self.model.config.hidden_size, origin_intermediate_size: self.model.config.intermediate_size}
+        self.bert_em_position = {origin_hidden_size: self.model.config.hidden_size}
         # print(f'scale: {scale}, width: {self.origin_target}')
     
     def run(self):
@@ -72,7 +73,8 @@ class Client(BaseClient):
         new_state_dict = {}
         for name, param in self.model.named_parameters():
             if target_state_dict[name].shape != param.shape:
-                prune_param = crop_tensor_dimensions(target_state_dict[name], self.origin_target)
+                if 'bert.embeddings.position' in name: prune_param = crop_tensor_dimensions(target_state_dict[name], self.bert_em_position)
+                else: prune_param = crop_tensor_dimensions(target_state_dict[name], self.origin_target)
             else: prune_param = target_state_dict[name]
             new_state_dict[name] = prune_param
         self.model.load_state_dict(new_state_dict)
