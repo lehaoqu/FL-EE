@@ -65,7 +65,8 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             for name, param in model.named_parameters():
                 if name in pre_model.state_dict().keys():
                     origin_tensor = pre_model.state_dict()[name]
-                    prune_tensor = crop_tensor_dimensions(origin_tensor, origin_target)
+                    if 'bert.embeddings.position' in name: prune_tensor = crop_tensor_dimensions(origin_tensor, {pre_model.config.hidden_size: eq_config.hidden_size})
+                    else: prune_tensor = crop_tensor_dimensions(origin_tensor, origin_target)
                     param = prune_tensor.clone()
                 new_state_dict[name] = param
             model.load_state_dict(new_state_dict)
