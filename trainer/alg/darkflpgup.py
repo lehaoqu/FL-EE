@@ -496,6 +496,7 @@ class Server(BaseServer):
     def progressive_train_model(self, diff_g, y_input_g):
         # == finetune eq model , multi teacher to teach each exit ==
         for g in self.generators.values():
+            g[0].to(self.device)
             g[0].eval()
         for model in self.models.values():
             model[0].to(self.device)
