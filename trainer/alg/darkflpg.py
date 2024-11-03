@@ -71,7 +71,7 @@ class Client(BaseClient):
         
         # eval diff distribution
         if self.client_crt_rnd % self.args.diff_client_gap == 0:    
-            self.diff_distribute = [0 for _ in range(5)]
+            self.diff_distribute = [0 for _ in range(10)]
             for idx, data in enumerate(self.loader_train):
                 batch, label = self.adapt_batch(data)
                 with torch.no_grad():
