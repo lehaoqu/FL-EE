@@ -33,6 +33,7 @@ def add_args(parser):
     parser.add_argument('--kd_n_iters', default=5, type=int)
     parser.add_argument('--gap_kd_lambda', default=1, type=float)
     parser.add_argument('--kd_frozen', default=False, type=bool)
+    parser.add_argument('--kd_gap', default=1, type=float)
     
     parser.add_argument('--g_skip', default=1, type=int)
     parser.add_argument('--g_begin', default=0, type=int)
@@ -197,7 +198,7 @@ class Server(BaseServer):
         # == args ==
         self.is_feature = args.is_feature
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
-        self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
+        self.kd_lr, self.kd_gap, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_gap, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99       
 
@@ -404,7 +405,7 @@ class Server(BaseServer):
                         gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_criterion(s, t) * s.shape[0] 
                 gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
                 
-        gap_loss = self.g_gap * gap_loss / sum
+        gap_loss = gap_loss / sum
         return gap_loss
     
     
@@ -482,7 +483,7 @@ class Server(BaseServer):
                 s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
                 s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                 s_exits_logits = s_policy(s_exits_logits)
-                gap_loss = self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+                gap_loss = self.g_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
             else: gap_loss = torch.tensor(0).to(self.device)
             
             # == total loss for backward ==
@@ -557,7 +558,7 @@ class Server(BaseServer):
                     
                     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=self.args.kd_frozen)
                     s_exits_logits = s_policy(s_exits_logits)
-                    sl_Loss += self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
+                    sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
                 
             ls_Loss = 0.0
             if self.args.kd_direction == 'sl' or self.args.kd_direction == 'sls':
@@ -592,7 +593,7 @@ class Server(BaseServer):
                     
                     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=self.args.kd_frozen)
                     s_exits_logits = s_policy(s_exits_logits)
-                    sl_Loss += self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')
+                    sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')
                   
             Loss = sl_Loss + ls_Loss  
             Loss.backward()
