@@ -463,7 +463,7 @@ class Server(BaseServer):
             # == Loss for y_input utilize eq_depth super-local model ==             
             ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list = self.y_loss(gen_latent, y_input, self.eq_model[eq_depth], self.eq_policy[eq_depth], target_probs, t_exits_num)
             
-            # == Loss for gap ==
+            # == Loss for gap == TODO gap LOSS SL & SLS
             if eq_depth != max(self.eq_depths):
                 with torch.no_grad():
                     batch_size = y_input[0].shape[0]
