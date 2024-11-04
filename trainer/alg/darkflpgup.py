@@ -412,9 +412,14 @@ class Server(BaseServer):
                         dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
                         gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
                     else:   
-                        s, t = s_logits, t_logits.detach()
-                        s, t = F.normalize(s, p=2, dim=1), F.normalize(t, p=2, dim=1)
-                        gap_kd_loss = weight_t_exits[s_exit_idx]* F.mse_loss(s, t) * s.shape[0] 
+                        s, t = s_feature, t_feature.detach()
+                        dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
+                        angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
+                        dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
+                        gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
+                        
+                        # s, t = s_logits, t_logits.detach()
+                        # gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_criterion(s, t) * s.shape[0] 
                 gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
                 
         gap_loss = gap_loss / sum
