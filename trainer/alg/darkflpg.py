@@ -412,7 +412,7 @@ class Server(BaseServer):
     
     
     def finetune(self):
-        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())) if self.args.daptive_epoches == 'True' else self.s_epoches
+        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())) if self.args.adaptive_epoches == 'True' else self.s_epoches
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
