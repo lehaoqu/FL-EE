@@ -22,6 +22,7 @@ def add_args(parser):
     parser.add_argument('--is_feature', default='False', type=str)
     
     parser.add_argument('--s_epoches', default=10, type=int)
+    parser.add_argument('--adaptive_epoches', default='False', type=str)
     
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
@@ -411,7 +412,7 @@ class Server(BaseServer):
     
     
     def finetune(self):
-        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values()))
+        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())) if self.args.daptive_epoches == 'True' else self.s_epoches
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
