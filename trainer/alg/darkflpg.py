@@ -66,6 +66,7 @@ class Client(BaseClient):
         super().__init__(id, args, dataset, model, depth, exits)
         self.diff_distribute = None
         self.client_crt_rnd = 0
+        self.batch_num = len(self.loader_train)
     
     def train(self):
         
@@ -410,6 +411,7 @@ class Server(BaseServer):
     
     
     def finetune(self):
+        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values()))
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
@@ -609,6 +611,7 @@ class Server(BaseServer):
     def sample(self):
         super().sample()
         self.larger_eq_total_num = {eq_depth: sum([self.eq_num[i] for i in self.eq_depths if i >= eq_depth]) for eq_depth in self.eq_depths}
+        self.eq_batch_num = {eq_depth: sum([client.batch_num for client in self.sampled_eq_clients[eq_depth]]) for eq_depth in self.eq_depths}
 
 
     def downlink(self):
