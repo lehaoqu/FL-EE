@@ -1,4 +1,4 @@
-# set -ex
+set -ex
 
 # sr=0.1
 # total_num=120
@@ -16,7 +16,9 @@
 # python main.py darkflpgup boosted --suffix exps/darkflpgup_5e-2_1101/$1_soft --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type soft --s_epoches 10
 
 
-python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_soft --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type soft
-python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_hard --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type hard
-python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_soft --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type soft
-python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_hard --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type hard
+python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_$2 --agg after --kd_direction ls --kd_knowledge $2 --kd_join last --device $3 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature $1  --loss_type ce-kd_loss --sw learn --sw_type soft
+
+# python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_soft --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type soft
+# python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_hard --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw learn --sw_type hard
+# python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_soft --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type soft
+# python main.py darkflpgup boosted --suffix exps/1104_darkflpgup_ls/$1_hard --agg after --kd_direction ls --kd_knowledge relation --kd_join last --device $2 --dataset cifar100-224-d03 --model vit --sr 0.1 --total_num 120 --lr 0.05 --s_epoches 2 --valid_gap 10 --rnd 500 --is_feature True --loss_type $1 --sw none  --sw_type hard
