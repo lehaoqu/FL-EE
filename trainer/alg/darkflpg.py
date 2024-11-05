@@ -519,8 +519,8 @@ class Server(BaseServer):
             # STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'============{eq_depth} Super-local Model============')
-        print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
+        # print(f'============{eq_depth} Super-local Model============')
+        # print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
     
 
     def progressive_train_model(self, diff_g, exits_diff_g, y_input_g):
@@ -549,7 +549,7 @@ class Server(BaseServer):
             Loss = 0.0
             
             sl_Loss = 0.0
-            if self.args.kd_direction == 'sl' or self.args.kd_direction == 'sls':
+            if 'sl' in self.args.kd_direction:
                 for idx, eq_depth in enumerate(self.eq_depths):
                     if eq_depth == max(self.eq_depths): continue
                     t_model = self.eq_model[self.eq_depths[idx]]
@@ -587,7 +587,7 @@ class Server(BaseServer):
                     sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
                 
             ls_Loss = 0.0
-            if self.args.kd_direction == 'sl' or self.args.kd_direction == 'sls':
+            if 'ls' in self.args.kd_direction:
                 for idx, eq_depth in enumerate(reversed(self.eq_depths)):
                     if eq_depth == min(self.eq_depths): continue
                     t_model = self.eq_model[list(reversed(self.eq_depths))[idx]]
