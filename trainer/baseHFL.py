@@ -204,6 +204,8 @@ class BaseServer:
         self.global_model = global_model.to(self.device)
         self.eq_depths = list(self.eq_model.keys())
         self.sampled_submodel_clients: Dict[int:List[BaseClient]] = {}
+        self.max_depth = max(self.eq_depths)
+        self.max_exit = len(self.eq_exits[self.max_depth])
 
         self.round = 0
         self.wall_clock_time = 0

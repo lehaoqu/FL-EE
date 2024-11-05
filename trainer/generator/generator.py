@@ -54,6 +54,7 @@ class DiversityLoss(nn.Module):
 class Generator_LATENT(BaseModule):
     def __init__(self, args=None, embedding=True):
         super(Generator_LATENT, self).__init__()
+        self.args = args
         self.device = args.device if args is not None else 0
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
@@ -63,7 +64,7 @@ class Generator_LATENT(BaseModule):
             self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 128, 256, 2, 2, 2
         self.latent_dim = self.token_num * self.hidden_rs
         
-        input_dim = self.noise_dim * 2 if self.embedding else self.noise_dim + self.n_class
+        input_dim = self.noise_dim * 2 + self.n_diff if self.args.diff_generator else self.noise_dim * 2
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
         self.build_network()
@@ -76,7 +77,8 @@ class Generator_LATENT(BaseModule):
         # self.embedding_layer_diff = nn.Embedding(self.n_diff, self.noise_dim)
         if self.embedding:
             self.embedding_layer = nn.Embedding(self.n_class, self.noise_dim)
-        
+        if self.args.diff_generator:
+            self.diff_laryer = nn.Linear(4, self.n_diff)
         ## == FC ==
         self.fc_layers = nn.ModuleList()
         for i in range(len(self.fc_configs) - 1):
@@ -89,7 +91,7 @@ class Generator_LATENT(BaseModule):
         # == Representation Layer ==
         self.representation_layer = nn.Linear(self.fc_configs[-1], self.latent_dim)
         
-    def forward(self, labels, eps):
+    def forward(self, labels, eps, exits_diff=None):
         if isinstance(labels, tuple): labels = labels[0]
         batch_size = labels.shape[0]
         
@@ -98,8 +100,8 @@ class Generator_LATENT(BaseModule):
             y_input = self.embedding_layer(labels)
         else:
             y_input = F.one_hot(labels, num_classes=self.n_class).float()
-        z = torch.cat((eps, y_input), dim=1)
-        # z = torch.cat((eps, y_input), dim=1)
+        if self.args.diff_generator: z = torch.cat((eps, y_input, self.diff_laryer(exits_diff)), dim=1)
+        else: z = torch.cat((eps, y_input), dim=1)
         
         # == FC Layers ==
         for layer in self.fc_layers:
