@@ -26,7 +26,7 @@ def add_args(parser):
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=5e-2, type=float)
-    parser.add_argument('--kd_response_ratio', default=3, type=float)
+    parser.add_argument('--kd_response_ratio', default=10, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
@@ -423,7 +423,7 @@ class Server(BaseServer):
                             dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
                             gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
                         else:
-                            gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_criterion(s, t) * s.shape[0] 
+                            gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
                 
                 gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
                 

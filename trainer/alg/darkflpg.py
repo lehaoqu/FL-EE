@@ -27,7 +27,7 @@ def add_args(parser):
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=5e-2, type=float)
-    parser.add_argument('--kd_response_ratio', default=3, type=float)
+    parser.add_argument('--kd_response_ratio', default=10, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
@@ -422,8 +422,8 @@ class Server(BaseServer):
                         gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
                     else:   
                         s, t = s_logits, t_logits.detach()
-                        s, t = F.normalize(s, p=2, dim=1), F.normalize(t, p=2, dim=1)
-                        gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_criterion(s, t) * s.shape[0] 
+                        gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
+                        
                 gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
                 
         gap_loss = gap_loss / sum
@@ -485,15 +485,28 @@ class Server(BaseServer):
             ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list = self.y_loss(gen_latent, y_input, self.eq_model[eq_depth], self.eq_policy[eq_depth], target_probs, t_exits_num)
             
             # == Loss for gap == TODO gap LOSS SL & SLS
-            if eq_depth != max(self.eq_depths):                
-                diff = (exits_diff[:,0], exits_diff)
-                eq_idx = self.eq_depths.index(eq_depth)
-                s_model = self.models[self.eq_depths[eq_idx+1]][0]
-                s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
-                s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-                s_exits_logits = s_policy(s_exits_logits)
-                gap_loss = self.g_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
-            else: gap_loss = torch.tensor(0).to(self.device)
+            gap_loss = 0.0
+            if 'sl' in self.args.kd_direction:
+                if eq_depth != max(self.eq_depths):                
+                    diff = (exits_diff[:,0], exits_diff)
+                    eq_idx = self.eq_depths.index(eq_depth)
+                    s_model = self.models[self.eq_depths[eq_idx+1]][0]
+                    s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
+                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
+                    s_exits_logits = s_policy(s_exits_logits)
+                    gap_loss += self.g_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))    
+                else: gap_loss += torch.tensor(0).to(self.device)
+            if 'ls' in self.args.kd_direction:
+                if eq_depth != min(self.eq_depths):
+                    diff = (exits_diff[:,0], exits_diff)
+                    eq_idx = list(reversed(self.eq_depths)).index(eq_depth)
+                    s_model = self.models[list(reversed(self.eq_depths))[eq_idx+1]][0]
+                    s_policy = self.eq_policy[list(reversed(self.eq_depths))[eq_idx+1]]
+                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
+                    s_exits_logits = s_policy(s_exits_logits)
+                    gap_loss += self.g_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')    
+                else: gap_loss += torch.tensor(0).to(self.device)
+                    
             
             # == total loss for backward ==
             loss = ce_loss + diff_loss - gap_loss + div_loss
