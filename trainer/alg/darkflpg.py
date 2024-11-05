@@ -74,7 +74,7 @@ class Client(BaseClient):
     
     def train(self):
         self.sample_exits_diff = torch.zeros(len(self.dataset_train), self.server.max_exit_num).to(self.device)
-        self.sample_y = torch.zeros(len(self.dataset_train), 1).to(self.device)
+        self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         sample_idx = 0
         # eval diff distribution
         if self.client_crt_rnd % self.args.diff_client_gap == 0:    
@@ -87,13 +87,13 @@ class Client(BaseClient):
                     for index in range(label.shape[0]):
                         diff, exits_diff = difficulty_measure([dm_exits_logits[i][index] for i in range(len(dm_exits_logits))], label[index], metric=self.args.dm, rt_exits_diff=True)
                         self.sample_exits_diff[sample_idx] = exits_diff
-                        self.sample_y[sample_idx] = label[idx]
+                        self.sample_y[sample_idx] = label[index]
                         self.diff_distribute[int(diff.cpu().item())] += 1
                         sample_idx += 1
         else:
             self.diff_distribute = self.diff_distribute
             self.sample_exits_diff = self.sample_exits_diff
-                        
+        
         # === train ===
         batch_loss = []
         for epoch in range(self.epoch):
@@ -210,7 +210,7 @@ class Server(BaseServer):
         self.global_model = self.eq_model[max(self.eq_depths)]
         # self.dm = self.eq_model[min(self.eq_depths)]
         # self.dm_policy = self.eq_policy[max(self.eq_depths)]
-        self.dm = self.eq_model[max(self.eq_depths)]
+        self.dm = copy.deepcopy(self.eq_model[max(self.eq_depths)] )
         self.dm_policy = self.eq_policy[max(self.eq_depths)]
         self.clients_embeddings = []
         # == args ==
@@ -287,7 +287,7 @@ class Server(BaseServer):
             diff_g[eq_depth] = diff
             random_idxs = torch.randint(0, self.eq_exits_diff[eq_depth].shape[0], (self.args.bs,))
             exits_diff_g[eq_depth] = self.eq_exits_diff[eq_depth][random_idxs]
-            y_input = self.sample_y[eq_depth][random_idxs]
+            y_input = self.eq_y[eq_depth][random_idxs].view(-1)
             
             if self.args.dataset in GLUE:
                 # TODO two classes for GLUE
@@ -341,16 +341,15 @@ class Server(BaseServer):
     
     
     def diff_distance(self, s_diff_exits, all_diff, sample_index):
-        diff, exits_diff = all_diff
-        diff = diff[sample_index]
-        exits_diff = exits_diff[sample_index]
-        
+        diff, exits_diff = all_diff        
         exits_dis = torch.zeros(len(s_diff_exits)).to(self.device)
         if self.args.sw == 'learn':
+            exits_diff = exits_diff[sample_index]
             t_diff = exits_diff
             for i, s_diff in enumerate(s_diff_exits):
                 exits_dis[i] = self.sw_net(torch.abs(t_diff - torch.mean(s_diff, dim=0)))
         else:
+            diff = diff[sample_index]
             t_diff = diff
             for i, s_diff in enumerate(s_diff_exits):
                 exits_dis[i] = F.pairwise_distance(t_diff, torch.mean(s_diff))
@@ -444,7 +443,7 @@ class Server(BaseServer):
             # == train global model utilize generators ==
             if self.crt_epoch % self.kd_skip == 0 and self.crt_epoch >= self.kd_begin:
                 self.progressive_train_model(diff_g, exits_diff_g, y_input_g)
-                    
+        self.dm.load_state_dict(self.eq_model[self.max_depth].state_dict())
     
     def train_generators(self, exits_diff_g, y_input_g):
         for g in self.generators.values():
@@ -486,19 +485,8 @@ class Server(BaseServer):
             ce_loss, t_exits_logits, t_exits_feature, t_selected_index_list = self.y_loss(gen_latent, y_input, self.eq_model[eq_depth], self.eq_policy[eq_depth], target_probs, t_exits_num)
             
             # == Loss for gap == TODO gap LOSS SL & SLS
-            if eq_depth != max(self.eq_depths):
-                with torch.no_grad():
-                    batch_size = y_input[0].shape[0]
-                    diff_preds = torch.zeros(batch_size, 1).to(self.device)
-                    exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
-                    dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-                    dm_exits_logits = self.dm_policy(dm_exits_logits)
-                    for sample_index in range(batch_size):
-                        diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
-                        diff_preds[sample_index] = diff_pred
-                        exits_diff_preds[sample_index] = exits_diff
-                    diff = (diff_preds, exits_diff_preds)
-                
+            if eq_depth != max(self.eq_depths):                
+                diff = (exits_diff[:,0], exits_diff)
                 eq_idx = self.eq_depths.index(eq_depth)
                 s_model = self.models[self.eq_depths[eq_idx+1]][0]
                 s_policy = self.eq_policy[self.eq_depths[eq_idx+1]]
@@ -510,7 +498,7 @@ class Server(BaseServer):
             # == total loss for backward ==
             loss = ce_loss + diff_loss - gap_loss + div_loss
             loss.backward() # avoid generated data lost in graph
-            
+                
             DIFF_LOSS += diff_loss
             CE_LOSS += ce_loss
             GAP_LOSS += gap_loss
