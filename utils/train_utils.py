@@ -275,7 +275,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss', rt_exits_diff=Fa
         loss_func = nn.CrossEntropyLoss()
         for i, logits in enumerate(exits_logits):
             exits_loss += (loss_func(logits, label).unsqueeze(0),)
-        diff_pred = sum(exits_loss)/len(exits_loss) # TODO cifar glue
+        diff_pred = min(sum(exits_loss)/len(exits_loss), torch.tensor([9.99]).to(exits_logits[0].device)) # TODO cifar glue
         exits_diff = torch.cat(exits_loss)
         
     elif metric == 'confidence':
