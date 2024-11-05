@@ -26,7 +26,7 @@ def add_args(parser):
     parser.add_argument('--kd_skip', default=1, type=int)
     parser.add_argument('--kd_begin', default=0, type=int)
     parser.add_argument('--kd_lr', default=5e-2, type=float)
-    parser.add_argument('--kd_response_ratio', default=10, type=float)
+    parser.add_argument('--kd_response_ratio', default=3, type=float)
     parser.add_argument('--kd_dist_ratio', default=5, type=float)
     parser.add_argument('--kd_angle_ratio', default=10, type=float)
     parser.add_argument('--kd_dark_ratio', default=0, type=float)
