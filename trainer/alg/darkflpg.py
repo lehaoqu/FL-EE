@@ -586,7 +586,7 @@ class Server(BaseServer):
                         t_exits_logits = t_policy(t_exits_logits)
                         t_selected_index_list = exit_policy(exits_num=t_exits_num, exits_logits=t_exits_logits, target_probs=target_probs)
                     
-                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=self.args.kd_frozen)
+                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                     s_exits_logits = s_policy(s_exits_logits)
                     sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
                 
@@ -624,7 +624,7 @@ class Server(BaseServer):
                         t_exits_logits = t_policy(t_exits_logits)
                         t_selected_index_list = exit_policy(exits_num=t_exits_num, exits_logits=t_exits_logits, target_probs=target_probs)
                     
-                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True, frozen=self.args.kd_frozen)
+                    s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                     s_exits_logits = s_policy(s_exits_logits)
                     sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')
                   

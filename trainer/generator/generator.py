@@ -61,7 +61,7 @@ class Generator_LATENT(BaseModule):
         if 'cifar' in args.dataset:
             self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 197, 192, 100, 100, 100
         else:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 128, 256, 2, 2, 2
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 128, 128, 2, 2, 2
         self.latent_dim = self.token_num * self.hidden_rs
         
         input_dim = self.noise_dim * 2 + self.n_diff if self.args.diff_generator else self.noise_dim * 2
