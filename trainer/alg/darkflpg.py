@@ -52,7 +52,7 @@ def add_args(parser):
     
     parser.add_argument('--loss_type', default='ce-kd', type=str)
     parser.add_argument('--dm', default='loss', type=str)
-    parser.add_argument('--diff_client_gap', default=100, type=int)
+    parser.add_argument('--diff_client_gap', default=1, type=int)
     parser.add_argument('--diff_generator', action='store_true')
     
     parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
