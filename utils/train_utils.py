@@ -283,8 +283,8 @@ def difficulty_measure(exits_logits, label=None, metric='loss', rt_exits_diff=Fa
         for logits in exits_logits:
             probs = F.softmax(logits, dim=0)
             confidence = probs.max(dim=0, keepdim=False)[0]
-            confidences += (confidence.unsqueeze(0), )
-        diff_pred = (1-sum(confidences)/len(exits_logits))
+            confidences += (1-confidence.unsqueeze(0), )
+        diff_pred = (sum(confidences)/len(exits_logits))
         exits_diff = torch.cat(confidences)
         
     elif metric == 'cosine':

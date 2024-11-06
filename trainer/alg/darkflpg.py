@@ -116,6 +116,7 @@ class Client(BaseClient):
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
         self.client_crt_rnd += 1
     
+    
     def get_embedding(self,):
         self.model.eval()
         embedding_outputs = []
@@ -132,6 +133,7 @@ class Client(BaseClient):
 
 
 class Server(BaseServer):
+    
     def run(self):
         self.sample()
         self.downlink()
@@ -249,7 +251,7 @@ class Server(BaseServer):
             client.server = self
         
         self.max_exit_num = len(self.eq_exits[max(self.eq_depths)])
-        self.sw_net = MLP_tanh(input_size=self.max_exit_num, output_size=1, hidden_size=100).to(self.device)
+        self.sw_net = MLP_tanh(input_size=self.max_exit_num*3, output_size=1, hidden_size=100).to(self.device)
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
         
         
@@ -347,7 +349,8 @@ class Server(BaseServer):
             exits_diff = exits_diff[sample_index]
             t_diff = exits_diff
             for i, s_diff in enumerate(s_diff_exits):
-                exits_dis[i] = self.sw_net(torch.abs(t_diff - torch.mean(s_diff, dim=0)))
+                # exits_dis[i] = self.sw_net(torch.abs(t_diff - torch.mean(s_diff, dim=0)))
+                exits_dis[i] = self.sw_net(torch.cat((t_diff.unsqueeze(0), torch.mean(s_diff, dim=0, keepdim=True), torch.var(s_diff, dim=0, keepdim=True)), dim=1))
         else:
             diff = diff[sample_index]
             t_diff = diff
@@ -445,6 +448,7 @@ class Server(BaseServer):
                 self.progressive_train_model(diff_g, exits_diff_g, y_input_g)
         self.dm.load_state_dict(self.eq_model[self.max_depth].state_dict())
     
+    
     def train_generators(self, exits_diff_g, y_input_g):
         for g in self.generators.values():
             g[0].to(self.device)
@@ -519,8 +523,8 @@ class Server(BaseServer):
             # STT_LOSS += stt_loss
             
             optimizer.step()
-        # print(f'============{eq_depth} Super-local Model============')
-        # print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
+        print(f'============{eq_depth} Super-local Model============')
+        print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
     
 
     def progressive_train_model(self, diff_g, exits_diff_g, y_input_g):
