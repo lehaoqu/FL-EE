@@ -523,8 +523,8 @@ class Server(BaseServer):
             # STT_LOSS += stt_loss
             
             optimizer.step()
-        print(f'============{eq_depth} Super-local Model============')
-        print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
+        # print(f'============{eq_depth} Super-local Model============')
+        # print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
     
 
     def progressive_train_model(self, diff_g, exits_diff_g, y_input_g):
