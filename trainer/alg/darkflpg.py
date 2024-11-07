@@ -75,6 +75,7 @@ class Client(BaseClient):
     def train(self):
         self.sample_exits_diff = torch.zeros(len(self.dataset_train), self.server.max_exit_num).to(self.device)
         self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
+        self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         sample_idx = 0
         # eval diff distribution
         if self.client_crt_rnd % self.args.diff_client_gap == 0:    
@@ -89,6 +90,10 @@ class Client(BaseClient):
                         self.sample_exits_diff[sample_idx] = exits_diff
                         self.sample_y[sample_idx] = label[index]
                         self.diff_distribute[int(diff.cpu().item())] += 1
+                        if 'attention_mask' in data.keys():
+                            attention_mask = data['attention_mask'].cpu().tolist()
+                            sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                            self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
                         sample_idx += 1
         else:
             self.diff_distribute = self.diff_distribute
@@ -170,14 +175,17 @@ class Server(BaseServer):
         self.eq_diff = {}
         self.eq_exits_diff = {} # eq_depth 3: [tensor(10*4), tensor(10*4), tensor(10*4)]
         self.eq_y = {}
+        self.eq_sl = {}
         for client in self.sampled_clients:
             self.eq_diff.setdefault(client.eq_depth, []).append(client.diff_distribute)
             self.eq_exits_diff.setdefault(client.eq_depth, []).append(client.sample_exits_diff)
             self.eq_y.setdefault(client.eq_depth, []).append(client.sample_y)
+            self.eq_sl.setdefault(client.eq_depth, []).append(client.sample_sl)
             
         self.eq_exits_diff = {eq_depth: torch.cat(self.eq_exits_diff[eq_depth], dim=0) for eq_depth in self.eq_depths}
         self.eq_y = {eq_depth: torch.cat(self.eq_y[eq_depth], dim=0) for eq_depth in self.eq_depths}
-        
+        self.eq_sl = {eq_depth: torch.cat(self.eq_sl[eq_depth], dim=0) for eq_depth in self.eq_depths}
+
         for eq_depth in self.eq_depths:
             diff_distribute = [sum(column) for column in zip(*self.eq_diff[eq_depth])]
             diff_distribute = [diff/sum(diff_distribute) for diff in diff_distribute]
@@ -293,13 +301,16 @@ class Server(BaseServer):
             
             if self.args.dataset in GLUE:
                 # TODO two classes for GLUE
-                y_sl_distribute = {y:[sum(column) for column in zip(*[[sl*self.eq_num[eq] for sl in self.eq_y_sl[eq][y]] for eq in attend_eq])] for y in range(0,2)}
-                y_sl_distribute = {y: [sl/sum(y_sl_distribute[y]) for sl in y_sl_distribute[y]] for y in range(0, 2)}
-            
+                # y_sl_distribute = {y:[sum(column) for column in zip(*[[sl*self.eq_num[eq] for sl in self.eq_y_sl[eq][y]] for eq in attend_eq])] for y in range(0,2)}
+                # y_sl_distribute = {y: [sl/sum(y_sl_distribute[y]) for sl in y_sl_distribute[y]] for y in range(0, 2)}
+
+                sentence_lens = self.eq_sl[eq_depth][random_idxs]
                 attention_mask = ()
                 for i in range(self.args.bs):
-                    y = y_input.cpu().tolist()[i]
-                    sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
+                    # y = y_input.cpu().tolist()[i]
+                    # sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
+                    
+                    sentence_len = int(sentence_lens[i].cpu().item())
                     mask = torch.zeros(128)
                     mask[:sentence_len] = 1
                     attention_mask += (mask.to(self.device), )
