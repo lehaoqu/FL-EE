@@ -16,7 +16,7 @@ from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
-CLASSES = {'svhn':10, 'cifar100-224-d03': 100, 'cifar100-224-d03-1': 100, 'cifar100-224-d03-0.1': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+CLASSES = {'svhn':10, 'cifar100-224-d03': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
 
 class BaseClient:
@@ -36,7 +36,8 @@ class BaseClient:
         self.batch_size = args.bs
         self.epoch = args.epoch
         self.eq_depth = depth
-        self.model = model.to(self.device)
+        self.model = model
+        self.model_arch = copy.deepcopy(model)
         self.exits_num = len(self.exits)
         
         self.loss_func = nn.CrossEntropyLoss()
@@ -107,6 +108,7 @@ class BaseClient:
 
     def train(self):
         # === train ===
+        self.model.to(self.device)
         batch_loss = []
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
@@ -125,6 +127,12 @@ class BaseClient:
         
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+   
+   
+    def clearGPU(self):
+        del self.model
+        del self.optim
+        torch.cuda.empty_cache()
         
 
     def clone_model(self, target):
@@ -284,6 +292,10 @@ class BaseServer:
             for client in self.sampled_clients:
                 check_all_depths_sampled[client.eq_depth] = 1
 
+        for client in self.sampled_clients:
+            client.model = client.model_arch
+            client.reset_optimizer()
+
         for submodel_depth in self.eq_depths:
             for client in self.sampled_clients:
                 if client.eq_depth >= submodel_depth:
@@ -319,7 +331,7 @@ class BaseServer:
     def client_update(self):
         for client in self.sampled_clients:
             client.model.train()
-            client.reset_optimizer()
+            # client.reset_optimizer()
             start_time = time.time()
             client.run()
             end_time = time.time()
@@ -333,6 +345,8 @@ class BaseServer:
             self.received_params += ([client.model.parameters_to_tensor(is_split=True)[idx] * client.submodel_weights[submodel_depth]
                                 for client in self.sampled_submodel_clients[submodel_depth]],)
         self.uplink_policy()
+        for client in self.sampled_clients:
+            client.clearGPU()
               
     def uplink_policy(self):
         if self.eq_policy[max(self.eq_depths)].name == 'l2w':
