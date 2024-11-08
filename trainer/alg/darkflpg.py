@@ -15,7 +15,6 @@ from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
 from trainer.policy.l2w import MLP_tanh
 
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def add_args(parser):
     parser.add_argument('--is_latent', default=True, type=bool)
@@ -69,17 +68,17 @@ class Client(BaseClient):
         self.diff_distribute, self.sample_exits_diff = None, None
         self.client_crt_rnd = 0
         self.batch_num = len(self.loader_train)
-        self.args.diff_client_gap = 1 if self.args.diff_generator else self.args.diff_client_gap
+        self.args.diff_client_gap = self.args.diff_client_gap if self.args.diff_generator else 100
         
     
     def train(self):
         self.sample_exits_diff = torch.zeros(len(self.dataset_train), self.server.max_exit_num).to(self.device)
         self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
+        self.diff_distribute = [1 for _ in range(10)]
         sample_idx = 0
         # eval diff distribution
         if self.client_crt_rnd % self.args.diff_client_gap == 0:    
-            self.diff_distribute = [0 for _ in range(10)]
             for idx, data in enumerate(self.loader_train):
                 batch, label = self.adapt_batch(data)
                 with torch.no_grad():
@@ -95,9 +94,7 @@ class Client(BaseClient):
                             sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
                             self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
                         sample_idx += 1
-        else:
-            self.diff_distribute = self.diff_distribute
-            self.sample_exits_diff = self.sample_exits_diff
+
         
         # === train ===
         batch_loss = []
@@ -467,6 +464,8 @@ class Server(BaseServer):
         for model in self.models.values():
             model[0].to(self.device)
             model[0].eval() 
+        self.sw_net.to(self.device)
+        self.sw_net.eval()
         
         # == train generators ==
         for eq_depth, g in self.generators.items():
