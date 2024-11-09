@@ -60,7 +60,7 @@ class BaseClient:
         }
 
         self.training_time = None
-        self.lag_level = args.lag_level
+        self.lag_level = 1
         self.weight = 1
         self.submodel_weights = {}
         
@@ -335,7 +335,7 @@ class BaseServer:
             start_time = time.time()
             client.run()
             end_time = time.time()
-            client.training_time = (end_time - start_time) * client.lag_level
+            client.training_time = (end_time - start_time) * 1
         self.wall_clock_time += max([client.training_time for client in self.sampled_clients])
 
     def uplink(self):

@@ -13,7 +13,11 @@ from utils.train_utils import get_layer_idx
 
 class BaseModule(nn.Module):
     def __init__(self, *args, **kwargs):
+        if len(args) == 1:
+            self.blocks = args[0]
+        args=tuple()
         super().__init__(*args, **kwargs)
+
 
     def grads_to_named(self, layer_idx_range=None, include_IC=True)->Dict[str, torch.tensor]:
         named_grads = {}
@@ -28,9 +32,11 @@ class BaseModule(nn.Module):
             named_grads[name] = param.grad.detach()
         return named_grads
             
-    def parameters_to_tensor(self, blocks=(2,5,8,11), is_split=False, is_inclusivefl=False, is_scalefl=False, layers=None):
-        if is_inclusivefl: blocks = (1,4,7,11)
-        if is_scalefl: blocks = (3,6,9,11)
+    def parameters_to_tensor(self, blocks=None, is_split=False, is_inclusivefl=False, is_scalefl=False, layers=None):
+        if blocks is None: blocks=self.blocks
+        if is_inclusivefl: blocks = tuple(i-1 if i != max(blocks) else i for i in blocks)
+        if is_scalefl: blocks = tuple(i+1 if i!= max(blocks) else i for i in blocks)
+
         if is_split:
             tensors = ()
             block_idx = 0
@@ -58,7 +64,8 @@ class BaseModule(nn.Module):
                 return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
         
         
-    def split_state_dict(self, blocks=(2,5,8,11)):
+    def split_state_dict(self, blocks=None):
+        if blocks is None: blocks = self.blocks
         state_dict_tuple = ()
         block_idx = 0
         filter_state_dict = {}

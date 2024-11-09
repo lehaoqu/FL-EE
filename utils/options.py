@@ -33,15 +33,11 @@ def args_parser():
     parser.add_argument('--valid_gap', type=int, default=10, help='Rounds between two valid phases')
 
     # ===== Clients Heterogeneous Setting =====
-    parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')
-    parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs=4, help='device\'s depth')
-    parser.add_argument('--lag_level', type=int, default=3, help="Lag level used to simulate latency of device")
-    parser.add_argument('--lag_rate', type=float, default=0.3, help="Proportion of stale device")
-
-
-    # ===== Other Setting =====
-    # Asynchronous aggregation
-    parser.add_argument('--alpha', type=float, default=0.3, help='Weight decay')
+    # parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')
+    # parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs=4, help='device\'s depth')
+    
+    parser.add_argument('--eq_ratios', default=(2/12, 2/12, 2/12, 2/12, 2/12, 2/12), type=float, nargs=6, help='device\'s size ratio')
+    parser.add_argument('--eq_depths', default=(2, 4, 6, 8, 10, 12), type=int, nargs=6, help='device\'s depth')
     
     # ===== Eval Setting =====
     parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')

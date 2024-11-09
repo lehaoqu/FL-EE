@@ -6,6 +6,8 @@ import math
 import numpy as np
 import os
 import copy
+import warnings
+warnings.simplefilter('always', UserWarning)
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
@@ -56,6 +58,8 @@ def add_args(parser):
     
     parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
     parser.add_argument('--sw_type', default='soft', type=str, help='weight [soft | hard]')
+    
+    parser.add_argument('--exit_p', default=30, type=str, help='p of exit policy')
     return parser
 
 
@@ -225,7 +229,8 @@ class Server(BaseServer):
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
         self.kd_lr, self.kd_gap, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_gap, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
-        self.gamma = 0.99       
+        # self.gamma = self.args.gamma
+        self.gamma = 1
 
         
         # == relation KD loss for small to large ==
@@ -238,6 +243,7 @@ class Server(BaseServer):
         self.diff_criterion = nn.MSELoss()
         
         self.is_latent = args.is_latent
+        args.exits = self.global_model.config.exits
         
         # == train for generators (each exit has a generator) & eq_models ==
         self.generators = {}
@@ -249,7 +255,7 @@ class Server(BaseServer):
             
             optimizer = torch.optim.SGD(params=self.eq_model[eq_depth].parameters(), lr=self.kd_lr, weight_decay=1e-3)
             self.models[eq_depth] = [self.eq_model[eq_depth], optimizer]
-        self.p=30
+        self.p=self.args.exit_p
         
         # global model for clients
         for client in self.clients:
@@ -387,20 +393,20 @@ class Server(BaseServer):
         # get diff distribution of each global model exit: diff_exits
         s_diff_exits = []
         for i in range(s_exits_num):
-            selected_index = s_selected_index_list[i]
-            if self.args.sw == 'learn': s_diff_exits.append(exits_diff[selected_index])
-            else: s_diff_exits.append(diff.float()[selected_index])
+            s_selected_index = s_selected_index_list[i]
+            if self.args.sw == 'learn': s_diff_exits.append(exits_diff[s_selected_index])
+            else: s_diff_exits.append(diff.float()[s_selected_index])
         
         sum = 0
         for t_exit_idx in range(t_exits_num):
             if self.args.kd_join == 'last':
                 if t_exit_idx != t_exits_num-1: continue
-            selected_index = t_selected_index_list[t_exit_idx]
+            t_selected_index = t_selected_index_list[t_exit_idx]
             
             # == diff based weight == 
             # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
             weight_t_exits = torch.zeros(s_exits_num).to(self.device)
-            for sample_index in selected_index:
+            for sample_index in s_selected_index:
                 sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
                 for s_exit_idx in range(s_exits_num):
                     weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]

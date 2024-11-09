@@ -538,7 +538,7 @@ class ExitModel(BertPreTrainedModel, BaseModule):
     
     def __init__(self, config: ExitConfig):
         BertPreTrainedModel.__init__(self, config)
-        BaseModule.__init__(self,)
+        BaseModule.__init__(self, config.exits)
         self.num_labels = config.num_labels
         self.config = config
 
