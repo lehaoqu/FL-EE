@@ -100,7 +100,7 @@ class FedSim:
                 self.server.run()
 
                 # ===================== valid =====================
-                if rnd % valid_GAP:
+                if rnd % valid_GAP and rnd < 200:
                     continue
 
                 ret_dict = self.server.valid_all()
@@ -114,9 +114,9 @@ class FedSim:
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')
-                # acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
-                self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, loss: {ret_dict['loss']:.2f}, ")
-                self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
+                acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
+                self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, exits:{acc_exits} loss: {ret_dict['loss']:.2f}\n")
+                # self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()
 
         except KeyboardInterrupt:

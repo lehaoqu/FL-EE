@@ -23,6 +23,7 @@ def add_args(parser):
     parser.add_argument('--is_feature', default='False', type=str)
     
     parser.add_argument('--s_epoches', default=10, type=int)
+    parser.add_argument('--s_bs', default=32, type=int)
     parser.add_argument('--adaptive_epoches', default='False', type=str)
     
     parser.add_argument('--kd_skip', default=1, type=int)
@@ -296,9 +297,9 @@ class Server(BaseServer):
             diff_distribute = [diff/sum(diff_distribute) for diff in diff_distribute]
             # print(f'eq_depth{eq_depth}:{diff_distribute}')
             
-            diff = torch.tensor(random.choices(range(len(diff_distribute)), weights=diff_distribute, k=self.args.bs), dtype=torch.long).to(self.device)
+            diff = torch.tensor(random.choices(range(len(diff_distribute)), weights=diff_distribute, k=self.args.s_bs), dtype=torch.long).to(self.device)
             diff_g[eq_depth] = diff
-            random_idxs = torch.randint(0, self.eq_exits_diff[eq_depth].shape[0], (self.args.bs,))
+            random_idxs = torch.randint(0, self.eq_exits_diff[eq_depth].shape[0], (self.args.s_bs,))
             exits_diff_g[eq_depth] = self.eq_exits_diff[eq_depth][random_idxs]
             y_input = self.eq_y[eq_depth][random_idxs].view(-1)
             
@@ -309,7 +310,7 @@ class Server(BaseServer):
 
                 sentence_lens = self.eq_sl[eq_depth][random_idxs]
                 attention_mask = ()
-                for i in range(self.args.bs):
+                for i in range(self.args.s_bs):
                     # y = y_input.cpu().tolist()[i]
                     # sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
                     
