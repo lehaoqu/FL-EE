@@ -406,7 +406,7 @@ class Server(BaseServer):
             # == diff based weight == 
             # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
             weight_t_exits = torch.zeros(s_exits_num).to(self.device)
-            for sample_index in s_selected_index:
+            for sample_index in t_selected_index:
                 sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
                 for s_exit_idx in range(s_exits_num):
                     weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
