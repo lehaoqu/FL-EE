@@ -59,7 +59,8 @@ def add_args(parser):
     parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
     parser.add_argument('--sw_type', default='soft', type=str, help='weight [soft | hard]')
     
-    parser.add_argument('--exit_p', default=30, type=str, help='p of exit policy')
+    parser.add_argument('--exit_p', default=30, type=int, help='p of exit policy')
+    parser.add_argument('--s_gamma', default=0.99, type=float, help='decay of server lr')
     return parser
 
 
@@ -197,13 +198,13 @@ class Server(BaseServer):
         # == decay lr for generator & global model ==
         
         for eq_depth in self.eq_depths:
-            optimizer = torch.optim.Adam(params=self.generators[eq_depth][0].parameters(), lr=self.g_lr * (self.gamma ** self.round))
+            optimizer = torch.optim.Adam(params=self.generators[eq_depth][0].parameters(), lr=self.g_lr * (self.s_gamma ** self.round))
             self.generators[eq_depth][1] = optimizer
             
-            optimizer = torch.optim.SGD(params=self.models[eq_depth][0].parameters(), lr=self.kd_lr * (self.gamma ** self.round), weight_decay=1e-3)
+            optimizer = torch.optim.SGD(params=self.models[eq_depth][0].parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=1e-3)
             self.models[eq_depth][1] = optimizer
         
-        self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3 * (self.gamma ** self.round))
+        self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3 * (self.s_gamma ** self.round))
         
     
     def kd_criterion(self, pred, teacher):
@@ -229,8 +230,7 @@ class Server(BaseServer):
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
         self.kd_lr, self.kd_gap, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_gap, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
-        # self.gamma = self.args.gamma
-        self.gamma = 1
+        self.s_gamma = self.args.s_gamma
 
         
         # == relation KD loss for small to large ==

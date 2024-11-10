@@ -33,11 +33,9 @@ def args_parser():
     parser.add_argument('--valid_gap', type=int, default=10, help='Rounds between two valid phases')
 
     # ===== Clients Heterogeneous Setting =====
-    # parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs=4, help='device\'s size ratio')
-    # parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs=4, help='device\'s depth')
+    parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs='+', help='device\'s size ratio')
+    parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs='+', help='device\'s depth')
     
-    parser.add_argument('--eq_ratios', default=(2/12, 2/12, 2/12, 2/12, 2/12, 2/12), type=float, nargs=6, help='device\'s size ratio')
-    parser.add_argument('--eq_depths', default=(2, 4, 6, 8, 10, 12), type=int, nargs=6, help='device\'s depth')
     
     # ===== Eval Setting =====
     parser.add_argument('--if_mode', type=str, default='all', help='Mode of inference')
