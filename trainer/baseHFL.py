@@ -16,7 +16,7 @@ from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
-CLASSES = {'svhn':10, 'cifar100-224-d03': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+CLASSES = {'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
 
 class BaseClient:

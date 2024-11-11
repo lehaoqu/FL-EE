@@ -8,7 +8,7 @@ from trainer.baseHFL import BaseServer, BaseClient
 from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 
 def add_args(parser):
-    parser.add_argument('--T', type=float, default=3, help="kd T")
+    parser.add_argument('--T', type=float, default=2, help="kd T")
     return parser
 
 class Client(BaseClient):

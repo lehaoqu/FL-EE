@@ -9,7 +9,7 @@ from dataset import (
 GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 'wnli']
 
 
-CIFAR = 'cifar100-224-d03'
+CIFAR = 'cifar100'
 
 SVHN = 'svhn'
 
