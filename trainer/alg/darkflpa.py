@@ -6,8 +6,6 @@ import math
 import numpy as np
 import os
 import copy
-import warnings
-warnings.simplefilter('always', UserWarning)
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
@@ -16,6 +14,7 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
 from trainer.policy.l2w import MLP_tanh
+from trainer.alg.darkflpg import Client as DarkClient
 
 
 def add_args(parser):
@@ -67,75 +66,12 @@ def add_args(parser):
 
 
 
-class Client(BaseClient):
+class Client(DarkClient):
     
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
         super().__init__(id, args, dataset, model, depth, exits)
-        self.diff_distribute, self.sample_exits_diff = None, None
-        self.client_crt_rnd = 0
-        self.batch_num = len(self.loader_train)
-        self.args.diff_client_gap = self.args.diff_client_gap if self.args.diff_generator else 100
         
-    
-    def train(self):
-        self.sample_exits_diff = torch.zeros(len(self.dataset_train), self.server.max_exit_num).to(self.device)
-        self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
-        self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
-        self.diff_distribute = [1 for _ in range(10)]
-        sample_idx = 0
-        # eval diff distribution
-        if self.client_crt_rnd % self.args.diff_client_gap == 0:    
-            for idx, data in enumerate(self.loader_train):
-                batch, label = self.adapt_batch(data)
-                with torch.no_grad():
-                    dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
-                    dm_exits_logits = self.server.dm_policy(dm_exits_logits)
-                    for index in range(label.shape[0]):
-                        diff, exits_diff = difficulty_measure([dm_exits_logits[i][index] for i in range(len(dm_exits_logits))], label[index], metric=self.args.dm, rt_exits_diff=True)
-                        self.sample_exits_diff[sample_idx] = exits_diff
-                        self.sample_y[sample_idx] = label[index]
-                        self.diff_distribute[int(diff.cpu().item())] += 1
-                        if 'attention_mask' in data.keys():
-                            attention_mask = data['attention_mask'].cpu().tolist()
-                            sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
-                            self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
-                        sample_idx += 1
-
         
-        # === train ===
-        batch_loss = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                self.optim.zero_grad()
-
-                batch, label = self.adapt_batch(data)
-                
-                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
-                    self.policy.train_meta(self.model, batch, label, self.optim)
-
-                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
-                ce_loss = sum(exits_ce_loss)
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item()) 
-        # print(self.diff_distribute)
-                    
-        # === record loss ===
-        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
-        self.client_crt_rnd += 1
-    
-    
-    def get_embedding(self,):
-        self.model.eval()
-        embedding_outputs = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                batch, label = self.adapt_batch(data)
-                batch['rt_embedding'] = True
-                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
-        return embedding_outputs
-        
-
     def run(self):
         self.train()
 
@@ -149,9 +85,8 @@ class Server(BaseServer):
         self.train_distribute()
         self.uplink()
         self.aggregate_eq()
-        if self.args.agg == 'before': self.heterogeneous_agg()
+        self.heterogeneous_agg()
         self.finetune()
-        if self.args.agg == 'after': self.heterogeneous_agg()
         self.lr_scheduler()
         self.crt_epoch += 1 
    
@@ -220,7 +155,6 @@ class Server(BaseServer):
     def __init__(self, id, args, dataset, clients, eq_model=None, global_model=None, eq_exits=None):
         super().__init__(id, args, dataset, clients, eq_model, global_model, eq_exits)
         
-        self.global_model = self.eq_model[max(self.eq_depths)]
         # self.dm = self.eq_model[min(self.eq_depths)]
         # self.dm_policy = self.eq_policy[max(self.eq_depths)]
         self.dm = copy.deepcopy(self.eq_model[max(self.eq_depths)] )
@@ -248,14 +182,12 @@ class Server(BaseServer):
         
         # == train for generators (each exit has a generator) & eq_models ==
         self.generators = {}
-        self.models = {}
         for eq_depth in self.eq_depths:
             generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             self.generators[eq_depth] = [generator, optimizer]
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
             
-            optimizer = torch.optim.SGD(params=self.eq_model[eq_depth].parameters(), lr=self.kd_lr, weight_decay=1e-3)
-            self.models[eq_depth] = [self.eq_model[eq_depth], optimizer]
         self.p=self.args.exit_p
         
         # global model for clients
@@ -548,9 +480,8 @@ class Server(BaseServer):
         # == finetune eq model , multi teacher to teach each exit ==
         for g in self.generators.values():
             g[0].eval()
-        for model in self.models.values():
-            model[0].to(self.device)
-            model[0].train()
+        self.global_model.to(self.device)
+        self.global_model.train()
         self.sw_net.to(self.device)
         self.sw_net.train()
         
@@ -562,12 +493,13 @@ class Server(BaseServer):
         # == finetune eq model
         Losses = []
         for _ in range(n_iters):
-            for model in self.models.values():
-                model[1].zero_grad()
+            self.global_optimizer.zero_grad()
             self.sw_optim.zero_grad()
         
             # == super-sub model teach eq model ==
             Loss = 0.0
+            
+            
             
             sl_Loss = 0.0
             if 'sl' in self.args.kd_direction:
@@ -708,10 +640,9 @@ class Server(BaseServer):
                 depth_weighted_tensor[idx] = depth_weighted_tensor.get(idx, 0.0) + tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[self.eq_depths[idx]]
         
         aggregated_tensors = list(depth_weighted_tensor.values())
-        for idx, eq_depth in enumerate(self.eq_depths):
-            aggregated_tensor = torch.cat(aggregated_tensors[:idx+1], 0)
-            eq_model: BaseModule = self.eq_model[eq_depth]
-            eq_model.tensor_to_parameters(aggregated_tensor)
+        
+        aggregated_tensor = torch.cat(aggregated_tensors, 0)
+        self.global_model.tensor_to_parameters(aggregated_tensor)
             
         
     def save_model(self, model_save_path, generator_save_path):
