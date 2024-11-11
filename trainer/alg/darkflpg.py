@@ -19,49 +19,45 @@ from trainer.policy.l2w import MLP_tanh
 
 
 def add_args(parser):
-    parser.add_argument('--is_latent', default=True, type=bool)
-    parser.add_argument('--is_feature', default='False', type=str)
+    parser.add_argument('--is_latent',              default=True, type=bool)
     
-    parser.add_argument('--s_epoches', default=10, type=int)
-    parser.add_argument('--s_bs', default=32, type=int)
-    parser.add_argument('--adaptive_epoches', default='False', type=str)
+    parser.add_argument('--s_epoches',              default=10, type=int)
+    parser.add_argument('--s_bs',                   default=32, type=int)
+    parser.add_argument('--adaptive_epoches',       default='False', type=str)
     
-    parser.add_argument('--kd_skip', default=1, type=int)
-    parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
-    parser.add_argument('--kd_response_ratio', default=3, type=float)
-    parser.add_argument('--kd_dist_ratio', default=5, type=float)
-    parser.add_argument('--kd_angle_ratio', default=10, type=float)
-    parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
-    parser.add_argument('--gap_kd_lambda', default=1, type=float)
-    parser.add_argument('--kd_frozen', action='store_true')
-    parser.add_argument('--kd_gap', default=1, type=float)
+    parser.add_argument('--kd_skip',                default=1, type=int)
+    parser.add_argument('--kd_begin',               default=0, type=int)
+    parser.add_argument('--kd_lr',                  default=5e-2, type=float)
+    parser.add_argument('--kd_response_ratio',      default=3, type=float)
+    parser.add_argument('--kd_dist_ratio',          default=5, type=float)
+    parser.add_argument('--kd_angle_ratio',         default=10, type=float)
+    parser.add_argument('--kd_dark_ratio',          default=0, type=float)
+    parser.add_argument('--kd_n_iters',             default=5, type=int)
+    parser.add_argument('--kd_gap',                 default=1, type=float)
     
-    parser.add_argument('--g_skip', default=1, type=int)
-    parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_lr', default=1e-2, type=float)
-    parser.add_argument('--g_y', default=1, type=float)
-    parser.add_argument('--g_div', default=1, type=float)
-    parser.add_argument('--g_gap', default=1, type=float)
-    parser.add_argument('--g_diff', default=1, type=float)
-    parser.add_argument('--g_n_iters', default=1, type=int)
+    parser.add_argument('--g_skip',                 default=1, type=int)
+    parser.add_argument('--g_begin',                default=0, type=int)
+    parser.add_argument('--g_lr',                   default=1e-2, type=float)
+    parser.add_argument('--g_y',                    default=1, type=float)
+    parser.add_argument('--g_div',                  default=1, type=float)
+    parser.add_argument('--g_gap',                  default=0, type=float)
+    parser.add_argument('--g_diff',                 default=1, type=float)
+    parser.add_argument('--g_n_iters',              default=1, type=int)
 
-    parser.add_argument('--kd_direction', default='sl', type=str)
-    parser.add_argument('--kd_join', default='last', type=str, help='last: only last exit of teacher can teach student model\'s exits')
-    parser.add_argument('--kd_knowledge', default='relation', type=str)
-    parser.add_argument('--agg', default='after', type=str)
+    parser.add_argument('--kd_direction',           default='sl', type=str)
+    parser.add_argument('--kd_join',                default='last', type=str, help='last: only last exit of teacher can teach student model\'s exits')
+    parser.add_argument('--agg',                    default='after', type=str)
     
-    parser.add_argument('--loss_type', default='ce-kd', type=str)
-    parser.add_argument('--dm', default='loss', type=str)
-    parser.add_argument('--diff_client_gap', default=1, type=int)
-    parser.add_argument('--diff_generator', action='store_true')
+    parser.add_argument('--loss_type',              default='kd', type=str)
+    parser.add_argument('--dm',                     default='loss', type=str)
+    parser.add_argument('--diff_client_gap',        default=1, type=int)
+    parser.add_argument('--diff_generator',         action='store_true')
     
-    parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
-    parser.add_argument('--sw_type', default='soft', type=str, help='weight [soft | hard]')
+    parser.add_argument('--sw',                     default='learn', type=str, help='how to get weight for students [learn | distance]')
+    parser.add_argument('--sw_type',                default='soft', type=str, help='weight [soft | hard]')
     
-    parser.add_argument('--exit_p', default=30, type=int, help='p of exit policy')
-    parser.add_argument('--s_gamma', default=0.99, type=float, help='decay of server lr')
+    parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
+    parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
     return parser
 
 
@@ -227,7 +223,6 @@ class Server(BaseServer):
         self.dm_policy = self.eq_policy[max(self.eq_depths)]
         self.clients_embeddings = []
         # == args ==
-        self.is_feature = args.is_feature
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
         self.kd_lr, self.kd_gap, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_gap, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
@@ -442,7 +437,7 @@ class Server(BaseServer):
                         s, t = s_logits, t_logits.detach()
                         gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
                         
-                gap_loss += gap_ce_loss + self.args.gap_kd_lambda*gap_kd_loss
+                gap_loss += gap_ce_loss + gap_kd_loss
                 
         gap_loss = gap_loss / sum
         return gap_loss

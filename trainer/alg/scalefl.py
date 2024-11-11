@@ -8,12 +8,14 @@ from trainer.baseHFL import BaseServer, BaseClient
 from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 
 def add_args(parser):
+    parser.add_argument('--T', type=float, default=3, help="kd T")
     return parser
 
 class Client(BaseClient):
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
         super().__init__(id, args, dataset, model, depth, exits)
         # self.scale_width = args.scale_width
+        self.T = self.args.T
         depth = min(12, self.eq_depth+1)
         self.width_scale = self.eq_depth / depth
         origin_hidden_size = args.origin_width[0]
@@ -27,11 +29,10 @@ class Client(BaseClient):
     
     def train(self):
         
-        def kd_loss_func(pred, teacher):
+        def kd_loss_func(pred, teacher, T=self.T):
             kld_loss = nn.KLDivLoss(reduction='batchmean')
             log_softmax = nn.LogSoftmax(dim=-1)
             softmax = nn.Softmax(dim=1)
-            T=3
             _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
             return _kld
         

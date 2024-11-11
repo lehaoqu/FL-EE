@@ -4,19 +4,24 @@ import torch.nn as nn
 from trainer.baseHFL import BaseServer, BaseClient
 
 def add_args(parser):
+    parser.add_argument('--T', type=float, default=1, help="kd T")
     return parser
 
 class Client(BaseClient):
+    
+    def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
+        super().__init__(id, args, dataset, model, depth, exits)
+        self.T = args.T
+        
     def run(self):
         self.train()
     
     def train(self):
         
-        def kd_loss_func(pred, teacher):
+        def kd_loss_func(pred, teacher, T=self.T):
             kld_loss = nn.KLDivLoss(reduction='batchmean')
             log_softmax = nn.LogSoftmax(dim=-1)
             softmax = nn.Softmax(dim=1)
-            T=3
             _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
             return _kld
         
