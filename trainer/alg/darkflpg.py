@@ -21,7 +21,7 @@ from trainer.policy.l2w import MLP_tanh
 def add_args(parser):
     parser.add_argument('--is_latent',              default=True, type=bool)
     
-    parser.add_argument('--s_epoches',              default=10, type=int)
+    parser.add_argument('--s_epoches',              default=2, type=int)
     parser.add_argument('--s_bs',                   default=32, type=int)
     parser.add_argument('--adaptive_epoches',       default='False', type=str)
     
@@ -51,7 +51,7 @@ def add_args(parser):
     parser.add_argument('--loss_type',              default='kd', type=str)
     parser.add_argument('--dm',                     default='loss', type=str)
     parser.add_argument('--diff_client_gap',        default=1, type=int)
-    parser.add_argument('--diff_generator',         action='store_true')
+    parser.add_argument('--diff_generator',         action='store_false')
     
     parser.add_argument('--sw',                     default='learn', type=str, help='how to get weight for students [learn | distance]')
     parser.add_argument('--sw_type',                default='soft', type=str, help='weight [soft | hard]')

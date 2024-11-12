@@ -4,7 +4,7 @@ import torch.nn as nn
 from trainer.baseHFL import BaseServer, BaseClient
 
 def add_args(parser):
-    parser.add_argument('--T', type=float, default=2, help="kd T")
+    parser.add_argument('--T', type=float, default=1, help="kd T")
     return parser
 
 class Client(BaseClient):

@@ -8,7 +8,7 @@ bs=32
 lr=0.05
 suffix=$1
 noniid=$2
-algs=(eefl depthfl darkflpg)
+algs=(darkflpg)
 policies=(boosted base)
 
 for alg in "${algs[@]}"
