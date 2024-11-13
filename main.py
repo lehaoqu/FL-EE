@@ -100,7 +100,9 @@ class FedSim:
                 self.server.run()
 
                 # ===================== valid =====================
-                if rnd % valid_GAP and rnd < 200:
+                if rnd > 200:
+                    valid_GAP = 2 if self.args.alg != 'darkflpg' else 1
+                if rnd % valid_GAP:
                     continue
 
                 ret_dict = self.server.valid_all()

@@ -30,7 +30,7 @@ from sklearn.model_selection import train_test_split
 
 random.seed(1)
 np.random.seed(1)
-num_clients = 120
+num_clients = 100
 dir_path = "dataset/cifar100_noniid0.1/"
 train_ratio = 0.8
 

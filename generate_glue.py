@@ -17,7 +17,7 @@ from dataset.glue_dataset import GLUEClassificationDataset
 
 random.seed(1)
 np.random.seed(1)
-num_clients = 120
+num_clients = 100
 dir_path = "dataset/glue/"
 train_ratio = 0.8
 
@@ -124,6 +124,6 @@ if __name__ == "__main__":
             use_fast=False,
         )
     # for task in ['sst2']:
-    # for task in ['sst2', 'mrpc', 'qqp', 'qnli']:
-    for task in ['qqp']:
+    for task in ['sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli']:
+    # for task in ['qqp']:
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)

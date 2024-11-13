@@ -91,7 +91,7 @@ class ViTExitLayer(nn.Module):
         self.exit = True if index in config.exits else False
         if self.exit:
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-            self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.classifier_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
         self.attention = ViTAttention(config)
@@ -128,10 +128,10 @@ class ViTExitLayer(nn.Module):
             exit_idx = self.config.exits.index(self.layer_index)
             if self.config.policy == 'base' or self.config.policy == 'l2w':
                 layer_output_cls = layer_output
-                logits = self.classifier(self.layernorm(layer_output_cls)[:, 0, :])
+                logits = self.classifier(self.classifier_layernorm(layer_output_cls)[:, 0, :])
             elif self.config.policy == 'boosted':
                 layer_output_cls = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
-                in_cls = self.layernorm(layer_output_cls)[:, 0, :]
+                in_cls = self.classifier_layernorm(layer_output_cls)[:, 0, :]
                 logits = self.classifier(in_cls)
                 layer_output = gradient_rescale(layer_output_cls, len(self.config.exits) - exit_idx - 1)
                 

@@ -193,8 +193,8 @@ class BertExitLayer(nn.Module):
         self.layer_index = index
         self.exit = True if index in config.exits else False
         if self.exit:
-            self.pooler = BertPooler(config)
-            self.dropout = nn.Dropout(config.hidden_dropout_prob)
+            self.classifier_pooler = BertPooler(config)
+            self.classifier_dropout = nn.Dropout(config.hidden_dropout_prob)
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
@@ -270,11 +270,11 @@ class BertExitLayer(nn.Module):
         if self.exit is True:
             exit_idx = self.config.exits.index(self.layer_index)
             if self.config.policy == 'base' or self.config.policy == 'l2w':
-                f = self.dropout(self.pooler(layer_output))
+                f = self.classifier_dropout(self.classifier_pooler(layer_output))
                 logits = self.classifier(f)
             elif self.config.policy == 'boosted':
                 layer_output = gradient_rescale(layer_output, 1.0/(len(self.config.exits) - exit_idx))
-                f = self.dropout(self.pooler(layer_output))
+                f = self.classifier_dropout(self.classifier_pooler(layer_output))
                 logits = self.classifier(f)
                 layer_output = gradient_rescale(layer_output, len(self.config.exits) - exit_idx - 1)
             
