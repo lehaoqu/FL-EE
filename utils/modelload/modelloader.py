@@ -5,6 +5,7 @@ import importlib
 from transformers import AutoTokenizer
 from utils.modelload.model import *
 from utils.train_utils import *
+from peft import PeftModel, PeftConfig, get_peft_model, LoraConfig, TaskType
 
 MNIST = 'mnist'
 CIFAR10 = 'cifar10'
@@ -103,6 +104,22 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     if args.load_path != '':
         existing_model = torch.load(args.load_path)
         model.load_state_dict(existing_model, strict=False)
+        
+    if args.ft == 'classifier':
+        for n, p in model.named_parameters():
+            if 'classifier' not in n:
+                p.requires_grad = False
+    elif args.ft == 'lora':
+        peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=4, lora_alpha=32, lora_dropout=0.01, target_modules=['query', 'value'])
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
+        for n, p in model.named_parameters():
+            if 'classifier' in n:
+                p.requires_grad = True
+                        
+    # for n, p in model.named_parameters():
+    #     print(n, p.requires_grad)
+    # exit(0)
     return model
 
 def load_model_eval(args, model_path, config_path=None):

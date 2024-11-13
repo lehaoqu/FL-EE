@@ -329,6 +329,12 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         rt_embedding:Optional[bool]=False,
         rt_feature:Optional[bool]=False,
         frozen:Optional[bool]=False,
+        input_ids=None, 
+        attention_mask=None,
+        inputs_embeds=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
         outputs = self.vit(

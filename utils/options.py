@@ -16,6 +16,7 @@ def args_parser():
     parser.add_argument('--config_path', type=str, default='models/facebook/deit-tiny-patch16-224')
 
     # ===== Training Setting =====
+    parser.add_argument('--ft', type=str, default='full', help="full | classifer | lora")
     parser.add_argument('--load_path', type=str, default='', help="pretrained model load path")
     parser.add_argument('--seed', type=int, default=1117, help="seed")
     parser.add_argument('--total_num', type=int, default=120, help="Total clients num")
