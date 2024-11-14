@@ -64,7 +64,7 @@ class BaseModule(nn.Module):
                 return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
         
         
-    def split_state_dict(self, blocks=None):
+    def split_state_dict(self, blocks=None, ft='full'):
         if blocks is None: blocks = self.blocks
         state_dict_tuple = ()
         block_idx = 0
@@ -75,6 +75,8 @@ class BaseModule(nn.Module):
                 state_dict_tuple += (filter_state_dict,)
                 block_idx += 1
                 filter_state_dict = {}
+            if ft == 'lora':
+                name = 'base_model.model.'+name    
             filter_state_dict[name] = param
         if filter_state_dict != {}:
             state_dict_tuple += (filter_state_dict,)

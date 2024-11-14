@@ -100,7 +100,7 @@ class Server(BaseServer):
         self.received_params = ()
 
         for idx, submodel_depth in enumerate(self.eq_depths):
-            self.received_params += ([{'state_dict': client.model.split_state_dict(blocks=self.global_model.config.exits)[idx], 'sample': len(client.dataset_train)} for client in self.sampled_submodel_clients[submodel_depth]],)
+            self.received_params += ([{'state_dict': client.model.split_state_dict(blocks=self.global_model.config.exits, ft=self.args.ft)[idx], 'sample': len(client.dataset_train)} for client in self.sampled_submodel_clients[submodel_depth]],)
         
         self.uplink_policy()
         
