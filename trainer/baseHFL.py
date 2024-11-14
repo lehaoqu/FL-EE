@@ -201,6 +201,7 @@ class BaseServer:
         # super().__init__(id, args, dataset)
         self.args = args
         self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True)
+        self.test_dataset,  self.test_dataloader  = load_dataset_loader(args=args, file_name='test', shuffle=False)
         self.eq_exits = eq_exits
         self.client_num = args.total_num
         self.sample_rate = args.sr
@@ -429,3 +430,42 @@ class BaseServer:
         
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)
+ 
+        
+    def calc_logits(self, best_model):
+        dataloader = self.test_dataloader
+        best_model.eval()
+        all_sample_exits_logits = [[] for _ in range(self.max_exit)]
+        all_sample_targets = []
+        for i, data in enumerate(dataloader):           
+            batch, y = self.adapt_batch(data)
+            
+            all_sample_targets.append(y)
+            with torch.no_grad():
+                exits_logits = self.eq_policy[self.max_depth](best_model(**batch))
+                for i, exit_logits in enumerate(exits_logits):
+                    # _t = self.softmax(exit_logits)
+                    # all_sample_exits_logits[i].append(_t)
+                    all_sample_exits_logits[i].append(exit_logits)
+        
+        for i in range(self.max_exit):
+            all_sample_exits_logits[i] = torch.cat(all_sample_exits_logits[i], dim=0)
+        
+        size = (len(all_sample_exits_logits), all_sample_exits_logits[0].size(0), all_sample_exits_logits[0].size(1))
+        ts_preds = torch.zeros(size=size).to(self.device)
+        for i in range(len(all_sample_exits_logits)):
+            ts_preds[i] = all_sample_exits_logits[i]
+            
+        all_sample_targets = torch.cat(all_sample_targets, dim=0)
+        self.test_exits_preds, self.test_targets, self.test_all_sample_exits_logits = ts_preds, all_sample_targets, all_sample_exits_logits
+        return 
+
+    def anytime(self, output):
+        crt_list = [0 for _ in range(self.max_exit)]
+        for i in range(self.max_exit):
+            _, predicted = torch.max(self.test_exits_preds[i], 1)
+            crt_list[i] += (predicted == self.test_targets).sum().item()
+        
+        acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.max_exit)]
+        output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, sum(acc_list) / len(acc_list)))
+        output.flush()

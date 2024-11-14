@@ -99,6 +99,7 @@ class Client(BaseClient):
 
         
         # === train ===
+        self.model.to(self.device)
         batch_loss = []
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):

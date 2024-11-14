@@ -61,7 +61,7 @@ class FedSim:
         # exits = (i-1 for i in args.eq_depths)
         # if args.alg == 'scalefl': exits = (i+1 for _, i in enumerate(exits) if _!=len(exits-1))
         # exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
-        exits = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i-1 if i != max(args.eq_depths) else i for i in args.eq_depths)
+        exits = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
         if args.alg != 'heterofl': eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
         else: eq_exits = {eq_depth: exits for eq_depth in args.eq_depths}
         
@@ -111,8 +111,8 @@ class FedSim:
                     best_acc = ret_dict['acc']
                     best_rnd = rnd
                     self.server.save_model(self.model_save_path, self.generator_save_path)
-                    
-                    
+                    best_model = copy.deepcopy(self.server.global_model)
+                    best_model.to(self.args.device)
 
                 self.output.write(f'========== Round {rnd} ==========\n')
                 # print(f'========== Round {rnd} ==========\n')
@@ -138,6 +138,8 @@ class FedSim:
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
 
+            self.server.calc_logits(best_model)
+            self.server.anytime(self.output)
             # self.res_output.write(f'{self.args.alg}, best_rnd: {best_rnd}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
 
 
