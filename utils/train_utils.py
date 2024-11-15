@@ -149,10 +149,13 @@ class RkdDistance(nn.Module):
         return loss
 
 
-def get_layer_idx(name):
+def get_layer_idx(name, ft='full'):
     layer_idx = 0
     if 'vit.encoder.layer' in name or 'bert.encoder.layer' in name:
-        layer_idx = name.split('.')[3]
+        if ft == 'full':
+            layer_idx = name.split('.')[3]
+        elif ft == 'lora':
+            layer_idx = name.split('.')[5]
     return int(layer_idx)
 
 

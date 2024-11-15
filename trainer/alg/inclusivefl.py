@@ -68,9 +68,9 @@ class Server(BaseServer):
         for (name, param) in state_dict.items():
             if layer_idx_range is not None:
                 if len(layer_idx_range) == 1:
-                    if get_layer_idx(name) != layer_idx_range[0]: continue
+                    if get_layer_idx(name, self.args.ft) != layer_idx_range[0]: continue
                 else:
-                    if get_layer_idx(name) not in tuple(range(layer_idx_range)): continue
+                    if get_layer_idx(name, self.args.ft) not in tuple(range(layer_idx_range)): continue
             if 'classifier' in name and include_IC is False: continue
             params.append(param.view(-1))
         return torch.nan_to_num(torch.cat(params, 0), nan=0.0, posinf=0.0, neginf=0.0)
@@ -184,7 +184,7 @@ class Server(BaseServer):
         eq_tensors = {}
         for eq_depth in self.eq_depths:
             eq_model = self.eq_model[eq_depth]
-            tensors = eq_model.parameters_to_tensor(is_split=True, is_inclusivefl=True)
+            tensors = eq_model.parameters_to_tensor(is_split=True, is_inclusivefl=True, blocks=self.global_model.config.exits)
             eq_tensors[eq_depth] = tensors
             for idx in range(len(tensors)-1):
                 depth_weighted_tensor[idx] = depth_weighted_tensor.get(idx, 0.0) + tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[self.eq_depths[idx]]

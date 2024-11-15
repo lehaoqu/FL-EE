@@ -35,7 +35,6 @@ class BaseModule(nn.Module):
     def parameters_to_tensor(self, blocks=None, is_split=False, is_inclusivefl=False, is_scalefl=False, layers=None):
         if blocks is None: blocks=self.blocks
         if is_inclusivefl: blocks = tuple(i-1 if i != max(blocks) else i for i in blocks)
-        if is_scalefl: blocks = tuple(i+1 if i!= max(blocks) else i for i in blocks)
 
         if is_split:
             tensors = ()

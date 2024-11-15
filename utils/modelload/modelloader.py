@@ -111,11 +111,11 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             if 'classifier' not in n:
                 p.requires_grad = False
     elif args.ft == 'lora':
-        peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=4, lora_alpha=32, lora_dropout=0.01, target_modules=['query', 'value'])
+        peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
         for n, p in model.named_parameters():
-            if 'classifier' in n:
+            if 'classifier' in n or 'accumulator' in n:
                 p.requires_grad = True
                         
     # for n, p in model.named_parameters():
