@@ -7,11 +7,8 @@ md=vit
 bs=32
 lr=0.05
 declare -a eq_ratios
-noniids=(1 0.1)
+noniids=(1000 1 0.1)
 
-if [ "$2" == "lora" ]; then
-        lr=0.005
-fi
 
 if [ "$3" == "small" ]; then
         eq_ratios="0.4 0.3 0.2 0.1"
