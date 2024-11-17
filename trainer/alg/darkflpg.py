@@ -567,6 +567,7 @@ class Server(BaseServer):
             
             sl_Loss = 0.0
             if 'sl' in self.args.kd_direction:
+                teacher_sum = sum([self.eq_num[eq_depth] for eq_depth in self.eq_depths[:-1]])
                 for idx, eq_depth in enumerate(self.eq_depths):
                     if eq_depth == max(self.eq_depths): continue
                     t_model = self.eq_model[self.eq_depths[idx]]
@@ -601,7 +602,7 @@ class Server(BaseServer):
                     
                     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                     s_exits_logits = s_policy(s_exits_logits)
-                    sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
+                    sl_Loss += self.kd_gap * self.eq_num[eq_depth]/teacher_sum * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
                 
             ls_Loss = 0.0
             if 'ls' in self.args.kd_direction:
