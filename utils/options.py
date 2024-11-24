@@ -19,7 +19,7 @@ def args_parser():
     parser.add_argument('--ft', type=str, default='full', help="full | classifer | lora")
     parser.add_argument('--load_path', type=str, default='', help="pretrained model load path")
     parser.add_argument('--seed', type=int, default=1117, help="seed")
-    parser.add_argument('--total_num', type=int, default=120, help="Total clients num")
+    parser.add_argument('--total_num', type=int, default=100, help="Total clients num")
     parser.add_argument('--sr', type=float, default=0.3, help="Clients sample rate")
     parser.add_argument('--suffix', type=str, default='default', help="Suffix for file")
     parser.add_argument('--device', type=int, default=0, help="Device to use")
@@ -36,6 +36,7 @@ def args_parser():
     # ===== Clients Heterogeneous Setting =====
     parser.add_argument('--eq_ratios', default=(3/12, 3/12, 3/12, 3/12), type=float, nargs='+', help='device\'s size ratio')
     parser.add_argument('--eq_depths', default=(3, 6, 9, 12), type=int, nargs='+', help='device\'s depth')
+    parser.add_argument('--multi_exit', action='store_true', help='exits is 12 or not')
     
     
     # ===== Eval Setting =====

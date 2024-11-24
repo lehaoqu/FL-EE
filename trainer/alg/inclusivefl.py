@@ -184,7 +184,7 @@ class Server(BaseServer):
         eq_tensors = {}
         for eq_depth in self.eq_depths:
             eq_model = self.eq_model[eq_depth]
-            tensors = eq_model.parameters_to_tensor(is_split=True, is_inclusivefl=True, blocks=self.global_model.config.exits)
+            tensors = eq_model.parameters_to_tensor(is_split=True, is_inclusivefl=True, blocks=self.global_model.config.blocks)
             eq_tensors[eq_depth] = tensors
             for idx in range(len(tensors)-1):
                 depth_weighted_tensor[idx] = depth_weighted_tensor.get(idx, 0.0) + tensors[idx] * self.eq_num[eq_depth]/self.larger_eq_total_num[self.eq_depths[idx]]

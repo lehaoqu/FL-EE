@@ -58,7 +58,7 @@ class Generator_LATENT(BaseModule):
         self.device = args.device if args is not None else 0
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
-        if 'cifar' in args.dataset:
+        if 'cifar' in args.dataset or 'svhn' in args.dataset:
             if 'tiny' in args.config_path:
                 self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 197, 192, 100, 100, 100
             elif 'small' in args.config_path:

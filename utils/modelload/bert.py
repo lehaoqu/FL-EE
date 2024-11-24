@@ -49,6 +49,7 @@ class ExitConfig(BertConfig):
             self,
             config,
             exits=None,
+            blocks=None,
             num_labels=None,
             base_model=None,
             classifier_archi=None,
@@ -76,6 +77,7 @@ class ExitConfig(BertConfig):
             **kwargs,
         )
         self.exits = exits if exits is not None else tuple(range(config.num_hidden_layers))
+        self.blocks = blocks
         self.base_model = base_model
         self.num_labels = num_labels if num_labels is not None else 2
         self.classifier_atchi = classifier_archi
@@ -538,7 +540,7 @@ class ExitModel(BertPreTrainedModel, BaseModule):
     
     def __init__(self, config: ExitConfig):
         BertPreTrainedModel.__init__(self, config)
-        BaseModule.__init__(self, config.exits)
+        BaseModule.__init__(self, config.blocks)
         self.num_labels = config.num_labels
         self.config = config
 

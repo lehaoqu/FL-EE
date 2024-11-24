@@ -58,7 +58,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             eq_config.num_hidden_layers = depth
             eq_config.hidden_size = int(eq_config.hidden_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
             eq_config.intermediate_size = int(eq_config.intermediate_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
-            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=args.policy, alg=args.alg) 
+            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=args.policy, alg=args.alg, blocks=args.blocks) 
             model = based_model.ExitModel(eq_exit_config)
             
             origin_target = {pre_model.config.hidden_size: eq_config.hidden_size, pre_model.config.intermediate_size: eq_config.intermediate_size}
@@ -76,7 +76,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         else:
             eq_config.num_hidden_layers = model_depth
             
-            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=args.policy, alg=args.alg) 
+            eq_exit_config = based_model.ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=args.policy, alg=args.alg, blocks=args.blocks) 
             model = based_model.ExitModel(eq_exit_config)
             model.load_state_dict(pre_model.state_dict(), strict=False)
 

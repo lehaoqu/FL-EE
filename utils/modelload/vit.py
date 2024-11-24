@@ -51,6 +51,7 @@ class ExitConfig(ViTConfig):
         self,
         config, 
         exits=None,
+        blocks=None,
         num_labels=None,
         base_model=None,
         alg=None,
@@ -75,6 +76,7 @@ class ExitConfig(ViTConfig):
             **kwargs
         )
         self.exits = exits if exits is not None else tuple(range(config.num_hidden_layers))
+        self.blocks = blocks
         self.classifier_dropout = 0.0
         self.num_labels = num_labels
         self.base_model = base_model
@@ -306,7 +308,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
     
     def __init__(self, config: ExitConfig) -> None:
         ViTPreTrainedModel.__init__(self, config)
-        BaseModule.__init__(self, config.exits)
+        BaseModule.__init__(self, config.blocks)
 
         self.num_labels = config.num_labels
         # if config.classifier_archi == 'ree':
