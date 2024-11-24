@@ -23,22 +23,38 @@ import torch
 import torch.utils
 import torch.utils.data
 import torchvision
+import pickle
 import torchvision.transforms as transforms
 from dataset.utils.dataset_utils import check, separate_data, split_data, save_file, save_origin_file, load_pkl
-from dataset.cifar100_dataset import CIFARClassificationDataset
+from dataset.imagenet_dataset import TinyImageNet
 from sklearn.model_selection import train_test_split
 
 random.seed(1)
 np.random.seed(1)
 num_clients = 100
-dir_path = "dataset/cifar100_noniid0.1/"
+dir_path = "dataset/imagenet/"
 train_ratio = 0.8
 
 # Allocate data to users
-def generate_cifar100(dir_path, num_clients, niid, balance, partition):
+def generate_imagenet(dir_path, num_clients, niid, balance, partition, test):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+    
+    if test:
+        test_path = dir_path + "test"
+        transform = transforms.ToTensor()
         
+        test_set = TinyImageNet(root=dir_path + "tiny-imagenet-200", train=False, transform=transform)
+        dataset_image = test_set.pixel_values
+        dataset_label = test_set.labels
+        dataset_image = np.array([t.numpy() for t in dataset_image])
+        dataset_label = np.array(dataset_label)
+        dct = {b'data': dataset_image, b'fine_labels': dataset_label}
+        with open(test_path, 'wb') as f:
+            pickle.dump(dct, f)
+        print('test pkl save to disk')
+        return
+      
     # Setup directory for train/valid data for clients
     config_path = dir_path + "config.json"
     train_path = dir_path + "train/"
@@ -62,14 +78,16 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
     # trainset = torchvision.datasets.CIFAR100(
     #     root=dir_path+"rawdata", train=True, download=True)
     
-    global_train_path = dir_path + "rawdata/cifar-100-python/train"
-    global_trainset = load_pkl(global_train_path)
+    global_train_path = dir_path + "tiny-imagenet-200"
+    
+    transform = transforms.ToTensor()
+    global_trainset = TinyImageNet(root=global_train_path, train=True, transform=transform)
     
     origin_train_len = len(global_trainset)
     train_len = int(origin_train_len * train_ratio)
     valid_len = origin_train_len - train_len
     
-    train_dataset = CIFARClassificationDataset(path=global_train_path)
+    train_dataset = global_trainset
 
     
     
@@ -133,5 +151,6 @@ if __name__ == "__main__":
     niid = True if sys.argv[1] == "noniid" else False
     balance = True if sys.argv[2] == "balance" else False
     partition = sys.argv[3] if sys.argv[3] != "-" else None
+    test = True if sys.argv[4] == "test" else False
 
-    generate_cifar100(dir_path, num_clients, niid, balance, partition)
+    generate_imagenet(dir_path, num_clients, niid, balance, partition, test)

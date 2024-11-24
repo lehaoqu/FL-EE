@@ -4,6 +4,16 @@ import numpy as np
 import sys
 import os
 from PIL import Image
+from dataset.utils.dataset_utils import load_np, load_pkl
+
+from torch.utils.data import Dataset, DataLoader
+from torchvision import models, utils, datasets, transforms
+import numpy as np
+import sys
+import os
+from PIL import Image
+import torch
+from tqdm import tqdm
 
 
 class TinyImageNet(Dataset):
@@ -13,6 +23,8 @@ class TinyImageNet(Dataset):
         self.transform = transform
         self.train_dir = os.path.join(self.root_dir, "train")
         self.val_dir = os.path.join(self.root_dir, "val")
+        self.pixel_values = []
+        self.labels = []
 
         if (self.Train):
             self._create_class_idx_dict_train()
@@ -87,7 +99,7 @@ class TinyImageNet(Dataset):
             img_root_dir = self.val_dir
             list_of_dirs = ["images"]
 
-        for tgt in list_of_dirs:
+        for tgt in tqdm(list_of_dirs):
             dirs = os.path.join(img_root_dir, tgt)
             if not os.path.isdir(dirs):
                 continue
@@ -100,7 +112,18 @@ class TinyImageNet(Dataset):
                             item = (path, self.class_to_tgt_idx[tgt])
                         else:
                             item = (path, self.class_to_tgt_idx[self.val_img_to_class[fname]])
+
                         self.images.append(item)
+                        img_path, t = item
+                        with open(img_path, 'rb') as f:
+                            sample = Image.open(img_path)
+                            sample = sample.convert('RGB')
+                        if self.transform is not None:
+                            sample = self.transform(sample).float()
+                        self.pixel_values.append(sample)
+                        t = torch.tensor(t, dtype=torch.long)
+                        self.labels.append(t)
+                        
 
     def return_label(self, idx):
         return [self.class_to_label[self.tgt_idx_to_class[i.item()]] for i in idx]
@@ -114,6 +137,53 @@ class TinyImageNet(Dataset):
             sample = Image.open(img_path)
             sample = sample.convert('RGB')
         if self.transform is not None:
-            sample = self.transform(sample)
+            sample = self.transform(sample).float()
 
-        return sample, tgt
+        return dict(
+            pixel_values=sample,
+            labels=torch.tensor(tgt, dtype=torch.long),
+        )
+
+
+class TinyImageNetClassificationDataset(Dataset):
+    def transform_for_vit(images: torch.tensor):
+
+        transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.Normalize(
+                    (0.5070751592371323, 0.48654887331495095, 0.4409178433670343), \
+                    (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+                ),
+            ])
+        
+        images = images.float()
+        images_reshaped = images.view(-1, 3, 64, 64)
+        return torch.stack([transform(image) for image in images_reshaped], dim=0)
+    
+    def __init__(self, args=None, path=None, eval_valids=False):
+        self.path = path
+        if eval_valids:
+            dict_all = [load_pkl(f'{path}{i}.pkl') for i in range(args.total_num)]
+            total_data = {}
+            for key in dict_all[0].keys():
+                for dic in dict_all:
+                    total_data.setdefault(key, []).extend(dic[key])
+            self.ann = total_data
+            
+        else:
+            self.ann = load_pkl(path)
+            
+            self.ann[b'data'] = [torch.tensor(row, dtype=torch.float32) for row in self.ann[b'data']]
+            self.ann[b'fine_labels'] = [torch.tensor(row, dtype=torch.long) for row in self.ann[b'fine_labels']]
+            
+        self.pixel_values = self.ann[b'data']
+        self.labels = self.ann[b'fine_labels']
+        
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, index):
+        return dict(
+            pixel_values=self.pixel_values[index],
+            labels=self.labels[index],
+        )

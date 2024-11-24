@@ -5,10 +5,12 @@ from utils.modelload.bert import *
 from dataset import (
     get_cifar_dataset,
     get_glue_dataset,
-    get_svhn_dataset
+    get_svhn_dataset,
+    get_imagenet_dataset
 )
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from dataset.svhn_dataset import SVHNClassificationDataset
+from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from utils.options import args_parser
 from utils.modelload.modelloader import load_model
 import numpy as np
@@ -23,6 +25,8 @@ def adapt_batch(data, args):
         if key == 'pixel_values':
             if 'cifar' in args.dataset:
                 batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
+            elif 'imagenet' in args.dataset:
+                batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
             else:
                 batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
     label = batch['labels'].view(-1)
@@ -51,6 +55,9 @@ output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
 output = open(output_path, 'a')  
 
 
+blocks = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
+args.blocks = blocks
+
 model = load_model(args, model_depth=12, is_scalefl=False, exits=(2,5,8,11))
 model.to(device)
 
@@ -60,12 +67,16 @@ with open(config_save_path, 'w', encoding='utf-8') as f:
 ds = args.dataset
 if 'cifar' in ds:
     get_dataset = get_cifar_dataset
+elif 'imagenet' in ds:
+    get_dataset = get_imagenet_dataset
 elif 'svhn' in ds:
     get_dataset = get_svhn_dataset
 else:
     ds = f'glue/{ds}'
     get_dataset = get_glue_dataset
-    
+
+
+
 train_dataset = get_dataset(args=args, path=f'dataset/{ds}/train/', eval_valids=True)
 loader_train = torch.utils.data.DataLoader(train_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(train_dataset))
@@ -101,7 +112,7 @@ for epoch in range(200):
     batch_loss = []
     model.train()
     
-    for idx, data in enumerate(loader_train):
+    for idx, data in tqdm(enumerate(loader_train)):
         
         optim.zero_grad()
 
@@ -111,10 +122,12 @@ for epoch in range(200):
             policy.train_meta(model, batch, label, optim)
 
         exits_ce_loss, _ = policy.train(model, batch, label)
-        ce_loss = sum(exits_ce_loss)
+        # ce_loss = sum(exits_ce_loss)
+        ce_loss = exits_ce_loss[-1]
         ce_loss.backward()
         optim.step()
         batch_loss.append(ce_loss.detach().cpu().item())
+        # print(ce_loss.detach().cpu().item())
         
     print(sum(batch_loss) / len(batch_loss))
     

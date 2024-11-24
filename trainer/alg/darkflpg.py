@@ -265,7 +265,7 @@ class Server(BaseServer):
         
     def get_batch(self, gen_latent, y_input):
         batch = {}
-        if 'cifar' in self.args.dataset or 'svhn' in self.args.dataset:
+        if 'cifar' in self.args.dataset or 'svhn' in self.args.dataset or 'imagenet' in self.args.dataset:
             batch['pixel_values'] = gen_latent
         else:
             batch['input_ids'] = gen_latent
