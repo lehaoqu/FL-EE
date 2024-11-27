@@ -58,6 +58,8 @@ def add_args(parser):
     
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
+    
+    parser.add_argument('--noise',                  default=100, type=int, help='noise dim of generator')
     return parser
 
 
@@ -110,8 +112,19 @@ class Client(BaseClient):
                 if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                     self.policy.train_meta(self.model, batch, label, self.optim)
 
-                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
+                exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
                 ce_loss = sum(exits_ce_loss)
+                # for index in range(label.shape[0]):
+                #     diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                #     self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                #     self.sample_y[sample_idx] = label[index]
+                #     self.diff_distribute[int(diff.cpu().item())] += 1
+                #     if 'attention_mask' in data.keys():
+                #         attention_mask = data['attention_mask'].cpu().tolist()
+                #         sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                #         self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                #     sample_idx += 1
+  
                 ce_loss.backward()
                 self.optim.step()
                 batch_loss.append(ce_loss.detach().cpu().item()) 
@@ -540,7 +553,7 @@ class Server(BaseServer):
             
             optimizer.step()
         # print(f'============{eq_depth} Super-local Model============')
-        # print(f'ce_loss:{CE_LOSS.cpu().item()/n_iters:.2f}, div_loss: {DIV_LOSS.cpu().item()/n_iters:.2f}, diff_loss: {DIFF_LOSS.cpu().item()/n_iters:.2f}, gap_loss: {GAP_LOSS.cpu().item()/n_iters:.2f}')
+        # print(f'ce_loss:{CE_LOSS/n_iters:.2f}, div_loss: {DIV_LOSS/n_iters:.2f}, diff_loss: {DIFF_LOSS/n_iters:.2f}, gap_loss: {GAP_LOSS/n_iters:.2f}')
     
 
     def progressive_train_model(self, diff_g, exits_diff_g, y_input_g):

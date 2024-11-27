@@ -62,14 +62,14 @@ class Generator_LATENT(BaseModule):
         # TODO latent_dim n_class will change in glue and cifar
         if 'cifar' in args.dataset or 'svhn' in args.dataset or 'imagenet' in args.dataset:
             if 'tiny' in args.config_path:
-                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 197, 192, CLASSES[args.dataset], CLASSES[args.dataset], 100
+                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 192, CLASSES[args.dataset], args.noise
             elif 'small' in args.config_path:
-                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 197, 384, CLASSES[args.dataset], CLASSES[args.dataset], 100
+                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 384, CLASSES[args.dataset], args.noise
         else:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim, self.n_diff = 1000, 128, 128, 2, 2, 2
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 128, 128, CLASSES[args.dataset], args.noise
         self.latent_dim = self.token_num * self.hidden_rs
         
-        input_dim = self.noise_dim + self.n_class + self.n_diff if self.args.diff_generator else self.noise_dim + self.n_class
+        input_dim = 3 * self.noise_dim  if self.args.diff_generator else 2 * self.noise_dim 
         self.fc_configs = [input_dim, self.hidden_dim]
         self.init_loss_fn()
         self.build_network()
@@ -83,7 +83,7 @@ class Generator_LATENT(BaseModule):
         if self.embedding:
             self.embedding_layer = nn.Embedding(self.n_class, self.noise_dim)
         if self.args.diff_generator:
-            self.diff_laryer = nn.Linear(len(self.args.exits), self.n_diff)
+            self.diff_laryer = nn.Linear(len(self.args.exits), self.noise_dim)
         ## == FC ==
         self.fc_layers = nn.ModuleList()
         for i in range(len(self.fc_configs) - 1):

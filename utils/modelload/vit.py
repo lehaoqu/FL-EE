@@ -188,7 +188,7 @@ class ViTExitEncoderRee(nn.Module):
             exit_head='normlinear',
             mode='add',
             base_model=base_model,
-            num_classes=100,
+            num_classes=config.num_labels,
             adapter=None,
             depth=1,
             attn_dim=16,

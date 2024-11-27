@@ -217,7 +217,7 @@ class Tester(object):
             if key == 'pixel_values':
                 if 'cifar' in self.args.dataset:
                     batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
-                if 'imagenet' in self.args.dataset:
+                elif 'imagenet' in self.args.dataset:
                     batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
                 else:
                     batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
