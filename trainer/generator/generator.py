@@ -83,7 +83,7 @@ class Generator_LATENT(BaseModule):
         if self.embedding:
             self.embedding_layer = nn.Embedding(self.n_class, self.noise_dim)
         if self.args.diff_generator:
-            self.diff_laryer = nn.Linear(len(self.args.exits), self.noise_dim)
+            self.diff_laryer = nn.Linear(1, self.noise_dim)
         ## == FC ==
         self.fc_layers = nn.ModuleList()
         for i in range(len(self.fc_configs) - 1):

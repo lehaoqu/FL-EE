@@ -76,28 +76,28 @@ class Client(BaseClient):
         
     
     def train(self):
-        self.sample_exits_diff = torch.zeros(len(self.dataset_train), self.server.max_exit_num).to(self.device)
+        self.sample_exits_diff = torch.zeros(len(self.dataset_train), 1).to(self.device)
         self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         self.diff_distribute = [1 for _ in range(10)]
         sample_idx = 0
         # eval diff distribution
-        if self.client_crt_rnd % self.args.diff_client_gap == 0:    
-            for idx, data in enumerate(self.loader_train):
-                batch, label = self.adapt_batch(data)
-                with torch.no_grad():
-                    dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
-                    dm_exits_logits = self.server.dm_policy(dm_exits_logits)
-                    for index in range(label.shape[0]):
-                        diff, exits_diff = difficulty_measure([dm_exits_logits[i][index] for i in range(len(dm_exits_logits))], label[index], metric=self.args.dm, rt_exits_diff=True)
-                        self.sample_exits_diff[sample_idx] = exits_diff
-                        self.sample_y[sample_idx] = label[index]
-                        self.diff_distribute[int(diff.cpu().item())] += 1
-                        if 'attention_mask' in data.keys():
-                            attention_mask = data['attention_mask'].cpu().tolist()
-                            sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
-                            self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
-                        sample_idx += 1
+        # if self.client_crt_rnd % self.args.diff_client_gap == 0:    
+        #     for idx, data in enumerate(self.loader_train):
+        #         batch, label = self.adapt_batch(data)
+        #         with torch.no_grad():
+        #             dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
+        #             dm_exits_logits = self.server.dm_policy(dm_exits_logits)
+        #             for index in range(label.shape[0]):
+        #                 diff, exits_diff = difficulty_measure([dm_exits_logits[i][index] for i in range(len(dm_exits_logits))], label[index], metric=self.args.dm, rt_exits_diff=True)
+        #                 self.sample_exits_diff[sample_idx] = exits_diff
+        #                 self.sample_y[sample_idx] = label[index]
+        #                 self.diff_distribute[int(diff.cpu().item())] += 1
+        #                 if 'attention_mask' in data.keys():
+        #                     attention_mask = data['attention_mask'].cpu().tolist()
+        #                     sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+        #                     self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+        #                 sample_idx += 1
 
         
         # === train ===
@@ -114,16 +114,16 @@ class Client(BaseClient):
 
                 exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
                 ce_loss = sum(exits_ce_loss)
-                # for index in range(label.shape[0]):
-                #     diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
-                #     self.sample_exits_diff[sample_idx] = exits_diff.detach()
-                #     self.sample_y[sample_idx] = label[index]
-                #     self.diff_distribute[int(diff.cpu().item())] += 1
-                #     if 'attention_mask' in data.keys():
-                #         attention_mask = data['attention_mask'].cpu().tolist()
-                #         sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
-                #         self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
-                #     sample_idx += 1
+                for index in range(label.shape[0]):
+                    diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                    self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                    self.sample_y[sample_idx] = label[index]
+                    self.diff_distribute[int(diff.cpu().item())] += 1
+                    if 'attention_mask' in data.keys():
+                        attention_mask = data['attention_mask'].cpu().tolist()
+                        sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                        self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                    sample_idx += 1
   
                 ce_loss.backward()
                 self.optim.step()
@@ -272,7 +272,7 @@ class Server(BaseServer):
             client.server = self
         
         self.max_exit_num = len(self.eq_exits[max(self.eq_depths)])
-        self.sw_net = MLP_tanh(input_size=self.max_exit_num*3, output_size=1, hidden_size=100).to(self.device)
+        self.sw_net = MLP_tanh(input_size=3, output_size=1, hidden_size=100).to(self.device)
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
         
         
@@ -338,9 +338,9 @@ class Server(BaseServer):
         dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
         dm_exits_logits = self.dm_policy(dm_exits_logits)
         batch_size = dm_exits_logits[0].shape[0]
-        exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
+        exits_diff_preds = torch.zeros(batch_size, 1).to(self.device)
         for sample_index in range(batch_size):
-            diff_pred, exits_diff_pred = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
+            diff_pred, exits_diff_pred = difficulty_measure([dm_exits_logits[0][sample_index]], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
             exits_diff_preds[sample_index] = exits_diff_pred
         
         diff_loss = self.diff_criterion(exits_diff_preds, exits_diff)
