@@ -399,6 +399,7 @@ class BaseServer:
 
         with torch.no_grad():
             for data in self.valid_dataloader:
+            # for data in self.test_dataloader:
                 batch, labels = self.adapt_batch(data)
                 
                 exits_logits = self.global_model(**batch)

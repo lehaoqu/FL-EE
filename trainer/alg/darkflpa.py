@@ -6,6 +6,8 @@ import math
 import numpy as np
 import os
 import copy
+import warnings
+warnings.simplefilter('always', UserWarning)
 
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
@@ -14,69 +16,141 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
 from trainer.policy.l2w import MLP_tanh
-from trainer.alg.darkflpg import Client as DarkClient
-from trainer.alg.darkflpg import Server as DarkServer
 
 
 def add_args(parser):
-    parser.add_argument('--is_latent', default=True, type=bool)
-    parser.add_argument('--is_feature', default='False', type=str)
+    parser.add_argument('--is_latent',              default=True, type=bool)
     
-    parser.add_argument('--s_epoches', default=10, type=int)
-    parser.add_argument('--s_bs', default=32, type=int)
-    parser.add_argument('--adaptive_epoches', default='False', type=str)
+    parser.add_argument('--s_epoches',              default=2, type=int)
+    parser.add_argument('--s_bs',                   default=32, type=int)
+    parser.add_argument('--adaptive_epoches',       default='False', type=str)
     
-    parser.add_argument('--kd_skip', default=1, type=int)
-    parser.add_argument('--kd_begin', default=0, type=int)
-    parser.add_argument('--kd_lr', default=5e-2, type=float)
-    parser.add_argument('--kd_response_ratio', default=3, type=float)
-    parser.add_argument('--kd_dist_ratio', default=5, type=float)
-    parser.add_argument('--kd_angle_ratio', default=10, type=float)
-    parser.add_argument('--kd_dark_ratio', default=0, type=float)
-    parser.add_argument('--kd_n_iters', default=5, type=int)
-    parser.add_argument('--gap_kd_lambda', default=1, type=float)
-    parser.add_argument('--kd_frozen', action='store_true')
-    parser.add_argument('--kd_gap', default=1, type=float)
+    parser.add_argument('--kd_skip',                default=1, type=int)
+    parser.add_argument('--kd_begin',               default=0, type=int)
+    parser.add_argument('--kd_lr',                  default=5e-2, type=float)
+    parser.add_argument('--kd_response_ratio',      default=3, type=float)
+    parser.add_argument('--kd_dist_ratio',          default=5, type=float)
+    parser.add_argument('--kd_angle_ratio',         default=10, type=float)
+    parser.add_argument('--kd_dark_ratio',          default=0, type=float)
+    parser.add_argument('--kd_n_iters',             default=5, type=int)
+    parser.add_argument('--kd_gap',                 default=1, type=float)
     
-    parser.add_argument('--g_skip', default=1, type=int)
-    parser.add_argument('--g_begin', default=0, type=int)
-    parser.add_argument('--g_lr', default=1e-2, type=float)
-    parser.add_argument('--g_y', default=1, type=float)
-    parser.add_argument('--g_div', default=1, type=float)
-    parser.add_argument('--g_gap', default=1, type=float)
-    parser.add_argument('--g_diff', default=1, type=float)
-    parser.add_argument('--g_n_iters', default=1, type=int)
+    parser.add_argument('--g_skip',                 default=1, type=int)
+    parser.add_argument('--g_begin',                default=0, type=int)
+    parser.add_argument('--g_lr',                   default=1e-2, type=float)
+    parser.add_argument('--g_y',                    default=1, type=float)
+    parser.add_argument('--g_div',                  default=1, type=float)
+    parser.add_argument('--g_gap',                  default=0, type=float)
+    parser.add_argument('--g_diff',                 default=1, type=float)
+    parser.add_argument('--g_n_iters',              default=1, type=int)
 
-    parser.add_argument('--kd_direction', default='sl', type=str)
-    parser.add_argument('--kd_join', default='last', type=str, help='last: only last exit of teacher can teach student model\'s exits')
-    parser.add_argument('--kd_knowledge', default='relation', type=str)
+    parser.add_argument('--kd_direction',           default='sl', type=str)
+    parser.add_argument('--kd_join',                default='last', type=str, help='last: only last exit of teacher can teach student model\'s exits')
+    parser.add_argument('--agg',                    default='after', type=str)
     
-    parser.add_argument('--loss_type', default='ce-kd', type=str)
-    parser.add_argument('--dm', default='loss', type=str)
-    parser.add_argument('--diff_client_gap', default=1, type=int)
-    parser.add_argument('--diff_generator', action='store_true')
+    parser.add_argument('--loss_type',              default='kd', type=str)
+    parser.add_argument('--dm',                     default='loss', type=str)
+    parser.add_argument('--diff_client_gap',        default=1, type=int)
+    parser.add_argument('--diff_generator',         action='store_false')
     
-    parser.add_argument('--sw', default='learn', type=str, help='how to get weight for students [learn | distance]')
-    parser.add_argument('--sw_type', default='soft', type=str, help='weight [soft | hard]')
+    parser.add_argument('--sw',                     default='learn', type=str, help='how to get weight for students [learn | distance]')
+    parser.add_argument('--sw_type',                default='soft', type=str, help='weight [soft | hard]')
     
-    parser.add_argument('--exit_p', default=30, type=int, help='p of exit policy')
-    parser.add_argument('--s_gamma', default=0.99, type=float, help='decay of server lr')
+    parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
+    parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
+    
+    parser.add_argument('--noise',                  default=100, type=int, help='noise dim of generator')
     return parser
 
 
 
 
-class Client(DarkClient):
+class Client(BaseClient):
     
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
         super().__init__(id, args, dataset, model, depth, exits)
+        self.diff_distribute, self.sample_exits_diff = None, None
+        self.client_crt_rnd = 0
+        self.batch_num = len(self.loader_train)
+        self.args.diff_client_gap = self.args.diff_client_gap if self.args.diff_generator else 100
         
+    
+    def train(self):
+        self.sample_exits_diff = torch.zeros(len(self.dataset_train), 1).to(self.device)
+        self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
+        self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
+        self.diff_distribute = [1 for _ in range(10)]
+        sample_idx = 0
+        # eval diff distribution
+        # if self.client_crt_rnd % self.args.diff_client_gap == 0:    
+        #     for idx, data in enumerate(self.loader_train):
+        #         batch, label = self.adapt_batch(data)
+        #         with torch.no_grad():
+        #             dm_exits_logits, dm_exits_feature = self.server.dm(**batch, rt_feature=True)
+        #             dm_exits_logits = self.server.dm_policy(dm_exits_logits)
+        #             for index in range(label.shape[0]):
+        #                 diff, exits_diff = difficulty_measure([dm_exits_logits[i][index] for i in range(len(dm_exits_logits))], label[index], metric=self.args.dm, rt_exits_diff=True)
+        #                 self.sample_exits_diff[sample_idx] = exits_diff
+        #                 self.sample_y[sample_idx] = label[index]
+        #                 self.diff_distribute[int(diff.cpu().item())] += 1
+        #                 if 'attention_mask' in data.keys():
+        #                     attention_mask = data['attention_mask'].cpu().tolist()
+        #                     sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+        #                     self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+        #                 sample_idx += 1
+
         
+        # === train ===
+        self.model.to(self.device)
+        batch_loss = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                self.optim.zero_grad()
+
+                batch, label = self.adapt_batch(data)
+                
+                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                    self.policy.train_meta(self.model, batch, label, self.optim)
+
+                exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                ce_loss = sum(exits_ce_loss)
+                for index in range(label.shape[0]):
+                    diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                    self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                    self.sample_y[sample_idx] = label[index]
+                    self.diff_distribute[int(diff.cpu().item())] += 1
+                    if 'attention_mask' in data.keys():
+                        attention_mask = data['attention_mask'].cpu().tolist()
+                        sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                        self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                    sample_idx += 1
+  
+                ce_loss.backward()
+                self.optim.step()
+                batch_loss.append(ce_loss.detach().cpu().item()) 
+        # print(self.diff_distribute)
+                    
+        # === record loss ===
+        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+        self.client_crt_rnd += 1
+    
+    
+    def get_embedding(self,):
+        self.model.eval()
+        embedding_outputs = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                batch, label = self.adapt_batch(data)
+                batch['rt_embedding'] = True
+                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
+        return embedding_outputs
+        
+
     def run(self):
         self.train()
 
 
-class Server(DarkServer):
+class Server(BaseServer):
     
     def run(self):
         self.sample()
@@ -161,7 +235,6 @@ class Server(DarkServer):
         self.dm_policy = self.eq_policy[max(self.eq_depths)]
         self.clients_embeddings = []
         # == args ==
-        self.is_feature = args.is_feature
         self.g_lr, self.g_y, self.g_div, self.g_diff, self.g_gap, self.g_skip, self.g_begin = args.g_lr, args.g_y, args.g_div, args.g_diff, args.g_gap, args.g_skip, args.g_begin
         self.kd_lr, self.kd_gap, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio, self.kd_skip, self.kd_begin = args.kd_lr, args.kd_gap, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio, args.kd_skip, args.kd_begin
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
@@ -181,11 +254,9 @@ class Server(DarkServer):
         args.exits = self.global_model.config.exits
         
         # == train for generators (each exit has a generator) & eq_models ==
-        self.generators = {}
-        for eq_depth in self.eq_depths:
-            generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
-            optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
-            self.generators[eq_depth] = [generator, optimizer]
+        generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
+        optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
+        self.generator = [generator, optimizer]
         self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
             
         self.p=self.args.exit_p
@@ -195,13 +266,13 @@ class Server(DarkServer):
             client.server = self
         
         self.max_exit_num = len(self.eq_exits[max(self.eq_depths)])
-        self.sw_net = MLP_tanh(input_size=self.max_exit_num*3, output_size=1, hidden_size=100).to(self.device)
+        self.sw_net = MLP_tanh(input_size=3, output_size=1, hidden_size=100).to(self.device)
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
         
         
     def get_batch(self, gen_latent, y_input):
         batch = {}
-        if 'cifar' in self.args.dataset:
+        if 'cifar' in self.args.dataset or 'svhn' in self.args.dataset or 'imagenet' in self.args.dataset:
             batch['pixel_values'] = gen_latent
         else:
             batch['input_ids'] = gen_latent
@@ -261,9 +332,9 @@ class Server(DarkServer):
         dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
         dm_exits_logits = self.dm_policy(dm_exits_logits)
         batch_size = dm_exits_logits[0].shape[0]
-        exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
+        exits_diff_preds = torch.zeros(batch_size, 1).to(self.device)
         for sample_index in range(batch_size):
-            diff_pred, exits_diff_pred = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
+            diff_pred, exits_diff_pred = difficulty_measure([dm_exits_logits[0][sample_index]], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
             exits_diff_preds[sample_index] = exits_diff_pred
         
         diff_loss = self.diff_criterion(exits_diff_preds, exits_diff)

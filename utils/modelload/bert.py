@@ -461,7 +461,11 @@ class BertExitModel(BertPreTrainedModel):
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         is_latent: Optional[bool] = False,
         stop_exit:Optional[int] = None,
-        rt_embedding:Optional[bool] = False
+        rt_embedding:Optional[bool] = False,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        labels=None
     ):
         extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(attention_mask, input_ids.size())
         
@@ -567,6 +571,10 @@ class ExitModel(BertPreTrainedModel, BaseModule):
         rt_embedding:Optional[bool]=False,
         labels:Optional[torch.Tensor] = None,
         rt_feature:Optional[bool]=False,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        inputs_embeds=None,
     ):
         outputs = self.bert(
                 input_ids,

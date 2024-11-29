@@ -7,7 +7,7 @@ md=vit
 bs=32
 lr=0.05
 
-noniids=(1000 1 0.1)
+noniids=(1 0.1)
 
 for noniid in "${noniids[@]}"
 do
