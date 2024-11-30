@@ -381,7 +381,7 @@ class Server(BaseServer):
         
         # exit policy     
         t_exits_num = len(self.eq_exits[eq_depth])
-        s_exits_num = self.max_exit_num
+        s_exits_num = min(self.max_exit_num, t_exits_num+1)
         
         target_probs = calc_target_probs(s_exits_num)[self.p-1]
         s_selected_index_list = exit_policy(s_exits_num, s_exits_logits, target_probs)
@@ -513,8 +513,8 @@ class Server(BaseServer):
             
             Loss.backward()
             optimizer.step()
-        print(f'============{eq_depth} Super-local Model============')
-        print(f'ce_loss:{CE_LOSS/n_iters:.2f}, div_loss: {DIV_LOSS/n_iters:.2f}, diff_loss: {DIFF_LOSS/n_iters:.2f}, gap_loss: {GAP_LOSS/n_iters:.2f}')
+        # print(f'============{eq_depth} Super-local Model============')
+        # print(f'ce_loss:{CE_LOSS/n_iters:.2f}, div_loss: {DIV_LOSS/n_iters:.2f}, diff_loss: {DIFF_LOSS/n_iters:.2f}, gap_loss: {GAP_LOSS/n_iters:.2f}')
     
 
     def parallel_train_model(self, diff_all, exits_diff_all, y_input_all):
@@ -567,7 +567,9 @@ class Server(BaseServer):
             
             s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
             s_exits_logits = s_policy(s_exits_logits)
+            
             for idx, eq_depth in enumerate(self.eq_depths):
+                if eq_depth == max(self.eq_depths): continue
                 t_model = self.eq_model[eq_depth]
                 t_policy = self.eq_policy[eq_depth]
                 with torch.no_grad():

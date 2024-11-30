@@ -62,11 +62,11 @@ class Generator_LATENT(BaseModule):
         # TODO latent_dim n_class will change in glue and cifar
         if 'cifar' in args.dataset or 'svhn' in args.dataset or 'imagenet' in args.dataset:
             if 'tiny' in args.config_path:
-                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 192, CLASSES[args.dataset], args.noise
+                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 192, CLASSES[args.dataset], CLASSES[args.dataset]
             elif 'small' in args.config_path:
-                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 384, CLASSES[args.dataset], args.noise
+                self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 384, CLASSES[args.dataset], CLASSES[args.dataset]
         else:
-            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 128, 128, CLASSES[args.dataset], args.noise
+            self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 128, 128, CLASSES[args.dataset], CLASSES[args.dataset]
         self.latent_dim = self.token_num * self.hidden_rs
         
         input_dim = 3 * self.noise_dim  if self.args.diff_generator else 2 * self.noise_dim 

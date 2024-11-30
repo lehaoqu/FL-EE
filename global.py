@@ -16,6 +16,7 @@ from utils.modelload.modelloader import load_model
 import numpy as np
 import random
 from tqdm import tqdm
+from torch.utils.data import ConcatDataset
 
 
 def adapt_batch(data, args):
@@ -85,9 +86,13 @@ valid_dataset = get_dataset(args=args, path=f'dataset/{ds}/valid/', eval_valids=
 loader_valid = torch.utils.data.DataLoader(valid_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(valid_dataset))
 
-# test_dataset = get_glue_dataset(args=args, path=f'dataset/glue/{ds}/test.pkl')
-# loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
-# print(len(test_dataset))
+all_dataset =ConcatDataset([train_dataset, valid_dataset])
+loader_train = torch.utils.data.DataLoader(all_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
+print(len(all_dataset))
+
+test_dataset = get_glue_dataset(args=args, path=f'dataset/{ds}/test.pkl')
+loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
+print(len(test_dataset))
 
 
 optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
@@ -140,7 +145,7 @@ for epoch in range(200):
 
     if epoch % 1 == 0:
         with torch.no_grad():
-            for data in loader_valid:
+            for data in loader_test:
                 batch, labels = adapt_batch(data, args)
                 
                 exits_logits = model(**batch)

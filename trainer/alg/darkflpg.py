@@ -114,16 +114,17 @@ class Client(BaseClient):
 
                 exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
                 ce_loss = sum(exits_ce_loss)
-                for index in range(label.shape[0]):
-                    diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
-                    self.sample_exits_diff[sample_idx] = exits_diff.detach()
-                    self.sample_y[sample_idx] = label[index]
-                    self.diff_distribute[int(diff.cpu().item())] += 1
-                    if 'attention_mask' in data.keys():
-                        attention_mask = data['attention_mask'].cpu().tolist()
-                        sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
-                        self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
-                    sample_idx += 1
+                if epoch == self.epoch-1:
+                    for index in range(label.shape[0]):
+                        diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                        self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                        self.sample_y[sample_idx] = label[index]
+                        self.diff_distribute[int(diff.cpu().item())] += 1
+                        if 'attention_mask' in data.keys():
+                            attention_mask = data['attention_mask'].cpu().tolist()
+                            sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                            self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                        sample_idx += 1
   
                 ce_loss.backward()
                 self.optim.step()
