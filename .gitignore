@@ -5,7 +5,8 @@
 dataset/cifar*/
 dataset/glue/
 dataset/svhn/
-dataset/imagenet
+dataset/imagenet/
+dataset/emnist/
 cifar*/
 models/
 script/08*/

@@ -384,7 +384,7 @@ class Server(BaseServer):
         return exits_dis/sum(exits_dis)
     
     
-    def gap_loss(self, diff, y_input, t_selected_index_list, eq_depth, t, s, direction='sl'):
+    def gap_loss(self, diff, y_input, selected_index_list, eq_depth, t, s, direction='sl'):
         t_exits_logits, t_exits_feature = t
         s_exits_logits, s_exits_feature = s
         # diff: 1, exits_diff: 4
@@ -409,60 +409,76 @@ class Server(BaseServer):
             else: s_diff_exits.append(diff.float()[s_selected_index])
         
         sum = 0
-        for t_exit_idx in range(t_exits_num):
-            if self.args.kd_join == 'last':
-                if t_exit_idx != t_exits_num-1: continue
-            t_selected_index = t_selected_index_list[t_exit_idx]
-            
-            # == diff based weight == 
-            # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
-            weight_t_exits = torch.zeros(s_exits_num).to(self.device)
-            for sample_index in t_selected_index:
-                sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
+        # == diff based weight == 
+        # for sample 19, samples_distance[19] = [0.2,0.4,0.1,0.3] distance to global exits difficulty distribution
+        if direction == 'sl':
+            for t_exit_idx in range(t_exits_num):
+                if self.args.kd_join == 'last':
+                    if t_exit_idx != t_exits_num-1: continue
+                t_selected_index = selected_index_list[t_exit_idx]
+                weight_t_exits = torch.zeros(s_exits_num).to(self.device)
+                for sample_index in t_selected_index:
+                    sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
+                    for s_exit_idx in range(s_exits_num):
+                        weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
+                weight_t_exits = F.softmax(-weight_t_exits, dim=0)
+                max_weight = weight_t_exits.max()
+                weight_t_exits = (weight_t_exits == max_weight).float() if self.args.sw_type == 'hard' else weight_t_exits
+                # print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
+                t_logits, t_feature = t_exits_logits[t_exit_idx][t_selected_index], t_exits_feature[t_exit_idx][t_selected_index]
                 for s_exit_idx in range(s_exits_num):
-                    weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
-            weight_t_exits = F.softmax(-weight_t_exits, dim=0)
-            max_weight = weight_t_exits.max()
-            weight_t_exits = (weight_t_exits == max_weight).float() if self.args.sw_type == 'hard' else weight_t_exits
-            # print(f'eq{eq_depth}_exit{t_exit_idx}:', ["{:.2f}".format(x) for x in weight_t_exits.cpu()])
-
-            t_selected_index = t_selected_index_list[t_exit_idx]
-            t_logits, t_feature = t_exits_logits[t_exit_idx][t_selected_index], t_exits_feature[t_exit_idx][t_selected_index]
+                    s_logits, s_feature = s_exits_logits[s_exit_idx][t_selected_index], s_exits_feature[s_exit_idx][t_selected_index]
+                    t_y = y_input[t_selected_index]
+                    sum += s_logits.shape[0]
+                    
+                    # == ce loss ==
+                    gap_ce_loss = 0.0
+                    if 'ce' in self.args.loss_type:
+                        s, t = s_logits, t_logits.detach()
+                        gap_ce_loss = weight_t_exits[s_exit_idx] * self.ce_criterion(s, t_y) * s.shape[0]
+                    
+                    # == kd gap loss == 
+                    gap_kd_loss = 0.0
+                    if 'kd' in self.args.loss_type:
+                        if direction == 'sl':
+                            s, t = s_feature, t_feature.detach()
+                            dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
+                            angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
+                            dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
+                            gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
+                            
+                            # s, t = s_logits, t_logits.detach()
+                            # gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
+                        else:   
+                            s, t = s_logits, t_logits.detach()
+                            gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
+                            
+                    gap_loss += gap_ce_loss + gap_kd_loss
+        else:
             for s_exit_idx in range(s_exits_num):
+                if s_exit_idx != s_exits_num-1: continue
+                e_t_logits = 0
+                for t_exit_idx in range(t_exits_num):
+                    if t_exit_idx < s_exit_idx: continue
+                    t_selected_index = selected_index_list[s_exit_idx]
+                    t_logits, t_feature = t_exits_logits[t_exit_idx][t_selected_index], t_exits_feature[t_exit_idx][t_selected_index]
+                    e_t_logits += t_logits
+                e_t_logits = e_t_logits / (t_exits_num-s_exits_num+1)
+                
                 s_logits, s_feature = s_exits_logits[s_exit_idx][t_selected_index], s_exits_feature[s_exit_idx][t_selected_index]
                 t_y = y_input[t_selected_index]
                 sum += s_logits.shape[0]
                 
-                # == ce loss ==
-                gap_ce_loss = 0.0
-                if 'ce' in self.args.loss_type:
-                    s, t = s_logits, t_logits.detach()
-                    gap_ce_loss = weight_t_exits[s_exit_idx] * self.ce_criterion(s, t_y) * s.shape[0]
-                
-                # == kd gap loss == 
-                gap_kd_loss = 0.0
-                if 'kd' in self.args.loss_type:
-                    if direction == 'sl':
-                        s, t = s_feature, t_feature.detach()
-                        dist_loss = self.kd_dist_ratio*self.dist_criterion(s, t)
-                        angle_loss = self.kd_angle_ratio*self.angle_criterion(s, t)
-                        dark_loss = self.kd_dark_ratio*self.dark_criterion(s, t)
-                        gap_kd_loss = weight_t_exits[s_exit_idx]*(dist_loss + angle_loss + dark_loss) * s.shape[0]
-                        
-                        # s, t = s_logits, t_logits.detach()
-                        # gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
-                    else:   
-                        s, t = s_logits, t_logits.detach()
-                        gap_kd_loss = weight_t_exits[s_exit_idx]* self.kd_response_ratio*self.kd_criterion(s, t) * s.shape[0] 
-                        
-                gap_loss += gap_ce_loss + gap_kd_loss
-                
+                s, t = s_logits, e_t_logits.detach()
+                gap_kd_loss = self.kd_response_ratio*self.kd_criterion(s, t) * s_logits.shape[0]
+                gap_loss += gap_kd_loss
+             
         gap_loss = gap_loss / sum
         return gap_loss
     
     
     def finetune(self):
-        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())) if self.args.adaptive_epoches == 'True' else self.s_epoches
+        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())/self.kd_n_iters) if self.args.adaptive_epoches == 'True' else self.s_epoches
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==
@@ -629,11 +645,12 @@ class Server(BaseServer):
                     s_model = self.eq_model[list(reversed(self.eq_depths))[idx+1]]
                     t_policy = self.eq_policy[list(reversed(self.eq_depths))[idx]]
                     s_policy = self.eq_policy[list(reversed(self.eq_depths))[idx+1]]
+                    s_depth = list(reversed(self.eq_depths))[idx+1]
                     
                     with torch.no_grad():
-                        y_input, diff, exits_diff = y_input_g[eq_depth], diff_g[eq_depth], exits_diff_g[eq_depth]
-                        eps = torch.rand((y_input[0].shape[0], self.generators[eq_depth][0].noise_dim)).to(self.device)
-                        gen_latent = self.generators[eq_depth][0](y_input, eps, exits_diff).detach()
+                        y_input, diff, exits_diff = y_input_g[s_depth], diff_g[s_depth], exits_diff_g[s_depth]
+                        eps = torch.rand((y_input[0].shape[0], self.generators[s_depth][0].noise_dim)).to(self.device)
+                        gen_latent = self.generators[s_depth][0](y_input, eps, exits_diff).detach()
 
                         if self.args.diff_generator:
                             diff = (diff, exits_diff)
@@ -657,7 +674,9 @@ class Server(BaseServer):
                     
                     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                     s_exits_logits = s_policy(s_exits_logits)
-                    sl_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')
+                    s_exits_num = len(self.eq_exits[list(reversed(self.eq_depths))[idx+1]])
+                    s_selected_index_list = exit_policy(exits_num=s_exits_num, exits_logits=s_exits_logits, target_probs=target_probs)
+                    ls_Loss += self.kd_gap * self.gap_loss(diff, y_input[0], s_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature), direction='ls')
                   
             Loss = sl_Loss + ls_Loss  
             Loss.backward()
@@ -673,7 +692,7 @@ class Server(BaseServer):
     def sample(self):
         super().sample()
         self.larger_eq_total_num = {eq_depth: sum([self.eq_num[i] for i in self.eq_depths if i >= eq_depth]) for eq_depth in self.eq_depths}
-        self.eq_batch_num = {eq_depth: sum([client.batch_num for client in self.sampled_eq_clients[eq_depth]]) for eq_depth in self.eq_depths}
+        self.eq_batch_num = {eq_depth: sum([client.batch_num for client in self.sampled_eq_clients[eq_depth]])/(len(self.sampled_eq_clients[eq_depth])) for eq_depth in self.eq_depths}
 
 
     def downlink(self):
