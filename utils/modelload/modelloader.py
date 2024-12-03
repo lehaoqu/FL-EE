@@ -26,6 +26,7 @@ def check_class_num(dataset):
         else -1
 
 def load_model(args, model_depth=None, is_scalefl=False, exits=None):
+    scales = {3:0.4, 6:0.55, 9:0.75, 12:1}
     model_arg = args.model
     dataset_arg = args.dataset
     class_num = check_class_num(dataset_arg)
@@ -55,7 +56,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
                 depth = min(12, model_depth+1)
             
             # scale = math.sqrt(model_depth / depth)
-            scale = model_depth / depth
+            scale = scales[model_depth]
             eq_config.num_hidden_layers = depth
             eq_config.hidden_size = int(eq_config.hidden_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
             eq_config.intermediate_size = int(eq_config.intermediate_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)

@@ -5,10 +5,10 @@ import copy
 import math
 
 def add_args(parser):
-    parser.add_argument('--meta_gap', type=int, default=1, help="meta gap")
-    parser.add_argument('--meta_lr', type=float, default=1e-4, help="meta lr")
+    parser.add_argument('--meta_gap', type=int, default=10, help="meta gap")
+    parser.add_argument('--meta_lr', type=float, default=1e-3, help="meta lr")
     parser.add_argument('--meta_weight_decay', type=float, default=1e-4, help="meta weight_decay")
-    parser.add_argument('--meta_p', type=int, default=15, help="meta valid p")
+    parser.add_argument('--meta_p', type=int, default=30, help="meta valid p")
     parser.add_argument('--meta_net_hidden_size', type=int, default=500, help="meta net hidden size")
     return parser
 

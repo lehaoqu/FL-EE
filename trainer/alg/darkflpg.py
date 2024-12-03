@@ -119,7 +119,7 @@ class Client(BaseClient):
                         diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
                         self.sample_exits_diff[sample_idx] = exits_diff.detach()
                         self.sample_y[sample_idx] = label[index]
-                        self.diff_distribute[int(diff.cpu().item())] += 1
+                        # self.diff_distribute[int(diff.cpu().item())] += 1
                         if 'attention_mask' in data.keys():
                             attention_mask = data['attention_mask'].cpu().tolist()
                             sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
@@ -324,7 +324,8 @@ class Server(BaseServer):
                     # y = y_input.cpu().tolist()[i]
                     # sentence_len = torch.tensor(random.choices(range(len(y_sl_distribute[y])), weights=y_sl_distribute[y], k=1), dtype=torch.long)
                     
-                    sentence_len = int(sentence_lens[i].cpu().item())
+                    # sentence_len = int(sentence_lens[i].cpu().item())
+                    sentence_len = 64
                     mask = torch.zeros(128)
                     mask[:sentence_len] = 1
                     attention_mask += (mask.to(self.device), )
