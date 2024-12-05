@@ -190,7 +190,7 @@ class Server(BaseServer):
         return batch
      
      
-    def get_gen_latent(self, ):
+    def get_conditional(self, ):
         for g in self.generators:
             g[0].to(self.device)
             g[0].train()
@@ -223,7 +223,7 @@ class Server(BaseServer):
             
             # gen_latent_g[t_exit] = gen_latent
             g = self.generators[t_exit][0]
-            eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
+            # eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
 
             # attend_logits = ()
             # for eq_depth in attend_eq:
@@ -231,19 +231,19 @@ class Server(BaseServer):
             # attend_logits = sum(attend_logits)
             
             # ts_logits[t_exit] = attend_logits
-        return y_input_g, eps_g
+        return y_input_g
     
     
     def finetune(self):
         # == train generator & global model ==
         for _ in range(self.s_epoches):
-            y_input_g, eps_g = self.get_gen_latent()
-            gen_latent_g = {}
-            for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
-                gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
-                gen_latent_g[t_exit] = gen_latent      
+            y_input_g = self.get_conditional()
+            # gen_latent_g = {}
+            # for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
+            #     gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
+            #     gen_latent_g[t_exit] = gen_latent      
 
-            self.train_generators(y_input_g, gen_latent_g, eps_g)
+            self.train_generators(y_input_g)
             
             for exit, y_input in y_input_g.items():
                 if isinstance(y_input, tuple): y_input_g[exit] = tuple(tensor.detach() for tensor in y_input)
@@ -253,10 +253,10 @@ class Server(BaseServer):
                 gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
                 gen_latent_g[t_exit] = gen_latent.detach()
 
-            self.finetune_global_model(y_input_g, gen_latent_g)
+            self.finetune_global_model(y_input_g)
                 
     
-    def train_generators(self, y_input_g, gen_latent_g, eps_g):
+    def train_generators(self, y_input_g):
         for g in self.generators:
             g[0].to(self.device)
             g[0].train()
@@ -265,82 +265,77 @@ class Server(BaseServer):
             eq_model.eval() 
         
         # == train generators ==
-        for exit_idx, g in enumerate(self.generators):
-            print(f'============{exit_idx}============')
-            self.update_generator(g, exit_idx, self.g_n_iters, y_input_g, gen_latent_g, eps_g)
+        self.update_generator(y_input_g)
     
     
-    def update_generator(self, g, exit_idx, n_iters, y_input_g, gen_latent_g, eps_g):
-        
-        CE_LOSS, DIV_LOSS, GAP_LOSS, STT_LOSS = 0, 0, 0, 0
-        
-        generator = g[0]
-        optimizer = g[1]
-        
-        attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx < len(self.eq_exits[eq_depth])]
+    def update_generator(self, y_input_g):
+        n_iters = self.g_n_iters
         
         for i in range(n_iters):
-            optimizer.zero_grad()
+            CE_LOSS, DIV_LOSS, GAP_LOSS, STT_LOSS = 0, 0, 0, 0
             
-            y_input, gen_latent, eps = y_input_g[exit_idx], gen_latent_g[exit_idx], eps_g[exit_idx]
-            # == div kd ce loss for G ==
-            # == div loss for G ==
-            div_loss = self.g_div*generator.diversity_loss(eps, gen_latent)
+            for g in self.generators():
+                g[1].zero_grad()
+            
+            # == prepare logits ==
+            gen_latent_g = {}, eps_g = {}
+            exits_logits_g, exits_feature_g = {}, {}
+            for exit_idx in range(len(self.eq_exits[max(self.eq_depths)])):
+                eps = torch.rand((y_input_g[exit_idx].shape[0], self.generators[self.eq_depths[exit_idx]][0].noise_dim)).to(self.device)
+                eps_g[exit_idx] = eps
+                y_input = y_input_g[exit_idx]
+                gen_latent = self.generators[exit_idx][0](y_input, eps)
+                gen_latent_g[exit_idx] = gen_latent
+                attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx < len(self.eq_exits[eq_depth])]
+                attend_logits_list = [() for _ in range(min(exit_idx+1, self.max_exit-1)+1)]
+                for eq_depth in attend_eq:
+                    r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
+                    exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=min(exit_idx+1, self.max_exit-1), is_latent=self.is_latent, rt_feature=True)
+                    exits_logits = self.eq_policy[eq_depth](exits_logits)
+                    for i, attend_logits in enumerate(attend_logits_list):
+                        attend_logits += (exits_logits[i] * r, )
+                exits_logits_g[exit_idx] = [sum(logits) for logits in attend_logits_list]
+            
+            # == train jointly ==               
+            for exit_idx, g in enumerate(self.generators):
+                s_generator = g[0]
+                
+                # == div kd ce loss for G ==
+                # == div loss for G ==
+                div_loss = self.g_div*s_generator.diversity_loss(eps_g[exit_idx], gen_latent[exit_idx])
 
-            # stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
-            stt_loss = 0
-            
-            # == ensemble logits for attend eq's
-            attend_logits = ()
-            attend_feature = ()
-            for eq_depth in attend_eq:
-                r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
-                exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=exit_idx, is_latent=self.is_latent, rt_feature=True)
+                # stt_loss = self.g_gamma*generator.statistic_loss(gen_latent, self.train_mean, self.train_std)
+                stt_loss = 0
                 
-                attend_logits += (self.eq_policy[eq_depth](exits_logits)[-1] * r, )
-                attend_feature += (self.eq_policy[eq_depth](exits_feature)[-1] * r, )
+                if exit_idx != self.max_exit-1: ce_loss = self.g_y*self.ce_criterion(exits_logits_g[exit_idx][-2], y_input_g[exit_idx][0].view(-1))
+                else: ce_loss = self.g_y*self.ce_criterion(exits_logits_g[exit_idx][-1], y_input_g[exit_idx][0].view(-1))
                 
-            attend_logits = sum(attend_logits)
-            attend_feature = sum(attend_feature)
-            
-            ce_loss = self.g_y*self.ce_criterion(attend_logits, y_input[0].view(-1))
-            gap_loss = self.g_gap*torch.zeros(1).to(self.device)
-            
-            if exit_idx != 0:
-                former_attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx-1 < len(self.eq_exits[eq_depth])]
-                former_attend_logits = ()
-                former_attend_feature = ()
-                for eq_depth in former_attend_eq:
-                    r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in former_attend_eq])
+                # == gap loss ==
+                gap_loss = self.g_gap*torch.zeros(1).to(self.device)                
+                if exit_idx != 0:
+                    ce_loss = self.g_y*self.ce_criterion(exits_logits_g[exit_idx][1], y_input_g[exit_idx][0].view(-1))
+                    t_kl = self.kd_criterion(exits_logits_g[exit_idx-1][-2].detach(), exits_logits_g[exit_idx-1][-1].detach())
+                    s_kl = self.kd_criterion(exits_logits_g[exit_idx][-3], exits_logits_g[exit_idx][-2].detach())
                     
-                    exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=exit_idx-1, is_latent=self.is_latent, rt_feature=True)
-                    former_attend_logits += (self.eq_policy[eq_depth](exits_logits)[-1] * r, )
-                    former_attend_feature += (self.eq_policy[eq_depth](exits_feature)[-1] * r, )
+                    mse = nn.MSELoss()
+                    gap_loss = self.g_gap * mse(t_kl, s_kl)
 
-                former_attend_logits = sum(former_attend_logits)
-                former_attend_feature = sum(former_attend_feature)
-                
-                # relation_loss = self.kd_dist_ratio*self.dist_criterion(former_attend_feature.detach(), attend_feature) + self.kd_angle_ratio*self.angle_criterion(former_attend_feature.detach(), attend_feature) + self.kd_dark_ratio*self.dark_criterion(former_attend_feature.detach(), attend_feature)
-                kd_loss = self.g_gap*self.kd_criterion(former_attend_logits, attend_logits.detach())
-                # kd_loss = self.g_gap*relation_loss
-                gap_loss = kd_loss
-                
-                
-                # kd_loss = self.g_gap*torch.mean(torch.mean(torch.abs(former_attend_logits-attend_logits.detach()), dim=1))
+                    loss = ce_loss + div_loss - gap_loss + stt_loss
+                    loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
+                    
+                    CE_LOSS += ce_loss
+                    DIV_LOSS += div_loss
+                    GAP_LOSS += gap_loss
+                    STT_LOSS += stt_loss
             
-            loss = ce_loss + div_loss - gap_loss + stt_loss
-            loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
+            # == update jointly ==
+            for g in self.generators():
+                g[1].step()
             
-            CE_LOSS += ce_loss
-            DIV_LOSS += div_loss
-            GAP_LOSS += gap_loss
-            STT_LOSS += stt_loss
-            
-            optimizer.step()
-        print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
+            print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
     
         
-    def finetune_global_model(self, y_input_g, gen_latent_g):
+    def finetune_global_model(self, y_input_g):
         # == finetune global model , multi teacher to teach each exit ==
         for g in self.generators:
             g[0].eval()
@@ -349,13 +344,13 @@ class Server(BaseServer):
             eq_model.eval() 
         self.global_model.train()
         
-        self.teach_global_model(self.generators, self.kd_n_iters, y_input_g, gen_latent_g)
+        self.teach_global_model(self.generators, self.kd_n_iters, y_input_g)
 
     
-    def teach_global_model(self, gs, n_iters, y_input_g, gen_latent_g):
+    def teach_global_model(self, gs, n_iters, y_input_g):
         
         t_logits_g, t_feature_g = {}, {}
-        
+        gen_latent_g = {}
         for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
             # == new y based y_distribute ==
             attend_eq = [eq_depth for eq_depth in self.eq_depths if t_exit < len(self.eq_exits[eq_depth])]
@@ -367,15 +362,18 @@ class Server(BaseServer):
             # gen_latent, eps = gs[t_exit][0](y_input, )
             # gen_latents[t_exit] = gen_latent.detach()
             
-            y_input, gen_latent = y_input_g[t_exit], gen_latent_g[t_exit]
-
+            y_input = y_input_g[t_exit]
+            eps = torch.rand((y_input_g[t_exit].shape[0], self.generators[self.eq_depths[t_exit]][0].noise_dim)).to(self.device)
+            gen_latent = self.generators[0](y_input, eps)
+            gen_latent_g[t_exit] = gen_latent
+            
             attend_logits = ()
             attend_feature = ()
             for eq_depth in attend_eq:
                 r = self.eq_num[eq_depth] / sum([self.eq_num[eq_depth] for eq_depth in attend_eq])
                 exits_logits, exits_feature = self.eq_model[eq_depth](**self.get_batch(gen_latent, y_input), stop_exit=t_exit, is_latent=self.is_latent, rt_feature=True)
                 attend_logits += (self.eq_policy[eq_depth](exits_logits)[-1] * r, )
-                attend_feature += (self.eq_policy[eq_depth](exits_feature)[-1] * r, )
+                attend_feature += (exits_feature[-1] * r, )
             attend_logits = sum(attend_logits)
             attend_feature = sum(attend_feature)
             
@@ -402,8 +400,6 @@ class Server(BaseServer):
                 t_exit_max_s_logits[t_exit] = max_s_logits
                 t_exit_max_s_feature[t_exit] = max_s_feature
             
-            
-            
             for s_exit in range(len(self.eq_exits[max(self.eq_depths)])):
                 loss = torch.zeros(1).to(self.device)
                 t_exits = (s_exit-1, s_exit, s_exit+1)
@@ -411,7 +407,7 @@ class Server(BaseServer):
                     if t_exit >= 0 and t_exit < len(self.eq_exits[max(self.eq_depths)]):
 
                         s_logits = self.eq_policy[max(self.eq_depths)](t_exit_max_s_logits[t_exit][:s_exit+1])[-1]
-                        s_feature = self.eq_policy[max(self.eq_depths)](t_exit_max_s_feature[t_exit][:s_exit+1])[-1]
+                        s_feature = t_exit_max_s_feature[t_exit][-1]
                         
                         t_logits, t_feature = t_logits_g[t_exit], t_feature_g[t_exit]
                         
