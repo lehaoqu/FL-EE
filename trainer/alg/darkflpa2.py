@@ -420,13 +420,13 @@ class Server(BaseServer):
                         
                         t_logits, t_feature = t_logits_g[t_exit], t_feature_g[t_exit]
                         
-                        # loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        # if t_exit >= s_exit:
-                        #     loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        # else:
-                        #     loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
+                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        if t_exit >= s_exit:
+                            loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        else:
+                            loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
                         
-                        loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
+                        # loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
                                 
                 # Loss += loss
                 Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
