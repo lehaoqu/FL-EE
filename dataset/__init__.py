@@ -2,3 +2,4 @@ from dataset.cifar100_dataset import CIFARClassificationDataset as get_cifar_dat
 from dataset.glue_dataset import GLUEClassificationDataset as get_glue_dataset
 from dataset.svhn_dataset import SVHNClassificationDataset as get_svhn_dataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset as get_imagenet_dataset
+from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset as get_speechcmds_dataset

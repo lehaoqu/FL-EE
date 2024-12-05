@@ -6,7 +6,7 @@ import numpy as np
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from utils.modelload.model import BaseModule
 
-CLASSES = {'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+CLASSES = {'speechcmds':35, 'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 
 class DiversityLoss(nn.Module):
     """
@@ -60,7 +60,7 @@ class Generator_LATENT(BaseModule):
         self.device = args.device if args is not None else 0
         self.embedding = embedding
         # TODO latent_dim n_class will change in glue and cifar
-        if 'cifar' in args.dataset or 'svhn' in args.dataset or 'imagenet' in args.dataset:
+        if 'cifar' in args.dataset or 'svhn' in args.dataset or 'imagenet' in args.dataset or 'speechcmds' in args.dataset:
             if 'tiny' in args.config_path:
                 self.hidden_dim, self.token_num, self.hidden_rs, self.n_class, self.noise_dim = 1000, 197, 192, CLASSES[args.dataset], CLASSES[args.dataset]
             elif 'small' in args.config_path:

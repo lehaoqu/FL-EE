@@ -6,11 +6,13 @@ from dataset import (
     get_cifar_dataset,
     get_glue_dataset,
     get_svhn_dataset,
-    get_imagenet_dataset
+    get_imagenet_dataset,
+    get_speechcmds_dataset
 )
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
+from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from utils.options import args_parser
 from utils.modelload.modelloader import load_model
 import numpy as np
@@ -28,6 +30,8 @@ def adapt_batch(data, args):
                 batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
             elif 'imagenet' in args.dataset:
                 batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
+            elif 'speechcmds' in args.dataset:
+                batch[key] = SPEEDCMDSClassificationDataset.transform_for_vit(batch[key])
             else:
                 batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
     label = batch['labels'].view(-1)
@@ -70,6 +74,9 @@ if 'cifar' in ds:
     get_dataset = get_cifar_dataset
 elif 'imagenet' in ds:
     get_dataset = get_imagenet_dataset
+elif 'speechcmds' in ds:
+    get_dataset = get_speechcmds_dataset
+    ds = 'SpeechCommands'
 elif 'svhn' in ds:
     get_dataset = get_svhn_dataset
 else:
@@ -90,7 +97,7 @@ all_dataset =ConcatDataset([train_dataset, valid_dataset])
 loader_train = torch.utils.data.DataLoader(all_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(all_dataset))
 
-test_dataset = get_glue_dataset(args=args, path=f'dataset/{ds}/test.pkl')
+test_dataset = get_dataset(args=args, path=f'dataset/{ds}/test')
 loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
 print(len(test_dataset))
 
@@ -132,7 +139,7 @@ for epoch in range(200):
         ce_loss.backward()
         optim.step()
         batch_loss.append(ce_loss.detach().cpu().item())
-        # print(ce_loss.detach().cpu().item())
+        print(ce_loss.detach().cpu().item())
         
     print(sum(batch_loss) / len(batch_loss))
     

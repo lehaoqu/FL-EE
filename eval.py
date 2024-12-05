@@ -16,6 +16,7 @@ from utils.modelload.modelloader import load_model_eval
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
+from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 
 
 
@@ -219,6 +220,8 @@ class Tester(object):
                     batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
                 elif 'imagenet' in self.args.dataset:
                     batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
+                elif 'speechcmds' in self.args.dataset:
+                    batch[key] = SPEEDCMDSClassificationDataset.transform_for_vit(batch[key])
                 else:
                     batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
         label = batch['labels'].view(-1)

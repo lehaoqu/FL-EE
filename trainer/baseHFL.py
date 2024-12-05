@@ -11,13 +11,14 @@ from utils.dataloader_utils import load_dataset_loader
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
+from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from utils.dataprocess import DataProcessor
 from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
 
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
-CLASSES = {'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
+CLASSES = {'speechcmds':35, 'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
 
 class BaseClient:
@@ -104,6 +105,8 @@ class BaseClient:
                     batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
                 elif 'imagenet' in self.args.dataset:
                     batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
+                elif 'speechcmds' in self.args.dataset:
+                    batch[key] = SPEEDCMDSClassificationDataset.transform_for_vit(batch[key])
                 else:
                     batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
         label = batch['labels'].view(-1)
@@ -281,6 +284,8 @@ class BaseServer:
                     batch[key] = CIFARClassificationDataset.transform_for_vit(batch[key])
                 elif 'imagenet' in self.args.dataset:
                     batch[key] = TinyImageNetClassificationDataset.transform_for_vit(batch[key])
+                elif 'speechcmds' in self.args.dataset:
+                    batch[key] = SPEEDCMDSClassificationDataset.transform_for_vit(batch[key])
                 else:
                     batch[key] = SVHNClassificationDataset.transform_for_vit(batch[key])
         label = batch['labels'].view(-1)

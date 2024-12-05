@@ -23,7 +23,7 @@ def add_args(parser):
     
     parser.add_argument('--s_epoches',              default=2, type=int)
     parser.add_argument('--s_bs',                   default=32, type=int)
-    parser.add_argument('--adaptive_epoches',       default='False', type=str)
+    parser.add_argument('--adaptive_epoches',       action='store_true')
     
     parser.add_argument('--kd_skip',                default=1, type=int)
     parser.add_argument('--kd_begin',               default=0, type=int)
@@ -59,7 +59,6 @@ def add_args(parser):
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
     
-    parser.add_argument('--noise',                  default=100, type=int, help='noise dim of generator')
     return parser
 
 
@@ -279,7 +278,7 @@ class Server(BaseServer):
         
     def get_batch(self, gen_latent, y_input):
         batch = {}
-        if 'cifar' in self.args.dataset or 'svhn' in self.args.dataset or 'imagenet' in self.args.dataset:
+        if 'cifar' in self.args.dataset or 'svhn' in self.args.dataset or 'imagenet' in self.args.dataset or 'speechcmds' in self.args.dataset:
             batch['pixel_values'] = gen_latent
         else:
             batch['input_ids'] = gen_latent
@@ -479,7 +478,7 @@ class Server(BaseServer):
     
     
     def finetune(self):
-        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())/self.kd_n_iters) if self.args.adaptive_epoches == 'True' else self.s_epoches
+        self.s_epoches = int(sum(self.eq_batch_num.values())/len(self.eq_batch_num.values())/self.kd_n_iters) if self.args.adaptive_epoches else self.s_epoches
         # == train generator & global model ==
         for _ in range(self.s_epoches):
             # == train Difficulty-Conditional Generators ==

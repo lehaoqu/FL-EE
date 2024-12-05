@@ -4,7 +4,8 @@ from dataset import (
     get_cifar_dataset,
     get_glue_dataset,
     get_svhn_dataset,
-    get_imagenet_dataset
+    get_imagenet_dataset,
+    get_speechcmds_dataset
 )
 
 GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 'wnli']
@@ -12,6 +13,7 @@ GLUE = ['douban', 'cola', 'sst2', 'mrpc', 'stsb', 'qqp', 'mnli', 'qnli', 'rte', 
 
 CIFAR = 'cifar100'
 IMAGENET = 'imagenet'
+SPEECHCMDS = 'speechcmds'
 
 SVHN = 'svhn'
 
@@ -42,7 +44,14 @@ def load_dataset_loader(args, file_name=None, id=None, eval_valids=False, shuffl
                 dataset = get_imagenet_dataset(args=args, path=f'dataset/{args.dataset}/{file_name}')
             else:
                 dataset = get_imagenet_dataset(args=args, path=f'dataset/{args.dataset}/{file_name}/{id}.pkl')
-    
+    elif SPEECHCMDS in args.dataset:
+        if eval_valids:
+            dataset = get_speechcmds_dataset(args=args, path=f'dataset/SpeechCommands/valid/', eval_valids=eval_valids)
+        else:
+            if file_name == 'test':
+                dataset = get_speechcmds_dataset(args=args, path=f'dataset/SpeechCommands/{file_name}')
+            else:
+                dataset = get_speechcmds_dataset(args=args, path=f'dataset/SpeechCommands/{file_name}/{id}.pkl')
          
     elif args.dataset in GLUE:
         if eval_valids:

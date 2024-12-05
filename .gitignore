@@ -7,9 +7,11 @@ dataset/glue/
 dataset/svhn/
 dataset/imagenet/
 dataset/emnist/
+dataset/SpeechCommands/
 cifar*/
 models/
 script/08*/
 exps/
+epxs/
 img/
 __pycache__/
