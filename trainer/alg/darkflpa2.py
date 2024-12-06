@@ -31,7 +31,7 @@ def add_args(parser):
     parser.add_argument('--g_lr',                   default=1e-2, type=float)
     parser.add_argument('--g_y',                    default=1, type=float)
     parser.add_argument('--g_div',                  default=1, type=float)
-    parser.add_argument('--g_gap',                  default=0.01, type=float)
+    parser.add_argument('--g_gap',                  default=1, type=float)
     parser.add_argument('--g_diff',                 default=1, type=float)
     parser.add_argument('--g_n_iters',              default=1, type=int)
 
@@ -50,7 +50,6 @@ def add_args(parser):
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
     
-    parser.add_argument('--noise',                  default=100, type=int, help='noise dim of generator')
     return parser
 
 class Client(BaseClient):
@@ -223,7 +222,7 @@ class Server(BaseServer):
             
             # gen_latent_g[t_exit] = gen_latent
             g = self.generators[t_exit][0]
-            # eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
+            eps_g[t_exit] = torch.rand((y_input.shape[0], g.noise_dim)).to(self.device)
 
             # attend_logits = ()
             # for eq_depth in attend_eq:
@@ -231,19 +230,19 @@ class Server(BaseServer):
             # attend_logits = sum(attend_logits)
             
             # ts_logits[t_exit] = attend_logits
-        return y_input_g
+        return y_input_g, eps_g
     
     
     def finetune(self):
         # == train generator & global model ==
         for _ in range(self.s_epoches):
-            y_input_g = self.get_conditional()
+            y_input_g, eps_g = self.get_conditional()
             # gen_latent_g = {}
             # for t_exit in range(len(self.eq_exits[max(self.eq_depths)])):
             #     gen_latent = self.generators[t_exit][0](y_input_g[t_exit], eps_g[t_exit])
             #     gen_latent_g[t_exit] = gen_latent      
 
-            self.train_generators(y_input_g)
+            self.train_generators(y_input_g, eps_g)
             
             for exit, y_input in y_input_g.items():
                 if isinstance(y_input, tuple): y_input_g[exit] = tuple(tensor.detach() for tensor in y_input)
@@ -256,7 +255,7 @@ class Server(BaseServer):
             self.finetune_global_model(y_input_g)
                 
     
-    def train_generators(self, y_input_g):
+    def train_generators(self, y_input_g, eps_g):
         for g in self.generators:
             g[0].to(self.device)
             g[0].train()
@@ -266,20 +265,20 @@ class Server(BaseServer):
         self.global_model.eval()
         
         # == train generators ==
-        self.update_generator(y_input_g)
+        self.update_generator(y_input_g, eps_g)
+    
+    def diff(self, y_input, gen_latent):
+        batch_size = y_input[0].shape[0]
+        exits_diff_preds = torch.zeros(batch_size, self.max_exit).to(self.device)
+        dm_exits_logits, dm_exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
+        dm_exits_logits = self.eq_policy[self.max_depth](dm_exits_logits)
+        for sample_index in range(batch_size):
+            diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
+            exits_diff_preds[sample_index] = exits_diff
+        return exits_diff_preds
     
     
-    def update_generator(self, y_input_g):
-        def diff(y_input, gen_latent):
-            batch_size = y_input[0].shape[0]
-            exits_diff_preds = torch.zeros(batch_size, self.max_exit).to(self.device)
-            dm_exits_logits, dm_exits_feature = self.global_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
-            dm_exits_logits = self.eq_policy[self.max_depth](dm_exits_logits)
-            for sample_index in range(batch_size):
-                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
-                exits_diff_preds[sample_index] = exits_diff
-            return exits_diff_preds
-        
+    def update_generator(self, y_input_g, eps_g):
         n_iters = self.g_n_iters
         
         for i in range(n_iters):
@@ -295,6 +294,7 @@ class Server(BaseServer):
                 eps = torch.rand((y_input_g[exit_idx][0].shape[0], self.generators[exit_idx][0].noise_dim)).to(self.device)
                 eps_g[exit_idx] = eps
                 y_input = y_input_g[exit_idx]
+                # y_input, eps = y_input_g[exit_idx], eps_g[exit_idx]
                 gen_latent = self.generators[exit_idx][0](y_input, eps)
                 gen_latent_g[exit_idx] = gen_latent
                 attend_eq = [eq_depth for eq_depth in self.eq_depths if exit_idx < len(self.eq_exits[eq_depth])]
@@ -308,6 +308,8 @@ class Server(BaseServer):
             
             # == train jointly ==               
             for exit_idx, g in enumerate(self.generators):
+               #  print(str(exit_idx).center(80, '='))
+                
                 s_generator = g[0]
                 
                 # == div kd ce loss for G ==
@@ -321,27 +323,28 @@ class Server(BaseServer):
                 
                 # == gap loss ==
                 gap_loss = self.g_gap*torch.zeros(1).to(self.device)                
+                
                 if exit_idx != 0:
-                    
-                    t_diff = diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
-                    s_diff = diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
-                                        
-                    mse = nn.MSELoss()
-                    gap_loss = self.g_gap * mse(t_diff, s_diff)
+                    t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
+                    s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
+                    # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
+                    gap_loss = self.g_gap * torch.mean(s_diff - t_diff)
 
-                    loss = ce_loss + div_loss - gap_loss + stt_loss
-                    loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
+                loss = ce_loss + div_loss - gap_loss + stt_loss
+                loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
                     
-                    CE_LOSS += ce_loss
-                    DIV_LOSS += div_loss
-                    GAP_LOSS += gap_loss
-                    STT_LOSS += stt_loss
+                CE_LOSS += ce_loss
+                DIV_LOSS += div_loss
+                GAP_LOSS += gap_loss
+                STT_LOSS += stt_loss
+                
+                print(f'ce_loss:{ce_loss.cpu().item():.2f}, div_loss: {div_loss.cpu().item():.2f}, gap_loss: {gap_loss.cpu().item():.4f}')
             
             # == update jointly ==
             for g in self.generators:
                 g[1].step()
             
-            print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
+            # print(f'ce_loss:{CE_LOSS/n_iters}, div_loss: {DIV_LOSS/n_iters}, gap_loss: {GAP_LOSS/n_iters}, stt_loss: {STT_LOSS/n_iters}')
     
         
     def finetune_global_model(self, y_input_g):
@@ -390,9 +393,12 @@ class Server(BaseServer):
             t_feature_g[t_exit] = attend_feature.detach()
             
         Losses = []
+        GAP_Losses = []
         for _ in range(n_iters):
             self.global_optimizer.zero_grad()
             Loss = torch.zeros(1).to(self.device)
+            
+
             
             t_exit_s_exit = {}
             for s_exit in range(len(self.eq_exits[max(self.eq_depths)])):
@@ -420,22 +426,33 @@ class Server(BaseServer):
                         
                         t_logits, t_feature = t_logits_g[t_exit], t_feature_g[t_exit]
                         
-                        loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        if t_exit >= s_exit:
-                            loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
-                        else:
-                            loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
+                        # loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        # if t_exit >= s_exit:
+                        #     loss += self.kd_response_ratio*self.kd_criterion(s_logits, t_logits)
+                        # else:
+                        #     loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
                         
-                        # loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
+                        loss += self.kd_dist_ratio*self.dist_criterion(s_feature, t_feature) + self.kd_angle_ratio*self.angle_criterion(s_feature, t_feature) + self.kd_dark_ratio*self.dark_criterion(s_feature, t_feature) 
                                 
-                # Loss += loss
-                Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
+                Loss += loss
+                # Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
+  
+            for exit_idx in range(1, self.max_exit):
+                # print(str(exit_idx).center(80, '='))
+                t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
+                s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
+                # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
+                gap_loss = self.g_gap * torch.abs(torch.mean(s_diff - t_diff))
+                GAP_Losses.append(gap_loss.item())
+                Loss += gap_loss
   
             Loss.backward()
             self.global_optimizer.step()
             Losses.append(Loss.item())
+        
+        print(f'GAP_Losses: {GAP_Losses}')    
         print(f'Losses: {Losses}')
-
+        
 
     def uplink(self):
         assert (len(self.sampled_clients) > 0)
