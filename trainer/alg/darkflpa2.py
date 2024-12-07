@@ -338,7 +338,7 @@ class Server(BaseServer):
                 GAP_LOSS += gap_loss
                 STT_LOSS += stt_loss
                 
-                print(f'ce_loss:{ce_loss.cpu().item():.2f}, div_loss: {div_loss.cpu().item():.2f}, gap_loss: {gap_loss.cpu().item():.4f}')
+                # print(f'ce_loss:{ce_loss.cpu().item():.2f}, div_loss: {div_loss.cpu().item():.2f}, gap_loss: {gap_loss.cpu().item():.4f}')
             
             # == update jointly ==
             for g in self.generators:
@@ -450,8 +450,8 @@ class Server(BaseServer):
             self.global_optimizer.step()
             Losses.append(Loss.item())
         
-        print(f'GAP_Losses: {GAP_Losses}')    
-        print(f'Losses: {Losses}')
+        # print(f'GAP_Losses: {GAP_Losses}')    
+        # print(f'Losses: {Losses}')
         
 
     def uplink(self):
