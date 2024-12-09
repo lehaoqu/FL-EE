@@ -39,6 +39,10 @@ class FedSim:
                     f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_G.pth'
         output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                     f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.txt'   
+        self.acc_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_acc.json'
+        self.loss_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_loss.json'
         self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                     f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.json'    
 
@@ -99,6 +103,8 @@ class FedSim:
         valid_GAP = self.args.valid_gap if args.dataset not in ('mrpc', 'rte') else 1
         best_acc = 0.0
         best_rnd = 0
+        valid_acc = []
+        losses = []
         try:
             for rnd in tqdm(range(self.server.total_round), desc='Communication Round', leave=False):
                 # ===================== train =====================
@@ -124,6 +130,9 @@ class FedSim:
                 # print(f'========== Round {rnd} ==========\n')
                 acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
                 self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, exits:{acc_exits} loss: {ret_dict['loss']:.2f}\n")
+                if rnd % 10 == 0:
+                    valid_acc.append(ret_dict['acc'])
+                    losses.append(ret_dict['loss'])
                 # self.output.write('wall clock time: %.2f seconds\n' % self.server.wall_clock_time)
                 self.output.flush()
 
@@ -143,6 +152,11 @@ class FedSim:
 
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
+            
+            with open(self.acc_path, 'w') as file:
+                json.dump(valid_acc, file)
+            with open(self.loss_path, 'w') as file:
+                json.dump(losses, file)
 
             self.server.calc_logits(best_model)
             self.server.anytime(self.output)

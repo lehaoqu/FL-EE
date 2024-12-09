@@ -31,7 +31,7 @@ import scipy.io as sio
 
 random.seed(1)
 np.random.seed(1)
-num_clients = 120
+num_clients = 100
 dir_path = "dataset/svhn/"
 train_ratio = 0.8
 

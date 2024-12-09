@@ -125,8 +125,9 @@ class Server(BaseServer):
     def lr_scheduler(self,):
         # == decay lr for generator & global model ==
         for g in self.generators:
-            g[2].step()
-        self.global_scheduler.step()
+            g[1] = torch.optim.Adam(params=g[0].parameters(), lr=self.g_lr * (self.s_gamma ** self.round))
+        
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=1e-3)
    
     
     def kd_criterion(self, pred, teacher):
@@ -147,6 +148,7 @@ class Server(BaseServer):
         self.kd_lr, self.kd_response_ratio, self.kd_dist_ratio, self.kd_angle_ratio, self.kd_dark_ratio = args.kd_lr, args.kd_response_ratio, args.kd_dist_ratio, args.kd_angle_ratio, args.kd_dark_ratio
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99
+        self.s_gamma = args.s_gamma
         
         # == train for global model ==
         # param_optimizer = list(self.global_model.named_parameters())
@@ -158,8 +160,7 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr)
-        self.global_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=self.global_optimizer, gamma=self.gamma)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
         
         # == relation KD loss for small to large ==
         self.dist_criterion = RkdDistance()
@@ -175,8 +176,7 @@ class Server(BaseServer):
         for i in range(len(self.eq_exits[max(self.eq_depths)])):
             generator = Generator_CIFAR(args) if self.is_latent is False else Generator_LATENT(args)
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
-            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.gamma)
-            self.generators.append([generator, optimizer, lr_scheduler])
+            self.generators.append([generator, optimizer])
      
      
     def get_batch(self, gen_latent, y_input):
