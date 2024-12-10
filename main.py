@@ -49,6 +49,9 @@ class FedSim:
         self.output = open(output_path, 'a')
         args.output = self.output
 
+        if os.path.exists(self.loss_path):
+            return
+
         for arg in vars(args):
             self.output.write(f"{arg}: {getattr(args, arg)}\n")
         self.output.flush()
