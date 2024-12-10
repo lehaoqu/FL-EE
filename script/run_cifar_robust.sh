@@ -9,9 +9,6 @@ lr=0.05
 declare -a eq_ratios
 noniids=(1000 1 0.1)
 
-if [ "$2" == "lora" ]; then
-        lr=0.005
-fi
 
 if [ "$3" == "small" ]; then
         eq_ratios="0.4 0.3 0.2 0.1"
@@ -29,7 +26,7 @@ ply=boosted
 for noniid in "${noniids[@]}"
 do
         python main.py darkflpg         $ply   --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
-        python main.py darkflpa2        $ply   --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
+        python main.py darkflpa2        $ply   --s_gamma 0.99 --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
         python main.py eefl             $ply   --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
         python main.py inclusivefl      $ply   --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
         python main.py depthfl          $ply   --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios

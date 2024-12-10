@@ -49,6 +49,7 @@ def add_args(parser):
     
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
+    parser.add_argument('--wd',                     default=1e-3, type=float, help='weight decay')
     
     return parser
 
@@ -127,7 +128,7 @@ class Server(BaseServer):
         for g in self.generators:
             g[1] = torch.optim.Adam(params=g[0].parameters(), lr=self.g_lr * (self.s_gamma ** self.round))
         
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=1e-3)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=self.wd)
    
     
     def kd_criterion(self, pred, teacher):
@@ -149,6 +150,7 @@ class Server(BaseServer):
         self.s_epoches, self.g_n_iters, self.kd_n_iters = args.s_epoches, args.g_n_iters, args.kd_n_iters
         self.gamma = 0.99
         self.s_gamma = args.s_gamma
+        self.wd = args.wd
         
         # == train for global model ==
         # param_optimizer = list(self.global_model.named_parameters())
@@ -160,7 +162,7 @@ class Server(BaseServer):
         # ]
         # optimizer = torch.optim.Adam(params=self.global_model.parameters(), lr=self.kd_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-3, amsgrad=False)
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.gamma)
-        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=1e-3)
+        self.global_optimizer = torch.optim.SGD(params=self.global_model.parameters(), lr=self.kd_lr, weight_decay=self.wd)
         
         # == relation KD loss for small to large ==
         self.dist_criterion = RkdDistance()

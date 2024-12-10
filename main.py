@@ -96,6 +96,9 @@ class FedSim:
 
     def simulate(self):
         
+        if os.path.exists(self.loss_path):
+            return
+        
         # == save global model's config if model is transformer type ==
         with open(self.config_save_path, 'w', encoding='utf-8') as f:
             json.dump(self.server.global_model.config.to_dict(), f, ensure_ascii=False, indent=4)
