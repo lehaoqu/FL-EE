@@ -158,14 +158,13 @@ class FedSim:
 
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
-            
+
+            self.server.calc_logits(best_model)
+            self.server.anytime(self.output)
             with open(self.acc_path, 'w') as file:
                 json.dump(valid_acc, file)
             with open(self.loss_path, 'w') as file:
                 json.dump(losses, file)
-
-            self.server.calc_logits(best_model)
-            self.server.anytime(self.output)
             # self.res_output.write(f'{self.args.alg}, best_rnd: {best_rnd}, acc: {acc_avg:.2f}+-{acc_std:.2f}\n')
 
 

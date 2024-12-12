@@ -6,6 +6,7 @@ import importlib
 from PIL import Image
 import numpy as np
 import argparse
+import json
 
 from tqdm import tqdm
 from transformers import BertTokenizer
@@ -29,12 +30,14 @@ class Eval():
         self.valid_dataset, self.valid_dataloader = load_dataset_loader(args=args, eval_valids=True, shuffle=False)
         self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test', shuffle=False)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
-        self.eval_output = open(self.eval_output_path, 'a')
+        self.eval_output = open(self.eval_output_path, 'w')
+        self.eval_json = f'./{args.suffix}/'
         self.img_dir = args.img_dir
   
         
         
     def eval(self, model_path, config_path):
+
         if 'cifar' in args.dataset:
             if not os.path.exists(self.img_dir):
                 os.makedirs(self.img_dir)
@@ -43,6 +46,8 @@ class Eval():
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
         
+        if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
+            return
         
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
@@ -79,7 +84,7 @@ class Eval():
                 self.sort(self.test_all_sample_cos_exits, self.test_dataset, spec_label)
             # self.sort(self.valid_all_sample_cos_exits, self.valid_dataset)
             
-        
+
         if self.args.if_mode == 'anytime':
             self.anytime()
         elif self.args.if_mode == 'budgeted':
@@ -98,14 +103,17 @@ class Eval():
         acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.n_exits)]
         self.eval_output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, sum(acc_list) / len(acc_list)))
         self.eval_output.flush()
+
         
-    
     def budgeted(self,):
         rnd = 20
         # TODO flops need to be measured
         flops = [i+1 for i in range(self.n_exits)]
         acc_test_list = ''
         exp_flops_list = ''
+        
+        acc_test_np, acc_val_np, exp_flops_np = [],[],[]
+        
         for p in range(1, rnd):
             # self.eval_output.write("\n*********************\n")
             _p = torch.tensor([p * (1.0/(rnd/2))], dtype=torch.float32).to(self.device)
@@ -116,12 +124,17 @@ class Eval():
             acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
             acc_test_list += (str(acc_test)+'\n')
             exp_flops_list += (str(exp_flops.cpu().item())+'\n')
+            acc_test_np.append(acc_test)
+            acc_val_np.append(acc_val)
+            exp_flops_np.append(exp_flops.cpu().item())
             self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
             # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
             self.eval_output.flush()
-        self.eval_output.write(acc_test_list)
-        self.eval_output.write(exp_flops_list)
+        # self.eval_output.write(acc_test_list)
+        # self.eval_output.write(exp_flops_list)
         self.eval_output.flush()
+        with open(self.eval_json+self.model_path+'_eval.json', 'w') as f:
+            json.dump({'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
             
     def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)
@@ -334,6 +347,6 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        print(model_path)
-        if args.policy in model_path and 'G' not in model_path:
+        if args.policy in model_path and 'G' not in model_path and 'loss' not in model_path and 'acc' not in model_path:
+            print(model_path)
             eval.eval(model_path+'.pth', model_path+'.json')

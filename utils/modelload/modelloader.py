@@ -133,10 +133,28 @@ def load_model_eval(args, model_path, config_path=None):
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
            
         exit_config = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)
-        model = based_model.ExitModel(config=exit_config)
-        state_dict = torch.load(model_path)
-        model.load_state_dict(state_dict)
-        print('model load compeleted')
+        if args.ft == 'full':
+            model = based_model.ExitModel(config=exit_config)
+            state_dict = torch.load(model_path)
+            model.load_state_dict(state_dict)
+            
+        elif args.ft == 'lora':
+            model = based_model.ExitModel(config=exit_config)
+            pre_model = based_model.Model.from_pretrained(pretrained_model_name_or_path=args.config_path)
+            model.load_state_dict(pre_model.state_dict(), strict=False)
+            peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
+            model = get_peft_model(model, peft_config)
+            state_dict = torch.load(model_path)
+            new_dict = {}
+            for n, p in state_dict.items():
+                new_dict['base_model.model.'+n]=p
+            # for n, p in new_dict.items():
+            #     print(n)
+            # for n, p in model.named_parameters():
+            #     if p.requires_grad:
+            #         print(n)
+            model.load_state_dict(new_dict, strict=False)
+        print('model load compeleted')   
     
     else:
         exit('Error: unrecognized model')
