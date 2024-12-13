@@ -46,8 +46,8 @@ class Eval():
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
         
-        if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
-            return
+        # if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
+        #     return
         
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
@@ -106,7 +106,7 @@ class Eval():
 
         
     def budgeted(self,):
-        rnd = 20
+        rnd = 40
         # TODO flops need to be measured
         flops = [i+1 for i in range(self.n_exits)]
         acc_test_list = ''
@@ -117,7 +117,7 @@ class Eval():
         for p in range(1, rnd):
             # self.eval_output.write("\n*********************\n")
             _p = torch.tensor([p * (1.0/(rnd/2))], dtype=torch.float32).to(self.device)
-            probs = torch.exp(torch.log(_p) * torch.tensor([i+1 for i in range(self.n_exits)]).to(self.device))
+            probs = torch.exp(torch.log(_p) * torch.tensor([(i+1)*4 for i in range(self.n_exits)]).to(self.device))
             probs /= probs.sum()
             
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
@@ -347,6 +347,6 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if args.policy in model_path and 'G' not in model_path and 'loss' not in model_path and 'acc' not in model_path:
+        if args.policy in model_path and 'G' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'budget' not in model_path:
             print(model_path)
             eval.eval(model_path+'.pth', model_path+'.json')
