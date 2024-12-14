@@ -77,7 +77,7 @@ def draw(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x
         if x_step > 0:
             EPS = 1e-6
             plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step), fontsize=TEXT_SIZE)    
-    plt.legend()
+    plt.legend(loc='lower right')
 
     plt.title(title)
     plt.xlabel(x_label)
@@ -86,11 +86,12 @@ def draw(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x
     # 显示图表
     plt.show()
     plt.savefig(suffix+'/'+path+'.png', dpi=300)
+    plt.savefig('imgs/'+path+'.png', dpi=300)
         
     
     
 
-def cifar_boosted():
+def cifar_full():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1000'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -107,7 +108,7 @@ def cifar_boosted():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    draw(data, path='cifar_budget', title='cifar100_full', x_label='Flops', y_label='Accuracy',
+    draw(data, path='cifar100_full', title='cifar100_full', x_label='Flops', y_label='Accuracy',
          y_range=(66.5, 72),
          x_range=(1.6, 4.0),
          suffix=suffix
@@ -131,12 +132,65 @@ def cifar_lora():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    draw(data, path='cifar_budget', title='cifar100_lora', x_label='Flops', y_label='Accuracy',
+    draw(data, path='cifar100_lora', title='cifar100_lora', x_label='Flops', y_label='Accuracy',
          y_range=(65, 70),
          x_range=(2.2, 4.0),
          x_step=0.5,
          suffix=suffix
          )
+  
+def svhn_full():
+    suffix = 'exps/BASE_SVHN/full_boosted/noniid'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     
-cifar_boosted()    
+    data = {}    
+    for model_path in model_paths:
+        if '_eval' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    draw(data, path='svhn_full', title='svhn_full', x_label='Flops', y_label='Accuracy',
+         y_range=(88, 89.5),
+         y_step=0.5,
+        #  x_range=(2.2, 4.0),
+        #  x_step=0.5,
+         suffix=suffix
+         ) 
+    
+def svhn_lora():
+    suffix = 'exps/BASE_SVHN/lora_boosted/noniid'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_eval' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    draw(data, path='svhn_lora', title='svhn_lora', x_label='Flops', y_label='Accuracy',
+         y_range=(83, 88),
+        #  x_range=(2.2, 4.0),
+        #  x_step=0.5,
+         suffix=suffix
+         )
+        
+    
+svhn_full()
+svhn_lora()
+
+cifar_full()    
 cifar_lora()
