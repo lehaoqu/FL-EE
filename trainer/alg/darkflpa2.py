@@ -50,6 +50,7 @@ def add_args(parser):
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
     parser.add_argument('--wd',                     default=1e-3, type=float, help='weight decay')
+    parser.add_argument('--increase',               action='store_true', help='difficulty increase')
     
     return parser
 
@@ -326,12 +327,13 @@ class Server(BaseServer):
                 # == gap loss ==
                 gap_loss = self.g_gap*torch.zeros(1).to(self.device)                
                 
-                if exit_idx != 0:
-                    t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
-                    s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
-                    # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
-                    gap_loss = self.g_gap * torch.mean(s_diff - t_diff)
-
+                if self.args.increase:
+                    if exit_idx != 0:
+                        t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
+                        s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
+                        # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
+                        gap_loss = self.g_gap * torch.mean(s_diff - t_diff)
+   
                 loss = ce_loss + div_loss - gap_loss + stt_loss
                 loss.backward(retain_graph=True) if i < n_iters - 1 else loss.backward()
                     
@@ -438,15 +440,16 @@ class Server(BaseServer):
                                 
                 Loss += loss
                 # Loss += loss * (s_exit+1) / (sum([i+1 for i in range(len(self.eq_exits[max(self.eq_depths)]))]))
-  
-            for exit_idx in range(1, self.max_exit):
-                # print(str(exit_idx).center(80, '='))
-                t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
-                s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
-                # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
-                gap_loss = self.g_gap * torch.abs(torch.mean(s_diff - t_diff))
-                GAP_Losses.append(gap_loss.item())
-                Loss += gap_loss
+            
+            if self.args.increase:
+                for exit_idx in range(1, self.max_exit):
+                    # print(str(exit_idx).center(80, '='))
+                    t_diff = self.diff(y_input_g[exit_idx-1], gen_latent_g[exit_idx-1]).detach()
+                    s_diff = self.diff(y_input_g[exit_idx], gen_latent_g[exit_idx])
+                    # print(torch.mean(s_diff).cpu().tolist(), torch.mean(t_diff).cpu().tolist())
+                    gap_loss = self.g_gap * torch.abs(torch.mean(s_diff - t_diff))
+                    GAP_Losses.append(gap_loss.item())
+                    Loss += gap_loss
   
             Loss.backward()
             self.global_optimizer.step()

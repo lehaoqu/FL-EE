@@ -129,7 +129,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
 def load_model_eval(args, model_path, config_path=None):
     model_arg = args.model
     dataset_arg = args.dataset
-    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE:
+    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE or SPEECHCMDS in dataset_arg:
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
            
         exit_config = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)

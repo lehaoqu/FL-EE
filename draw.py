@@ -188,9 +188,61 @@ def svhn_lora():
          suffix=suffix
          )
         
+        
+def speechcmds_full():
+    suffix = 'exps/BASE_SPEECHCMDS/full_boosted'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     
-svhn_full()
-svhn_lora()
+    data = {}    
+    for model_path in model_paths:
+        if '_eval' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    draw(data, path='speechcmds_full', title='speechcmds_full', x_label='Flops', y_label='Accuracy',
+        y_range=(91, 94),
+        #  y_step=0.5,
+        #  x_range=(2.2, 4.0),
+        #  x_step=0.5,
+         suffix=suffix
+         ) 
+    
+def speechcmds_lora():
+    suffix = 'exps/BASE_SPEECHCMDS/lora_boosted'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_eval' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    draw(data, path='speechcmds_lora', title='speechcmds_lora', x_label='Flops', y_label='Accuracy',
+        y_range=(87, 92),
+        #  x_range=(2.2, 4.0),
+        #  x_step=0.5,
+         suffix=suffix
+         )       
+ 
+speechcmds_full()
+speechcmds_lora()
+    
+# svhn_full()
+# svhn_lora()
 
-cifar_full()    
-cifar_lora()
+# cifar_full()    
+# cifar_lora()

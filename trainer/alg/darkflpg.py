@@ -618,11 +618,11 @@ class Server(BaseServer):
                         else:
                             batch_size = y_input[0].shape[0]
                             diff_preds = torch.zeros(batch_size, 1).to(self.device)
-                            exits_diff_preds = torch.zeros(batch_size, self.max_exit_num).to(self.device)
+                            exits_diff_preds = torch.zeros(batch_size, 1).to(self.device)
                             dm_exits_logits, dm_exits_feature = self.dm(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                             dm_exits_logits = self.dm_policy(dm_exits_logits)
                             for sample_index in range(batch_size):
-                                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[i][sample_index] for i in range(len(dm_exits_logits))], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
+                                diff_pred, exits_diff = difficulty_measure([dm_exits_logits[0][sample_index]], y_input[0][sample_index], metric=self.args.dm, rt_exits_diff=True)
                                 diff_preds[sample_index] = diff_pred
                                 exits_diff_preds[sample_index] = exits_diff
                             diff = (diff_preds, exits_diff_preds)
