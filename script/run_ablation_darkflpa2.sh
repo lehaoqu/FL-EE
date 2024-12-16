@@ -15,5 +15,5 @@ python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/no
 python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/noniid1_nonincrease/      --device $2 --dataset cifar100_noniid1      --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs 
 python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/noniid0.1_nonincrease/    --device $2 --dataset cifar100_noniid0.1    --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs 
 
-python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/speechcmds_nonincrease --device $2 --dataset speechcmds --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --kd_lr $lr --s_epoches 1 --rnd $rnd 
+python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/speechcmds_nonincrease --device $2 --dataset speechcmds --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --kd_lr $lr --s_epoches 1
 python main.py darkflpa2         $ply  --increase       --ft full --suffix $1/svhn_nonincrease/ --device $2 --dataset svhn --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --s_epoches 2

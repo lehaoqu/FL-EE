@@ -50,7 +50,7 @@ def add_args(parser):
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
     parser.add_argument('--wd',                     default=1e-3, type=float, help='weight decay')
-    parser.add_argument('--increase',               action='store_true', help='difficulty increase')
+    parser.add_argument('--increase',               action='store_false', help='difficulty increase')
     
     return parser
 
