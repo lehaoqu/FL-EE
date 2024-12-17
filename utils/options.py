@@ -11,7 +11,7 @@ def args_parser():
     # ===== train-test mismatch Policy =====
     parser.add_argument('policy', type=str, default='base', help="early exit train-test mismatch policy")
     
-    parser.add_argument('--dataset', type=str, default='mnist')
+    parser.add_argument('--dataset', type=str, default='cifar100_noniid1000')
     parser.add_argument('--model', type=str, default='mlp')
     parser.add_argument('--config_path', type=str, default='models/facebook/deit-tiny-patch16-224')
 

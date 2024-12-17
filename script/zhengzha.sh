@@ -11,12 +11,12 @@ lr=0.05
 
 # python main.py eefl             $3  --rnd $rnd --ft $2 --suffix $1/${2}_${3} --device $4 --dataset speechcmds --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs 
 
-ses=(1)
-sgs=(1)
+ses=(1 2 5 10)
+sgs=(1 0.99)
 for s in "${ses[@]}" 
 do
     for sg in "${sgs[@]}"
     do
-        python main.py darkflpg         $2  --s_epoches $s  --s_gamma $sg   --rnd $rnd --ft lora --suffix $1/lora_${2}/$sg --device $3 --dataset speechcmds    --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --kd_lr $lr
+        python main.py darkflpg         $2  --s_epoches $s  --s_gamma $sg   --rnd $rnd --ft lora --suffix $1/lora_${2}/$sg/$s --device $3 --dataset speechcmds    --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs --kd_lr $lr
     done
 done
