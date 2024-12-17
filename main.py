@@ -45,6 +45,9 @@ class FedSim:
                     f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_loss.json'
         self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
                     f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.json'    
+                    
+        self.distance_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
+            f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_distance.json'
 
         self.output = open(output_path, 'a')
         args.output = self.output
@@ -159,6 +162,9 @@ class FedSim:
             self.output.write('server, max accuracy: %.2f\n' % acc_max)
             self.output.write('server, final accuracy: %.2f +- %.2f\n' % (acc_avg, acc_std))
 
+            if self.args.alg == 'darkflpg':
+                self.server.save_distance(self.distance_path)
+            
             self.server.calc_logits(best_model)
             self.server.anytime(self.output)
             with open(self.acc_path, 'w') as file:

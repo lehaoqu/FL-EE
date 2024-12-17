@@ -6,7 +6,7 @@ import math
 import numpy as np
 import os
 import copy
-import warnings
+import warnings, json
 warnings.simplefilter('always', UserWarning)
 
 from typing import *
@@ -274,6 +274,7 @@ class Server(BaseServer):
         self.max_exit_num = len(self.eq_exits[max(self.eq_depths)])
         self.sw_net = MLP_tanh(input_size=3, output_size=1, hidden_size=100).to(self.device)
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3)
+        self.t2s_weights_list = []
         
         
     def get_batch(self, gen_latent, y_input):
@@ -421,6 +422,8 @@ class Server(BaseServer):
                     sample_distance = self.diff_distance(s_diff_exits, (diff, exits_diff), sample_index)
                     for s_exit_idx in range(s_exits_num):
                         weight_t_exits[s_exit_idx] = weight_t_exits[s_exit_idx] + sample_distance[s_exit_idx]
+                distance = weight_t_exits.detach().cpu().tolist()
+                
                 weight_t_exits = F.softmax(-weight_t_exits, dim=0)
                 max_weight = weight_t_exits.max()
                 weight_t_exits = (weight_t_exits == max_weight).float() if self.args.sw_type == 'hard' else weight_t_exits
@@ -472,9 +475,8 @@ class Server(BaseServer):
                 s, t = s_logits, e_t_logits.detach()
                 gap_kd_loss = self.kd_response_ratio*self.kd_criterion(s, t) * s_logits.shape[0]
                 gap_loss += gap_kd_loss
-             
         gap_loss = gap_loss / sum
-        return gap_loss
+        return gap_loss, distance
     
     
     def finetune(self):
@@ -600,6 +602,7 @@ class Server(BaseServer):
             
             sl_Loss = 0.0
             if 'sl' in self.args.kd_direction:
+                dct={}
                 teacher_sum = sum([self.eq_num[eq_depth] for eq_depth in self.eq_depths[:-1]])
                 for idx, eq_depth in enumerate(self.eq_depths):
                     if eq_depth == max(self.eq_depths): continue
@@ -635,7 +638,10 @@ class Server(BaseServer):
                     
                     s_exits_logits, s_exits_feature = s_model(**self.get_batch(gen_latent, y_input), is_latent=self.is_latent, rt_feature=True)
                     s_exits_logits = s_policy(s_exits_logits)
-                    sl_Loss += self.kd_gap * self.eq_num[eq_depth]/teacher_sum * self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
+                    loss, distance = self.gap_loss(diff, y_input[0], t_selected_index_list, eq_depth, (t_exits_logits, t_exits_feature), (s_exits_logits, s_exits_feature))
+                    sl_Loss += self.kd_gap * self.eq_num[eq_depth]/teacher_sum * loss
+                    dct[eq_depth] = distance
+                self.t2s_weights_list.append(dct) if _ == n_iters-1 else None
                 
             ls_Loss = 0.0
             if 'ls' in self.args.kd_direction:
@@ -755,4 +761,9 @@ class Server(BaseServer):
             g_model = g[0]
             generator_save_path_i = f'{generator_save_path}_{i}.pth'
             g_model.save_model(generator_save_path_i)
-        
+    
+    
+    def save_distance(self, path):
+        with open(path, 'w') as f:
+            json.dump(self.t2s_weights_list, f)
+            
