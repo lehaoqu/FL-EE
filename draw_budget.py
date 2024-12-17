@@ -144,7 +144,7 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
         
     
 
-def cifar_full_1000():
+def cifar_Full_1000():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1000'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -161,13 +161,13 @@ def cifar_full_1000():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid1000_full', title=f'cifar100_noniid1000_full', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full', x_label='Flops', y_label='Accuracy',
          y_range=(66.5, 72),
          x_range=(1.6, 4.0),
          suffix=suffix
          )
     
-def cifar_lora_1000():
+def cifar_LORA_1000():
     suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1000'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -184,14 +184,14 @@ def cifar_lora_1000():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid1000_lora', title=f'cifar100_noniid1000_lora', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid1000_LORA', title=f'CIFAR100_noniid1000_LORA', x_label='Flops', y_label='Accuracy',
          y_range=(65, 70),
          x_range=(2.2, 4.0),
          x_step=0.5,
          suffix=suffix
          )
   
-def cifar_full_1():
+def cifar_Full_1():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -208,13 +208,13 @@ def cifar_full_1():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid1_full', title=f'cifar100_noniid1_full', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid1_Full', title=f'CIFAR100_noniid1_Full', x_label='Flops', y_label='Accuracy',
         y_range=(66, 70.5),
         x_range=(1.8, 4.0),
         suffix=suffix
         )
     
-def cifar_lora_1():
+def cifar_LORA_1():
     suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -231,14 +231,14 @@ def cifar_lora_1():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid1_lora', title=f'cifar100_noniid1_lora', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid1_LORA', title=f'CIFAR100_noniid1_LORA', x_label='Flops', y_label='Accuracy',
          y_range=(65, 70),
          x_range=(2.2, 4.0),
          x_step=0.5,
          suffix=suffix
          )
   
-def cifar_full_01():
+def cifar_Full_01():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid0.1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -255,13 +255,13 @@ def cifar_full_01():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid0.1_full', title=f'cifar100_noniid0.1_full', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid0.1_Full', title=f'CIFAR100_noniid0.1_Full', x_label='Flops', y_label='Accuracy',
          y_range=(60, 66),
          x_range=(1.6, 4.0),
          suffix=suffix
          )
     
-def cifar_lora_01():
+def cifar_LORA_01():
     suffix = 'exps/BASE_CIFAR/lora_boosted/noniid0.1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -278,7 +278,7 @@ def cifar_lora_01():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path=f'cifar100_noniid0.1_lora', title=f'cifar100_noniid0.1_lora', x_label='Flops', y_label='Accuracy',
+    budget(data, path=f'CIFAR100_noniid0.1_LORA', title=f'CIFAR100_noniid0.1_LORA', x_label='Flops', y_label='Accuracy',
          y_range=(50, 66),
          x_range=(1.5, 4.0),
          x_step=0.5,
@@ -286,7 +286,7 @@ def cifar_lora_01():
          )
    
   
-def svhn_full():
+def svhn_Full():
     suffix = 'exps/BASE_SVHN/full_boosted/noniid'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -303,7 +303,7 @@ def svhn_full():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path='svhn_full', title='svhn_full', x_label='Flops', y_label='Accuracy',
+    budget(data, path='SVHN_Full', title='SVHN_Full', x_label='Flops', y_label='Accuracy',
          y_range=(88, 89.5),
          y_step=0.5,
         #  x_range=(2.2, 4.0),
@@ -311,7 +311,7 @@ def svhn_full():
          suffix=suffix
          ) 
     
-def svhn_lora():
+def svhn_LORA():
     suffix = 'exps/BASE_SVHN/lora_boosted/noniid'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -328,14 +328,14 @@ def svhn_lora():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path='svhn_lora', title='svhn_lora', x_label='Flops', y_label='Accuracy',
+    budget(data, path='SVHN_LORA', title='SVHN_LORA', x_label='Flops', y_label='Accuracy',
          y_range=(83, 88),
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
          suffix=suffix
          )
            
-def speechcmds_full():
+def speechcmds_Full():
     suffix = 'exps/BASE_SPEECHCMDS/full_boosted'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -352,7 +352,7 @@ def speechcmds_full():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path='speechcmds_full', title='speechcmds_full', x_label='Flops', y_label='Accuracy',
+    budget(data, path='SpeechCmds_Full', title='SpeechCmds_Full', x_label='Flops', y_label='Accuracy',
         y_range=(91, 94),
         #  y_step=0.5,
         #  x_range=(2.2, 4.0),
@@ -360,7 +360,7 @@ def speechcmds_full():
          suffix=suffix
          ) 
     
-def speechcmds_lora():
+def speechcmds_LORA():
     suffix = 'exps/BASE_SPEECHCMDS/lora_boosted'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -377,7 +377,7 @@ def speechcmds_lora():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    budget(data, path='speechcmds_lora', title='speechcmds_lora', x_label='Flops', y_label='Accuracy',
+    budget(data, path='SpeechCmds_LORA', title='SpeechCmds_LORA', x_label='Flops', y_label='Accuracy',
         y_range=(87, 92),
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
@@ -387,7 +387,7 @@ def speechcmds_lora():
 
 
 
-def cifar_full_acc_1000():
+def cifar_Full_acc_1000():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1000'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -404,14 +404,14 @@ def cifar_full_acc_1000():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid1000_full', title=f'cifar100_noniid1000_full_acc', x_label='Round', y_label='Accuracy',
+    round(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full_acc', x_label='Round', y_label='Accuracy',
         #  y_range=(54, 66),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def cifar_full_acc_1():
+def cifar_Full_acc_1():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -428,14 +428,14 @@ def cifar_full_acc_1():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid1_full', title=f'cifar100_noniid1_full_acc', x_label='Round', y_label='Accuracy',
+    round(data, path=f'CIFAR100_noniid1_Full', title=f'CIFAR100_noniid1_Full_acc', x_label='Round', y_label='Accuracy',
         #  y_range=(50, 66),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def cifar_full_acc_01():
+def cifar_Full_acc_01():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid0.1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -452,14 +452,14 @@ def cifar_full_acc_01():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid0.1_full', title=f'cifar100_noniid0.1_full_acc', x_label='Round', y_label='Accuracy',
+    round(data, path=f'CIFAR100_noniid0.1_Full', title=f'CIFAR100_noniid0.1_Full_acc', x_label='Round', y_label='Accuracy',
         #  y_range=(54, 62),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def svhn_full_acc():
+def svhn_Full_acc():
     suffix = 'exps/BASE_SVHN/full_boosted/noniid'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -476,13 +476,13 @@ def svhn_full_acc():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path='svhn_full', title='svhn_full_acc', x_label='Round', y_label='Accuracy',
+    round(data, path='SVHN_Full', title='SVHN_Full_acc', x_label='Round', y_label='Accuracy',
          y_range=(90, 95),
          y_step=2,
          suffix=suffix
          )
 
-def speechcmds_full_acc():
+def speechcmds_Full_acc():
     suffix = 'exps/BASE_SPEECHCMDS/full_boosted'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -499,14 +499,14 @@ def speechcmds_full_acc():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path='speechcmds_full', title='speechcmds_full_acc', x_label='Round', y_label='Accuracy',
+    round(data, path='SpeechCmds_Full', title='SpeechCmds_Full_acc', x_label='Round', y_label='Accuracy',
          y_range=(90.5, 93.6),
          y_step=0.5,
          suffix=suffix
          )
 
 
-def cifar_full_loss_1000():
+def cifar_Full_loss_1000():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1000'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -523,14 +523,14 @@ def cifar_full_loss_1000():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid1000_full', title=f'cifar100_noniid1000_full_loss', x_label='Round', y_label='Loss',
+    round(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full_loss', x_label='Round', y_label='Loss',
         #  y_range=(54, 66),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def cifar_full_loss_1():
+def cifar_Full_loss_1():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -547,14 +547,14 @@ def cifar_full_loss_1():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid1_full', title=f'cifar100_noniid1_full_loss', x_label='Round', y_label='Loss',
+    round(data, path=f'CIFAR100_noniid1_Full', title=f'CIFAR100_noniid1_Full_loss', x_label='Round', y_label='Loss',
         #  y_range=(50, 66),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def cifar_full_loss_01():
+def cifar_Full_loss_01():
     suffix = 'exps/BASE_CIFAR/full_boosted/noniid0.1'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -571,14 +571,14 @@ def cifar_full_loss_01():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path=f'cifar100_noniid0.1_full', title=f'cifar100_noniid0.1_full_loss', x_label='Round', y_label='Loss',
+    round(data, path=f'CIFAR100_noniid0.1_Full', title=f'CIFAR100_noniid0.1_Full_loss', x_label='Round', y_label='Loss',
         #  y_range=(54, 62),
         #  y_step=2,
         #  x_range=(1.6, 4.0),
          suffix=suffix
          )
 
-def svhn_full_loss():
+def svhn_Full_loss():
     suffix = 'exps/BASE_SVHN/full_boosted/noniid'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -595,13 +595,13 @@ def svhn_full_loss():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path='svhn_full', title='svhn_full_loss', x_label='Round', y_label='Loss',
+    round(data, path='SVHN_Full', title='SVHN_Full_loss', x_label='Round', y_label='Loss',
         #  y_range=(90, 95),
         #  y_step=2,
          suffix=suffix
          )
 
-def speechcmds_full_loss():
+def speechcmds_Full_loss():
     suffix = 'exps/BASE_SPEECHCMDS/full_boosted'
     eval_dir = suffix
     file_names = os.listdir(eval_dir)
@@ -618,7 +618,7 @@ def speechcmds_full_loss():
             if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
-    round(data, path='speechcmds_full', title='speechcmds_full_loss', x_label='Round', y_label='Loss',
+    round(data, path='SpeechCmds_Full', title='SpeechCmds_Full_loss', x_label='Round', y_label='Loss',
         #  y_range=(90.5, 93.6),
         #  y_step=0.5,
          suffix=suffix
@@ -629,32 +629,32 @@ def speechcmds_full_loss():
 
 
 #== BUDGET ==
-cifar_full_1000()    
-cifar_lora_1000()
-cifar_full_1()    
-cifar_lora_1()
-cifar_full_01()    
-cifar_lora_01()
+cifar_Full_1000()    
+cifar_LORA_1000()
+cifar_Full_1()    
+cifar_LORA_1()
+cifar_Full_01()    
+cifar_LORA_01()
 
-svhn_full()
-svhn_lora()
+svhn_Full()
+svhn_LORA()
 
-speechcmds_full()
-speechcmds_lora()
+speechcmds_Full()
+speechcmds_LORA()
     
 
 # == ACC ==
-cifar_full_acc_1000()
-cifar_full_acc_1()
-cifar_full_acc_01()
+cifar_Full_acc_1000()
+cifar_Full_acc_1()
+cifar_Full_acc_01()
 # # 不太行
-svhn_full_acc()
-speechcmds_full_acc()
+svhn_Full_acc()
+speechcmds_Full_acc()
 
 
 # == LOSS ==
-cifar_full_loss_1000()
-cifar_full_loss_1()
-cifar_full_loss_01()
-svhn_full_loss()
-speechcmds_full_loss()
+cifar_Full_loss_1000()
+cifar_Full_loss_1()
+cifar_Full_loss_01()
+svhn_Full_loss()
+speechcmds_Full_loss()
