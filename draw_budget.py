@@ -4,17 +4,17 @@ import numpy as np
 import json
 import argparse
 import os
+import math
 
 plt.rcParams['axes.prop_cycle']
 matplotlib.rcParams['font.family'] = 'Times New Roman'
 
 RATIO=1.7
 
-MARKER_SIZE = 10/RATIO
-TEXT_SIZE = 14/RATIO
-
 LINE_WIDTH = 2/RATIO
 MARKER_EDGE_WITH=2/RATIO
+MARKER_SIZE = 10/RATIO
+TEXT_SIZE = 30/RATIO
 
 GRAY = '#777777'
 DARK_GRAY = '#333333'
@@ -32,19 +32,21 @@ LIGHT_GREEN = '#A8D7A3'  # Lightened version of DARK_GREEN
 LIGHT_BLUE = '#A3B9E1'  # Lightened version of DEEP_DARK_BLUE
 LIGHT_RED = '#FF9999'  # Lightened version of RED
 
-RATIO=1.7
 
-MARKER_SIZE = 10/RATIO
-TEXT_SIZE = 14/RATIO
 COLORS = [GRAY, DARK_GRAY, PURPLE, BROWN, DARK_GREEN, DEEP_DARK_BLUE, RED]
 LIGHT_COLORS = [LIGHT_GRAY, LIGHT_DARK_GRAY, LIGHT_PURPLE, LIGHT_BROWN, LIGHT_GREEN, LIGHT_BLUE, LIGHT_RED]
 
+YELLOW  = '#FFCC5B'
+GREEN   = '#3FB11D'
+BLUE    = '#4DD0FD'
+PURPLE  = '#BF00BF'
 
-COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl':BROWN, 'reefl': DARK_GREEN, 'inclusivefl': GRAY, 'scalefl': DEEP_DARK_BLUE, 'exclusivefl': DARK_GRAY}
+
+COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl': YELLOW, 'reefl': GREEN, 'inclusivefl': BLUE, 'scalefl': PURPLE, 'exclusivefl': DARK_GRAY}
 MARKER={'darkflpa2':'none', 'darkflpg': 'none', 'eefl':'s', 'depthfl':'s', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
 STYLE={'darkflpa2':'-', 'darkflpg': '-', 'eefl':'--', 'depthfl':'--', 'reefl': '--', 'inclusivefl': '--', 'scalefl': '--', 'exclusivefl': '--'}
 NAMES = {'darkflpa2':'DarkDistill+', 'darkflpg': 'DarkDistill', 'eefl':'EEFL', 'depthfl':'DepthFL', 'reefl': 'ReeFL', 'inclusivefl': 'InclusiveFL', 'scalefl': 'ScaleFL', 'exclusivefl': 'ExclusiveFL'}
-
+APPS = ['inclusivefl', 'scalefl', 'depthfl', 'reefl', 'darkflpg', 'darkflpa2']
 
 def args_parser():
     parser = argparse.ArgumentParser()
@@ -55,12 +57,12 @@ def args_parser():
 
 def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x_step=1, suffix=''):
     fig, ax = plt.subplots()
-
-    for model_name in data.keys():
+    
+    for model_name in APPS:
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
         #     continue
-        x = data[model_name]['flops']
-        y = data[model_name]['test']
+        x = data[model_name]['flops'][:25] +  data[model_name]['flops'][25::3]
+        y = data[model_name]['test'][:25] + data[model_name]['test'][25::3]
         
         plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name])
 
@@ -69,20 +71,20 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
         plt.ylim(*y_range)
         if y_step > 0:
             EPS = 1e-6
-            plt.yticks(np.arange(y_range[0], y_range[1] + EPS, y_step), fontsize=TEXT_SIZE)    
+            plt.yticks(np.arange(y_range[0], y_range[1] + EPS, y_step),)    
     
 
     if len(x_range) == 2:
         plt.xlim(*x_range)
         if x_step > 0:
             EPS = 1e-6
-            plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step), fontsize=TEXT_SIZE)    
-    plt.legend(loc='lower right')
+            plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step),)    
+    plt.legend(ncol=3, loc="lower center")
 
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-
+    # plt.title(title, fontsize=TEXT_SIZE)
+    plt.xlabel(x_label, fontsize=TEXT_SIZE)
+    plt.ylabel(y_label, fontsize=TEXT_SIZE)
+    plt.grid()
     # 显示图表
     plt.show()
     
@@ -95,16 +97,16 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
     plt.savefig(o_dir+path+'.png', dpi=300)
     plt.savefig(t_dir+path+'.png', dpi=300)
         
-
 def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x_step=1, suffix=''):
     fig, ax = plt.subplots()
 
-    for model_name in data.keys():
+    for model_name in APPS:
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
         #     continue
         x = [i*10 for i in range(50)]
         y = data[model_name]
-                
+        if 'loss' in title and 'scalefl' in model_name:
+            y = [l*4 for l in y]
         plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], linestyle=STYLE[model_name])
 
 
@@ -120,12 +122,16 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
         if x_step > 0:
             EPS = 1e-6
             plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step), fontsize=TEXT_SIZE)    
-    plt.legend(loc='lower right')
+    if 'loss' in title:
+        plt.legend(loc='upper right')
+    else:
+        plt.legend(loc='lower right')
 
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-
+    # plt.title(title, fontsize=TEXT_SIZE)
+    plt.xlabel(x_label, fontsize=TEXT_SIZE)
+    plt.ylabel(y_label, fontsize=TEXT_SIZE)
+    plt.grid()
+    
     # 显示图表
     plt.show()
     
@@ -162,8 +168,8 @@ def cifar_Full_1000():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full', x_label='Flops', y_label='Accuracy',
-         y_range=(66.5, 72),
-         x_range=(1.6, 4.0),
+         y_range=(50, 72),
+        #  x_range=(1.6, 4.0),
          suffix=suffix
          )
     
@@ -285,6 +291,7 @@ def cifar_LORA_01():
          suffix=suffix
          )
    
+
   
 def svhn_Full():
     suffix = 'exps/BASE_SVHN/full_boosted/noniid'
@@ -383,7 +390,6 @@ def speechcmds_LORA():
         #  x_step=0.5,
          suffix=suffix
          )       
-
 
 
 
@@ -504,6 +510,7 @@ def speechcmds_Full_acc():
          y_step=0.5,
          suffix=suffix
          )
+
 
 
 def cifar_Full_loss_1000():
@@ -643,18 +650,18 @@ speechcmds_Full()
 speechcmds_LORA()
     
 
-# == ACC ==
-cifar_Full_acc_1000()
-cifar_Full_acc_1()
-cifar_Full_acc_01()
-# # 不太行
-svhn_Full_acc()
-speechcmds_Full_acc()
+# # = ACC ==
+# cifar_Full_acc_1000()
+# cifar_Full_acc_1()
+# cifar_Full_acc_01()
+# # # 不太行
+# svhn_Full_acc()
+# speechcmds_Full_acc()
 
 
-# == LOSS ==
-cifar_Full_loss_1000()
-cifar_Full_loss_1()
-cifar_Full_loss_01()
-svhn_Full_loss()
-speechcmds_Full_loss()
+# # == LOSS ==
+# cifar_Full_loss_1000()
+# cifar_Full_loss_1()
+# cifar_Full_loss_01()
+# svhn_Full_loss()
+# speechcmds_Full_loss()

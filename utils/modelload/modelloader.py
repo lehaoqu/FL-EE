@@ -57,7 +57,8 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
                 depth = min(12, model_depth+1)
             
             # scale = math.sqrt(model_depth / depth)
-            scale = scales[model_depth]
+            scale = model_depth / depth
+            # scale = scales[model_depth]
             eq_config.num_hidden_layers = depth
             eq_config.hidden_size = int(eq_config.hidden_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
             eq_config.intermediate_size = int(eq_config.intermediate_size * scale // eq_config.num_attention_heads * eq_config.num_attention_heads)
@@ -118,7 +119,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
         for n, p in model.named_parameters():
-            if 'accumulator' in n:
+            if 'accumulator' in n or 'classifier' in n:
                 p.requires_grad = True
                         
     # for n, p in model.named_parameters():
