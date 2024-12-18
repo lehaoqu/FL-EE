@@ -36,8 +36,10 @@ class MetaSGD(torch.optim.SGD):
         dampening = group['dampening']
         nesterov = group['nesterov']
         lr = group['lr']
+        with_grad_named_parameters = [(n, p) for n, p in self.net.named_parameters() if p.requires_grad is True]
 
-        for (name, parameter), grad in zip(self.net.named_parameters(), grads):
+        for (name, parameter), grad in zip(with_grad_named_parameters, grads):
+            # print(name, parameter.requires_grad, parameter.grad, grad)
             parameter.detach_()
             if weight_decay != 0:
                 grad_wd = grad.add(parameter, alpha=weight_decay)
@@ -205,7 +207,8 @@ class Policy():
         # pseudo_loss_multi_exits.backward(retain_graph=True)
         # pseudo_optimizer.step()
 
-        pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, pseudo_net.parameters(), create_graph=True, allow_unused=True)
+        params_with_grad = [param for param in pseudo_net.parameters() if param.requires_grad]
+        pseudo_grads = torch.autograd.grad(pseudo_loss_multi_exits, params_with_grad, create_graph=True, allow_unused=True)
 
         # # 获取未使用的参数名称
         # used_params = {p for g, p in zip(pseudo_grads, list(pseudo_net.parameters())) if g is not None}
