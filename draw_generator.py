@@ -15,6 +15,10 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import StandardScaler
 
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -106,16 +110,16 @@ def darkflpg_draw(label, dir, title):
     plt.savefig(f'{dir}label{label}.png')
 
 
-darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
-darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
-darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
+# darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
+# darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
+# darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
 
 
 def darkflpa_draw(label, dir, title):
     COLORS = [RED, DARK_GREEN, BROWN, PURPLE]
     args.diff_generator=False
     gs = []
-    ALL=64
+    ALL=300
     for i in range(4):
         a = torch.load(f'exps/BASE_CIFAR/full_boosted/noniid1000/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_G_{i}.pth')
         g = Generator_LATENT(args)
@@ -141,7 +145,7 @@ def darkflpa_draw(label, dir, title):
     X = imgs.detach().cpu().numpy()
 
     # 创建t-SNE对象，并指定降维后的维度为2
-    tsne = TSNE(n_components=2)
+    tsne = TSNE(n_components=2, n_iter=250)
 
     # 对数据进行降维
     print(X.shape)
@@ -149,7 +153,7 @@ def darkflpa_draw(label, dir, title):
 
     # 可视化降维后的结果
     for idx in range(4):
-        plt.scatter(result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 0], result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 1], color=COLORS[idx], label=f'Generator {idx}')
+        plt.scatter(result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 0], result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 1], color=COLORS[idx], label=f'Generator {idx}', alpha=0.5)
 
     plt.legend(loc='lower right')
     plt.xlabel('t-SNE Component 1')
@@ -159,6 +163,6 @@ def darkflpa_draw(label, dir, title):
     plt.savefig(f'{dir}label{label}.png')
     
     
-darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {20}')    
+darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {0}')    
 darkflpa_draw(50, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {50}')    
 darkflpa_draw(99, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {99}')

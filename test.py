@@ -1,44 +1,31 @@
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
 import numpy as np
-
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import StandardScaler
 
-# 假设X是包含多个向量的数组，shape为(num_samples, num_features)
-X1 = np.random.rand(32, 4)*0.1  # 示例数据
+# 假设X是你的数据，labels是对应的标签
+# X, labels = load_your_data()  # 替换为加载数据的代码
 
-X2 = np.random.rand(32, 4)*10
+# 标准化数据
+X_scaled = StandardScaler().fit_transform(X)
 
-X = np.concatenate((X1, X2), axis=0)
+# 应用t-SNE
+tsne = TSNE(n_components=2, random_state=0)
+X_tsne = tsne.fit_transform(X_scaled)
 
-# 假设data是一个包含多个向量的NumPy数组，每个向量有10个维度
+# 绘制散点图
+plt.figure(figsize=(10, 8))
+scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='viridis', s=50)
 
+# 添加渐变背景
+x_min, x_max = X_tsne[:, 0].min() - 1, X_tsne[:, 0].max() + 1
+y_min, y_max = X_tsne[:, 1].min() - 1, X_tsne[:, 1].max() + 1
+xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100), np.linspace(y_min, y_max, 100))
+Z = tsne.fit_transform(StandardScaler().fit_transform(np.c_[xx.ravel(), yy.ravel()]))
+Z = Z.reshape(xx.shape)
+plt.contourf(xx, yy, Z, cmap='viridis', alpha=0.3)
 
-# 创建t-SNE对象，并指定降维后的维度为2
-tsne = TSNE(n_components=2)
-
-# 对数据进行降维
-result = tsne.fit_transform(X)
-
-# 可视化降维后的结果
-plt.scatter(result[:32, 0], result[:32, 1])
-
-plt.scatter(result[32:, 0], result[32:, 1], color='red')
-
-
-# tsne = TSNE(n_components=2)
-
-# # 对数据进行降维
-# result = tsne.fit_transform(X)
-
-# # 可视化降维后的结果
-# plt.scatter(result[:, 0], result[:, 1], color='red')
-
-plt.xlabel('t-SNE Component 1')
-plt.ylabel('t-SNE Component 2')
-plt.title('t-SNE Visualization of Vectors')
+# 显示图表
+plt.colorbar(scatter)
+plt.title('t-SNE with Gradient Background')
 plt.show()
-plt.savefig('test.png')

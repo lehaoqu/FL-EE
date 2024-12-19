@@ -5,6 +5,7 @@ import json
 import argparse
 import os
 import math
+from scipy.interpolate import make_interp_spline
 
 plt.rcParams['axes.prop_cycle']
 matplotlib.rcParams['font.family'] = 'Times New Roman'
@@ -16,33 +17,17 @@ MARKER_EDGE_WITH=2/RATIO
 MARKER_SIZE = 10/RATIO
 TEXT_SIZE = 30/RATIO
 
-GRAY = '#777777'
-DARK_GRAY = '#333333'
-PURPLE = '#988ED5'
+
 BROWN = '#8C6D31'
-DARK_GREEN = '#467821'
-DEEP_DARK_BLUE = '#253494'
 RED = '#FF0000'
-
-LIGHT_DARK_GRAY = '#A6A6A6'  # Lightened version of DARK_GRAY
-LIGHT_GRAY = '#D3D3D3'  # Lightened version of GRAY
-LIGHT_PURPLE = '#D6CDEA'  # Lightened version of PURPLE
-LIGHT_BROWN = '#D6B37E'  # Lightened version of BROWN
-LIGHT_GREEN = '#A8D7A3'  # Lightened version of DARK_GREEN
-LIGHT_BLUE = '#A3B9E1'  # Lightened version of DEEP_DARK_BLUE
 LIGHT_RED = '#FF9999'  # Lightened version of RED
-
-
-COLORS = [GRAY, DARK_GRAY, PURPLE, BROWN, DARK_GREEN, DEEP_DARK_BLUE, RED]
-LIGHT_COLORS = [LIGHT_GRAY, LIGHT_DARK_GRAY, LIGHT_PURPLE, LIGHT_BROWN, LIGHT_GREEN, LIGHT_BLUE, LIGHT_RED]
-
 YELLOW  = '#FFCC5B'
 GREEN   = '#3FB11D'
 BLUE    = '#4DD0FD'
 PURPLE  = '#BF00BF'
 
 
-COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl': YELLOW, 'reefl': GREEN, 'inclusivefl': BLUE, 'scalefl': PURPLE, 'exclusivefl': DARK_GRAY}
+COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl': YELLOW, 'reefl': GREEN, 'inclusivefl': BLUE, 'scalefl': PURPLE, 'exclusivefl': BROWN}
 MARKER={'darkflpa2':'none', 'darkflpg': 'none', 'eefl':'s', 'depthfl':'s', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
 STYLE={'darkflpa2':'-', 'darkflpg': '-', 'eefl':'--', 'depthfl':'--', 'reefl': '--', 'inclusivefl': '--', 'scalefl': '--', 'exclusivefl': '--'}
 NAMES = {'darkflpa2':'DarkDistill+', 'darkflpg': 'DarkDistill', 'eefl':'EEFL', 'depthfl':'DepthFL', 'reefl': 'ReeFL', 'inclusivefl': 'InclusiveFL', 'scalefl': 'ScaleFL', 'exclusivefl': 'ExclusiveFL'}
@@ -61,8 +46,12 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
     for model_name in APPS:
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
         #     continue
-        x = data[model_name]['flops'][:25] +  data[model_name]['flops'][25::3]
-        y = data[model_name]['test'][:25] + data[model_name]['test'][25::3]
+        x = data[model_name]['flops'][5:25] +  data[model_name]['flops'][25::3]
+        y = data[model_name]['test'][5:25] + data[model_name]['test'][25::3]
+        # print(x)
+        # spl = make_interp_spline(x,y)
+        # x_smooth = np.linspace(min(x), max(x), 200)
+        # y_smooth = spl(x_smooth)
         
         plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name])
 
