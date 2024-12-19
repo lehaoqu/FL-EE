@@ -1,31 +1,29 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
-from sklearn.preprocessing import StandardScaler
 
-# 假设X是你的数据，labels是对应的标签
-# X, labels = load_your_data()  # 替换为加载数据的代码
 
-# 标准化数据
-X_scaled = StandardScaler().fit_transform(X)
-
-# 应用t-SNE
-tsne = TSNE(n_components=2, random_state=0)
-X_tsne = tsne.fit_transform(X_scaled)
+# 假设这些是你的数据点坐标（示例数据）
+x1 = np.random.randn(100)
+y1 = np.random.randn(100)
+x2 = np.random.randn(100)
+y2 = np.random.randn(100)
+x3 = np.random.randn(100)
+y3 = np.random.randn(100)
+x4 = np.random.randn(100)
+y4 = np.random.randn(100)
 
 # 绘制散点图
-plt.figure(figsize=(10, 8))
-scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='viridis', s=50)
+plt.scatter(x1, y1, c='red', label='Difficulty 1', s=50, marker='s')  # 方形，大小为50
+plt.scatter(x2, y2, c='purple', label='Difficulty 2', s=30, marker='^')  # 三角形，大小为30
+plt.scatter(x3, y3, c='green', label='Difficulty 3', s=40, marker='o')  # 圆形，大小为40
+plt.scatter(x4, y4, c='brown', label='Difficulty 4', s=60, marker='*')  # 星形，大小为60
 
-# 添加渐变背景
-x_min, x_max = X_tsne[:, 0].min() - 1, X_tsne[:, 0].max() + 1
-y_min, y_max = X_tsne[:, 1].min() - 1, X_tsne[:, 1].max() + 1
-xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100), np.linspace(y_min, y_max, 100))
-Z = tsne.fit_transform(StandardScaler().fit_transform(np.c_[xx.ravel(), yy.ravel()]))
-Z = Z.reshape(xx.shape)
-plt.contourf(xx, yy, Z, cmap='viridis', alpha=0.3)
+# 设置标题
+plt.title("Pseudo latent Visualization Label: 0")
 
-# 显示图表
-plt.colorbar(scatter)
-plt.title('t-SNE with Gradient Background')
+# 添加图例
+plt.legend()
+
+# 显示图形
 plt.show()
+plt.savefig('t.png')

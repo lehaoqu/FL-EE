@@ -129,9 +129,9 @@ def darkflpg_draw(label, dir, title):
     # plt.ylabel('t-SNE Component 2')
     ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
     ax.tick_params(axis='both', which='both', bottom=False, left=False)
-    plt.title(title)
+    # plt.title(title)
     plt.show()
-    plt.savefig(f'{dir}label{label}.png')
+    plt.savefig(f'{dir}label{label}.pdf')
 
 
 darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
@@ -185,9 +185,9 @@ def darkflpa_draw(label, dir, title):
     # plt.ylabel('t-SNE Component 2')
     ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
     ax.tick_params(axis='both', which='both', bottom=False, left=False)
-    plt.title(title)
+    # plt.title(title)
     plt.show()
-    plt.savefig(f'{dir}label{label}.png')
+    plt.savefig(f'{dir}label{label}.pdf')
     
     
 darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {0}')    
