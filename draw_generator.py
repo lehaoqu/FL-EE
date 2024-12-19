@@ -23,6 +23,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from trainer.policy.boosted import Policy
 
 
 GRAY = '#777777'
@@ -48,7 +49,7 @@ TEXT_SIZE = 14/RATIO
 # COLORS = ["#E0F7FA", "#B2EBF2", "#4DD0E1", "#00BFA5"]
 
 
-DIFFS = ["Easy", "Moderate", "Challenging", "Difficult"]
+
 
 
 
@@ -63,14 +64,16 @@ np.random.seed(seed)
 random.seed(seed)
 
 def darkflpg_draw(label, dir, title):
-    COLORS = ["#E0F7FA", "#B2EBF2", "#4DD0E1", "#00BFA5"]
+    DIFFS = ["Difficulty 1", "Difficulty 2", "Difficulty 3", "Difficulty 4"]
+    # COLORS = ["#E0F7FA", "#B2EBF2", "#4DD0E1", "#00BFA5"]
+    COLORS = [RED, PURPLE, DARK_GREEN, BROWN]
     args.diff_generator=True
     a = torch.load('exps/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_G_12.pth')
     g = Generator_LATENT(args)
 
     g.load_state_dict(a, strict=False)
 
-    ALL=500
+    ALL=1000
     fig, ax = plt.subplots()
     if not os.path.exists(dir):
         os.makedirs(dir)
@@ -78,21 +81,40 @@ def darkflpg_draw(label, dir, title):
 
     y_input = torch.tensor([label]*ALL, dtype=torch.long).to(0)
     diff=[]
-    ds = [0, 1.5, 3, 4.5]
+    ds = [1, 2, 3, 4]
     for d in ds:
         diff.extend([d]*int(ALL/len(ds)))
         
     # diffs = torch.tensor(diff, dtype=torch.float).resize(ALL, 1).to(0)
-    diffs = torch.tensor(np.linspace(0, 5, ALL), dtype=torch.float).resize(ALL,1).to(0)
+    # diffs = torch.tensor(np.linspace(0, 5, ALL), dtype=torch.float).resize(ALL,1).to(0)
+    diffs = torch.tensor(diff, dtype=torch.float).resize(ALL,1).to(0)
     eps = torch.rand((y_input.shape[0], g.noise_dim)).to(0)
 
     imgs = g(y_input, eps, diffs)
+    
+    # model_path = 'exps/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
+    # config_path = 'exps/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+    # model = load_model_eval(args, model_path, config_path)
+    # model.to(0)
+    # md = []
+    # for b_idx in range(int(ALL/20)):
+    #     batch = {}
+    #     batch['pixel_values'] = imgs[b_idx*20:(b_idx+1)*20]
+    #     batch['labels'] = y_input[b_idx*20:(b_idx+1)*20]
+    #     exits_logits = model(**batch, is_latent=True)
+    #     for i in range(len(exits_logits[0])):
+    #         diff =  difficulty_measure([exits_logits[0][i]], batch['labels'][i], metric='loss')
+    #         md.append(diff.cpu().item())
+    # print(md)
+    # exit(0)
+    
     imgs = imgs.resize(ALL, 197*192)
 
     X = imgs.detach().cpu().numpy()
+    X = StandardScaler().fit_transform(X)
 
     # 创建t-SNE对象，并指定降维后的维度为2
-    tsne = TSNE(n_components=2)
+    tsne = TSNE(n_components=2, n_iter=300)
 
     # 对数据进行降维
     print(X.shape)
@@ -100,26 +122,28 @@ def darkflpg_draw(label, dir, title):
 
     # 可视化降维后的结果
     for idx, d in enumerate(ds):
-        plt.scatter(result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 0], result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 1], color=COLORS[idx], label=DIFFS[idx])
+        plt.scatter(result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 0], result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 1], color=COLORS[idx], label=DIFFS[idx], alpha=0.5)
 
     plt.legend(loc='lower right')
-    plt.xlabel('t-SNE Component 1')
-    plt.ylabel('t-SNE Component 2')
+    # plt.xlabel('t-SNE Component 1')
+    # plt.ylabel('t-SNE Component 2')
+    ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+    ax.tick_params(axis='both', which='both', bottom=False, left=False)
     plt.title(title)
     plt.show()
     plt.savefig(f'{dir}label{label}.png')
 
 
-# darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
-# darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
-# darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
+darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
+darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
+darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
 
 
 def darkflpa_draw(label, dir, title):
-    COLORS = [RED, DARK_GREEN, BROWN, PURPLE]
+    COLORS = [RED, PURPLE, DARK_GREEN, BROWN]
     args.diff_generator=False
     gs = []
-    ALL=300
+    ALL=1000
     for i in range(4):
         a = torch.load(f'exps/BASE_CIFAR/full_boosted/noniid1000/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_G_{i}.pth')
         g = Generator_LATENT(args)
@@ -143,9 +167,10 @@ def darkflpa_draw(label, dir, title):
     imgs = imgs.resize(ALL, 197*192)
 
     X = imgs.detach().cpu().numpy()
+    X = StandardScaler().fit_transform(X)
 
     # 创建t-SNE对象，并指定降维后的维度为2
-    tsne = TSNE(n_components=2, n_iter=250)
+    tsne = TSNE(n_components=2, n_iter=300)
 
     # 对数据进行降维
     print(X.shape)
@@ -156,8 +181,10 @@ def darkflpa_draw(label, dir, title):
         plt.scatter(result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 0], result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 1], color=COLORS[idx], label=f'Generator {idx}', alpha=0.5)
 
     plt.legend(loc='lower right')
-    plt.xlabel('t-SNE Component 1')
-    plt.ylabel('t-SNE Component 2')
+    # plt.xlabel('t-SNE Component 1')
+    # plt.ylabel('t-SNE Component 2')
+    ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+    ax.tick_params(axis='both', which='both', bottom=False, left=False)
     plt.title(title)
     plt.show()
     plt.savefig(f'{dir}label{label}.png')
