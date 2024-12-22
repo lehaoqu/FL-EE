@@ -35,19 +35,19 @@ declare -a eq_ratios
 noniids=(1000 1 0.1)
 
 
-if [ "$3" == "small" ]; then
-        eq_ratios="0.4 0.3 0.2 0.1"
-fi
+# if [ "$3" == "small" ]; then
+#         eq_ratios="0.4 0.3 0.2 0.1"
+# fi
 
-if [ "$3" == "normal" ]; then
-        eq_ratios="0.25 0.25 0.25 0.25"
-fi
+# if [ "$3" == "normal" ]; then
+#         eq_ratios="0.25 0.25 0.25 0.25"
+# fi
 
-if [ "$3" == "large" ]; then
-        eq_ratios="0.1 0.2 0.3 0.4"
-fi
+# if [ "$3" == "large" ]; then
+#         eq_ratios="0.1 0.2 0.3 0.4"
+# fi
 
-ply=$5
+ply=$4
 
 if [ "$2" == "lora" ]; then
     if [ "$5" == "base" ]; then
@@ -55,7 +55,9 @@ if [ "$2" == "lora" ]; then
     fi
 fi
 
-for noniid in "${noniids[@]}"
-do
-        python main.py scalefl          $ply   --ft $2 --suffix $1/${2}_${3}_{$ply}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
-done
+# for noniid in "${noniids[@]}"
+# do
+#         python main.py scalefl          $ply   --ft $2 --suffix $1/${2}_${3}_{$ply}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios
+# done
+
+python main.py scalefl          $ply   --ft $2 --suffix $1/${2}_$ply/ --device $3 --dataset $5 --model $md --sr $sr --total_num $total_num --lr $lr       --bs $bs --eq_ratios $eq_ratios

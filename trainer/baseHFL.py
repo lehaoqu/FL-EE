@@ -403,7 +403,8 @@ class BaseServer:
         corrects = [0 for _ in range(exit_num)]
 
         with torch.no_grad():
-            for data in self.valid_dataloader:
+            dataloader = self.test_dataloader if self.args.eval_test else self.valid_dataloader
+            for data in dataloader:
             # for data in self.test_dataloader:
                 batch, labels = self.adapt_batch(data)
                 

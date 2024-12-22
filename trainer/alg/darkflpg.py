@@ -58,6 +58,7 @@ def add_args(parser):
     
     parser.add_argument('--exit_p',                 default=30, type=int, help='p of exit policy')
     parser.add_argument('--s_gamma',                default=1, type=float, help='decay of server lr')
+    parser.add_argument('--s_wd',                   default=1e-3, type=float)
     
     return parser
 
@@ -212,7 +213,7 @@ class Server(BaseServer):
             optimizer = torch.optim.Adam(params=self.generators[eq_depth][0].parameters(), lr=self.g_lr * (self.s_gamma ** self.round))
             self.generators[eq_depth][1] = optimizer
             
-            optimizer = torch.optim.SGD(params=self.models[eq_depth][0].parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=1e-3)
+            optimizer = torch.optim.SGD(params=self.models[eq_depth][0].parameters(), lr=self.kd_lr * (self.s_gamma ** self.round), weight_decay=self.args.s_wd)
             self.models[eq_depth][1] = optimizer
         
         self.sw_optim = torch.optim.Adam(self.sw_net.parameters(), lr=1e-3 * (self.s_gamma ** self.round))
@@ -263,7 +264,7 @@ class Server(BaseServer):
             optimizer = torch.optim.Adam(params=generator.parameters(), lr=self.g_lr)
             self.generators[eq_depth] = [generator, optimizer]
             
-            optimizer = torch.optim.SGD(params=self.eq_model[eq_depth].parameters(), lr=self.kd_lr, weight_decay=1e-3)
+            optimizer = torch.optim.SGD(params=self.eq_model[eq_depth].parameters(), lr=self.kd_lr, weight_decay=self.args.s_wd)
             self.models[eq_depth] = [self.eq_model[eq_depth], optimizer]
         self.p=self.args.exit_p
         

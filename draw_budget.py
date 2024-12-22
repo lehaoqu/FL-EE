@@ -25,10 +25,11 @@ YELLOW  = '#FFCC5B'
 GREEN   = '#3FB11D'
 BLUE    = '#4DD0FD'
 PURPLE  = '#BF00BF'
+LIGHT_GARY = '#D3D3D3'
 
 
 COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl': YELLOW, 'reefl': GREEN, 'inclusivefl': BLUE, 'scalefl': PURPLE, 'exclusivefl': BROWN}
-MARKER={'darkflpa2':'none', 'darkflpg': 'none', 'eefl':'s', 'depthfl':'s', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
+MARKER={'darkflpa2':'v', 'darkflpg': 'v', 'eefl':'s', 'depthfl':'s', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
 STYLE={'darkflpa2':'-', 'darkflpg': '-', 'eefl':'--', 'depthfl':'--', 'reefl': '--', 'inclusivefl': '--', 'scalefl': '--', 'exclusivefl': '--'}
 NAMES = {'darkflpa2':'DarkDistill+', 'darkflpg': 'DarkDistill', 'eefl':'EEFL', 'depthfl':'DepthFL', 'reefl': 'ReeFL', 'inclusivefl': 'InclusiveFL', 'scalefl': 'ScaleFL', 'exclusivefl': 'ExclusiveFL'}
 APPS = ['inclusivefl', 'scalefl', 'depthfl', 'reefl', 'darkflpg', 'darkflpa2']
@@ -40,20 +41,26 @@ def args_parser():
     parser.add_argument('--suffix', type=str, default='dir')
     return parser.parse_args()
 
-def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x_step=1, suffix=''):
+def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x_step=1, suffix='', y_none=False):
     fig, ax = plt.subplots()
     
     for model_name in APPS:
+        if 'LORA' in path:
+            if model_name == 'darkflpa2':
+                continue
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
         #     continue
-        x = data[model_name]['flops'][5:25] +  data[model_name]['flops'][25::3]
-        y = data[model_name]['test'][5:25] + data[model_name]['test'][25::3]
+        x = data[model_name]['flops'][5:25] +  data[model_name]['flops'][25::2]
+        y = data[model_name]['test'][5:25] + data[model_name]['test'][25::2]
+        
+        # x = data[model_name]['flops']
+        # y = data[model_name]['test']
         # print(x)
         # spl = make_interp_spline(x,y)
         # x_smooth = np.linspace(min(x), max(x), 200)
         # y_smooth = spl(x_smooth)
         
-        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name])
+        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name], markeredgecolor='white', markeredgewidth=1)
 
 
     if len(y_range) == 2:
@@ -71,9 +78,19 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
     plt.legend(ncol=3, loc="lower center")
 
     # plt.title(title, fontsize=TEXT_SIZE)
-    plt.xlabel(x_label, fontsize=TEXT_SIZE)
-    plt.ylabel(y_label, fontsize=TEXT_SIZE)
-    plt.grid()
+    if y_none is True:
+        ax.tick_params(axis='both', which='both', left=False, labelleft=False)
+    else:
+        plt.ylabel(y_label, fontsize=TEXT_SIZE)
+    
+    plt.xlabel(x_label, fontsize=TEXT_SIZE)   
+    
+    plt.gca().set_facecolor('#EAEAF2')
+    plt.grid(color='white', linestyle='-', linewidth=0.5)
+    ax.tick_params(axis='x', which='both', top=False, bottom=False, length=0)
+    ax.tick_params(axis='y', which='both', left=False, right=False, length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     # 显示图表
     plt.show()
     
@@ -83,11 +100,12 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
         os.makedirs(o_dir)
     if not os.path.exists(t_dir):
         os.makedirs(t_dir)    
-    plt.savefig(o_dir+path+'.png', dpi=300)
-    plt.savefig(t_dir+path+'.png', dpi=300)
+    plt.savefig(o_dir+path+'.pdf')
+    plt.savefig(t_dir+path+'.pdf')
         
 def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, x_step=1, suffix=''):
     fig, ax = plt.subplots()
+    
 
     for model_name in APPS:
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
@@ -119,7 +137,13 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
     # plt.title(title, fontsize=TEXT_SIZE)
     plt.xlabel(x_label, fontsize=TEXT_SIZE)
     plt.ylabel(y_label, fontsize=TEXT_SIZE)
-    plt.grid()
+    
+    plt.gca().set_facecolor('#EAEAF2')
+    plt.grid(color='white', linestyle='-', linewidth=0.5)
+    ax.tick_params(axis='x', which='both', top=False, bottom=False, length=0)
+    ax.tick_params(axis='y', which='both', left=False, right=False, length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     
     # 显示图表
     plt.show()
@@ -134,8 +158,8 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
         os.makedirs(o_dir)
     if not os.path.exists(t_dir):
         os.makedirs(t_dir)    
-    plt.savefig(o_dir+path+'.png', dpi=300)
-    plt.savefig(t_dir+path+'.png', dpi=300)
+    plt.savefig(o_dir+path+'.pdf')
+    plt.savefig(t_dir+path+'.pdf')
         
     
 
@@ -157,9 +181,12 @@ def cifar_Full_1000():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full', x_label='Flops', y_label='Accuracy',
-         y_range=(50, 72),
+        y_range=(50, 72),
+        y_step=2,
+        #  y_range=(55, 72),
+        #  y_step=5,
         #  x_range=(1.6, 4.0),
-         suffix=suffix
+         suffix=suffix,
          )
     
 def cifar_LORA_1000():
@@ -180,9 +207,12 @@ def cifar_LORA_1000():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1000_LORA', title=f'CIFAR100_noniid1000_LORA', x_label='Flops', y_label='Accuracy',
-         y_range=(65, 70),
-         x_range=(2.2, 4.0),
-         x_step=0.5,
+        y_range=(60, 70),
+        y_step=1,
+        x_range=(2.0, 4.0),
+        x_step=0.5,
+        # y_range=(54, 70),
+        # y_step=2,
          suffix=suffix
          )
   
@@ -204,9 +234,11 @@ def cifar_Full_1():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1_Full', title=f'CIFAR100_noniid1_Full', x_label='Flops', y_label='Accuracy',
-        y_range=(66, 70.5),
-        x_range=(1.8, 4.0),
-        suffix=suffix
+        # y_range=(66, 70.5),
+        # x_range=(1.8, 4.0),
+        y_range=(50, 72),
+        y_step=2,
+        suffix=suffix,
         )
     
 def cifar_LORA_1():
@@ -227,9 +259,12 @@ def cifar_LORA_1():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1_LORA', title=f'CIFAR100_noniid1_LORA', x_label='Flops', y_label='Accuracy',
-         y_range=(65, 70),
-         x_range=(2.2, 4.0),
-         x_step=0.5,
+         y_range=(60, 70),
+         x_range=(2.0, 4.0),
+        x_step=0.5,
+        y_step=1,
+        # y_range=(54, 70),
+        #  y_step=2,
          suffix=suffix
          )
   
@@ -251,9 +286,10 @@ def cifar_Full_01():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid0.1_Full', title=f'CIFAR100_noniid0.1_Full', x_label='Flops', y_label='Accuracy',
-         y_range=(60, 66),
-         x_range=(1.6, 4.0),
-         suffix=suffix
+         y_range=(50, 66),
+         y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix,
          )
     
 def cifar_LORA_01():
@@ -274,8 +310,9 @@ def cifar_LORA_01():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid0.1_LORA', title=f'CIFAR100_noniid0.1_LORA', x_label='Flops', y_label='Accuracy',
-         y_range=(50, 66),
-         x_range=(1.5, 4.0),
+         y_range=(56, 66),
+         y_step=1,
+         x_range=(2.0, 4.0),
          x_step=0.5,
          suffix=suffix
          )
@@ -300,8 +337,8 @@ def svhn_Full():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path='SVHN_Full', title='SVHN_Full', x_label='Flops', y_label='Accuracy',
-         y_range=(88, 89.5),
-         y_step=0.5,
+        y_range=(87.5, 89.5),
+        y_step=0.5,
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
          suffix=suffix
@@ -325,7 +362,7 @@ def svhn_LORA():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path='SVHN_LORA', title='SVHN_LORA', x_label='Flops', y_label='Accuracy',
-         y_range=(83, 88),
+        #  y_range=(83, 88),
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
          suffix=suffix
@@ -349,7 +386,7 @@ def speechcmds_Full():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path='SpeechCmds_Full', title='SpeechCmds_Full', x_label='Flops', y_label='Accuracy',
-        y_range=(91, 94),
+        # y_range=(91, 94),
         #  y_step=0.5,
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
@@ -374,7 +411,7 @@ def speechcmds_LORA():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path='SpeechCmds_LORA', title='SpeechCmds_LORA', x_label='Flops', y_label='Accuracy',
-        y_range=(87, 92),
+        y_range=(90, 92),
         #  x_range=(2.2, 4.0),
         #  x_step=0.5,
          suffix=suffix
@@ -639,18 +676,18 @@ speechcmds_Full()
 speechcmds_LORA()
     
 
-# # = ACC ==
-# cifar_Full_acc_1000()
-# cifar_Full_acc_1()
-# cifar_Full_acc_01()
-# # # 不太行
-# svhn_Full_acc()
-# speechcmds_Full_acc()
+# = ACC ==
+cifar_Full_acc_1000()
+cifar_Full_acc_1()
+cifar_Full_acc_01()
+# # 不太行
+svhn_Full_acc()
+speechcmds_Full_acc()
 
 
 # # == LOSS ==
-# cifar_Full_loss_1000()
-# cifar_Full_loss_1()
-# cifar_Full_loss_01()
-# svhn_Full_loss()
-# speechcmds_Full_loss()
+cifar_Full_loss_1000()
+cifar_Full_loss_1()
+cifar_Full_loss_01()
+svhn_Full_loss()
+speechcmds_Full_loss()

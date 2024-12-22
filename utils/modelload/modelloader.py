@@ -119,9 +119,13 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
         for n, p in model.named_parameters():
-            if 'accumulator' in n or 'classifier' in n:
-                p.requires_grad = True
-                        
+            if args.policy == 'l2w':
+                if 'accumulator' in n:
+                    p.requires_grad = True
+            else:
+                if 'accumulator' in n or 'classifier' in n:
+                    p.requires_grad = True
+                            
     # for n, p in model.named_parameters():
     #     print(n, p.requires_grad)
     # exit(0)

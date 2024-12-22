@@ -46,8 +46,8 @@ class Eval():
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
         
-        # if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
-        #     return
+        if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
+            return
         
         self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
         self.model = load_model_eval(self.args, model_path, config_path)
