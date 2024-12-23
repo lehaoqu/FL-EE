@@ -19,6 +19,7 @@ import numpy as np
 import random
 from tqdm import tqdm
 from torch.utils.data import ConcatDataset
+from thop import profile
 
 
 def adapt_batch(data, args):
@@ -97,9 +98,9 @@ all_dataset =ConcatDataset([train_dataset, valid_dataset])
 loader_train = torch.utils.data.DataLoader(all_dataset, batch_size=args.bs, shuffle=True, collate_fn=None)
 print(len(all_dataset))
 
-test_dataset = get_dataset(args=args, path=f'dataset/{ds}/test')
-loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
-print(len(test_dataset))
+# test_dataset = get_dataset(args=args, path=f'dataset/{ds}/test')
+# loader_test = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=None)
+# print(len(test_dataset))
 
 
 optim = torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-4)
@@ -133,7 +134,11 @@ for epoch in range(200):
         if policy.name == 'l2w' and idx % args.meta_gap == 0:
             policy.train_meta(model, batch, label, optim)
 
+        F, p = profile(model, inputs=(batch['pixel_values'],))
         exits_ce_loss, _ = policy.train(model, batch, label)
+        print('Flops: % .4fG' % (F / 1000000000))  # 输出FLOPs，单位为G（十亿）
+        print('params参数量: % .4fM' % (p / 1000000))
+        exit(0)
         # ce_loss = sum(exits_ce_loss)
         ce_loss = exits_ce_loss[-1]
         ce_loss.backward()
@@ -150,27 +155,27 @@ for epoch in range(200):
     total = 0
     corrects = [0 for _ in range(4)]
 
-    if epoch % 1 == 0:
-        with torch.no_grad():
-            for data in loader_test:
-                batch, labels = adapt_batch(data, args)
+    # if epoch % 1 == 0:
+        # with torch.no_grad():
+        #     for data in loader_test:
+        #         batch, labels = adapt_batch(data, args)
                 
-                exits_logits = model(**batch)
-                exits_logits = policy(exits_logits)
+        #         exits_logits = model(**batch)
+        #         exits_logits = policy(exits_logits)
                 
-                for i, exit_logits in enumerate(exits_logits):
-                    _, predicted = torch.max(exit_logits, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    corrects[i] += (predicted == labels).sum().item()
-        acc = 100.00 * correct / total
+        #         for i, exit_logits in enumerate(exits_logits):
+        #             _, predicted = torch.max(exit_logits, 1)
+        #             total += labels.size(0)
+        #             correct += (predicted == labels).sum().item()
+        #             corrects[i] += (predicted == labels).sum().item()
+        # acc = 100.00 * correct / total
         
-        if acc > best_acc:
-            best_acc = acc
-            model.save_model(model_save_path)
+        # if acc > best_acc:
+        #     best_acc = acc
+        #     model.save_model(model_save_path)
             
         
-        acc_exits = [100 * c / (total/4) for c in corrects]
-        output.write(f'{epoch}, {acc}, {acc_exits}\n')
-        output.flush()
-        print(epoch, acc, acc_exits)
+        # acc_exits = [100 * c / (total/4) for c in corrects]
+        # output.write(f'{epoch}, {acc}, {acc_exits}\n')
+        # output.flush()
+        # print(epoch, acc, acc_exits)
