@@ -1,0 +1,45 @@
+alg: eefl
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: lora
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: exps/test/ROBUST_CIFAR/lora_large/noniid1000
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: [0.1, 0.2, 0.3, 0.4]
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+T: 3
+ensemble_weight: 0.2
+output: <_io.TextIOWrapper name='./exps/test/ROBUST_CIFAR/lora_large/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 8.19, exits:['0.98', '0.86', '2.42', '28.49'] loss: 14.51
+========== Round 10 ==========
+server, accuracy: 39.40, exits:['4.91', '27.32', '57.38', '67.99'] loss: 9.98
+========== Round 20 ==========
+server, accuracy: 48.03, exits:['14.66', '43.03', '64.49', '69.95'] loss: 7.44
+========== Round 30 ==========
+server, accuracy: 52.41, exits:['23.79', '49.56', '65.82', '70.48'] loss: 6.26
+========== Round 40 ==========
+server, accuracy: 55.14, exits:['29.43', '53.05', '67.20', '70.89'] loss: 5.40
+========== Round 50 ==========
+server, accuracy: 57.00, exits:['32.84', '55.99', '67.99', '71.18'] loss: 5.11
+========== Round 60 ==========
+server, accuracy: 58.43, exits:['34.67', '57.61', '69.26', '72.18'] loss: 4.83
+========== Round 70 ==========
+server, accuracy: 58.74, exits:['36.28', '58.01', '69.49', '71.19'] loss: 4.47

@@ -1,0 +1,43 @@
+=====eval model:scalefl_cifar100_noniid1_vit_100c_1E_lrsgd0.05_boosted.pth======
+logits calc compeleted
+p: 1, valid acc: 14.405, test acc: 14.800, test flops: 1.00
+p: 2, valid acc: 14.415, test acc: 14.800, test flops: 1.00
+p: 3, valid acc: 14.405, test acc: 14.820, test flops: 1.00
+p: 4, valid acc: 14.435, test acc: 14.830, test flops: 1.00
+p: 5, valid acc: 14.505, test acc: 14.860, test flops: 1.00
+p: 6, valid acc: 14.634, test acc: 14.960, test flops: 1.01
+p: 7, valid acc: 14.873, test acc: 15.150, test flops: 1.01
+p: 8, valid acc: 15.232, test acc: 15.550, test flops: 1.02
+p: 9, valid acc: 15.730, test acc: 16.050, test flops: 1.04
+p: 10, valid acc: 16.507, test acc: 16.720, test flops: 1.07
+p: 11, valid acc: 17.484, test acc: 17.510, test flops: 1.10
+p: 12, valid acc: 19.087, test acc: 18.930, test flops: 1.15
+p: 13, valid acc: 20.950, test acc: 20.500, test flops: 1.20
+p: 14, valid acc: 23.272, test acc: 22.840, test flops: 1.29
+p: 15, valid acc: 26.768, test acc: 26.060, test flops: 1.41
+p: 16, valid acc: 30.773, test acc: 30.000, test flops: 1.56
+p: 17, valid acc: 35.645, test acc: 34.720, test flops: 1.76
+p: 18, valid acc: 40.944, test acc: 40.270, test flops: 1.99
+p: 19, valid acc: 46.404, test acc: 45.860, test flops: 2.24
+p: 20, valid acc: 51.674, test acc: 51.220, test flops: 2.49
+p: 21, valid acc: 56.047, test acc: 55.860, test flops: 2.73
+p: 22, valid acc: 59.444, test acc: 58.890, test flops: 2.94
+p: 23, valid acc: 61.974, test acc: 61.300, test flops: 3.13
+p: 24, valid acc: 63.469, test acc: 63.050, test flops: 3.29
+p: 25, valid acc: 64.545, test acc: 64.270, test flops: 3.41
+p: 26, valid acc: 65.322, test acc: 64.980, test flops: 3.52
+p: 27, valid acc: 66.059, test acc: 65.620, test flops: 3.60
+p: 28, valid acc: 66.517, test acc: 66.020, test flops: 3.66
+p: 29, valid acc: 66.776, test acc: 66.200, test flops: 3.72
+p: 30, valid acc: 66.836, test acc: 66.440, test flops: 3.76
+p: 31, valid acc: 66.826, test acc: 66.530, test flops: 3.80
+p: 32, valid acc: 66.856, test acc: 66.590, test flops: 3.82
+p: 33, valid acc: 66.876, test acc: 66.700, test flops: 3.84
+p: 34, valid acc: 66.906, test acc: 66.800, test flops: 3.87
+p: 35, valid acc: 66.946, test acc: 66.820, test flops: 3.88
+p: 36, valid acc: 66.936, test acc: 66.810, test flops: 3.90
+p: 37, valid acc: 66.956, test acc: 66.790, test flops: 3.91
+p: 38, valid acc: 66.966, test acc: 66.820, test flops: 3.92
+p: 39, valid acc: 66.975, test acc: 66.840, test flops: 3.92
+Anytime:
+[14.8, 42.85, 64.14, 66.91], avg:47.175

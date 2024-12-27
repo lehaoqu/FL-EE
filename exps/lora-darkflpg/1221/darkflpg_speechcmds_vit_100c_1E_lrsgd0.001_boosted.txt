@@ -1,0 +1,95 @@
+alg: darkflpg
+policy: boosted
+dataset: speechcmds
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: lora
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: exps/lora-darkflpg/1221/
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.001
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+s_wd: 0.0001
+ensemble_weight: 0.2
+output: <_io.TextIOWrapper name='./exps/lora-darkflpg/1221//darkflpg_speechcmds_vit_100c_1E_lrsgd0.001_boosted.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 3.97, exits:['4.40', '3.60', '3.87', '4.02'] loss: 9.63
+========== Round 10 ==========
+server, accuracy: 5.09, exits:['3.83', '4.33', '4.32', '7.88'] loss: 8.75
+========== Round 20 ==========
+server, accuracy: 6.27, exits:['4.05', '3.79', '5.89', '11.36'] loss: 8.74
+========== Round 30 ==========
+server, accuracy: 6.44, exits:['3.83', '3.81', '5.43', '12.68'] loss: 9.05
+========== Round 40 ==========
+server, accuracy: 6.91, exits:['3.83', '3.83', '6.07', '13.91'] loss: 8.01
+========== Round 50 ==========
+server, accuracy: 8.61, exits:['3.86', '3.84', '11.04', '15.70'] loss: 8.00
+========== Round 60 ==========
+server, accuracy: 8.82, exits:['3.69', '3.69', '11.07', '16.82'] loss: 8.99
+========== Round 70 ==========
+server, accuracy: 9.31, exits:['3.66', '4.47', '11.27', '17.84'] loss: 8.27
+========== Round 80 ==========
+server, accuracy: 9.71, exits:['3.86', '4.22', '11.84', '18.90'] loss: 8.54
+========== Round 90 ==========
+server, accuracy: 10.53, exits:['3.82', '4.66', '13.86', '19.79'] loss: 9.51
+========== Round 100 ==========
+server, accuracy: 11.58, exits:['4.08', '6.01', '15.19', '21.05'] loss: 8.55
+========== Round 110 ==========
+server, accuracy: 11.81, exits:['3.80', '5.80', '15.80', '21.83'] loss: 8.26
+========== Round 120 ==========
+server, accuracy: 12.55, exits:['4.47', '7.40', '15.67', '22.67'] loss: 8.24
+========== Round 130 ==========
+server, accuracy: 12.04, exits:['3.69', '5.35', '15.54', '23.58'] loss: 8.19
+========== Round 140 ==========
+server, accuracy: 11.85, exits:['3.57', '3.59', '15.96', '24.28'] loss: 7.57
+========== Round 150 ==========
+server, accuracy: 13.14, exits:['4.78', '6.66', '16.14', '24.98'] loss: 7.56
+========== Round 160 ==========
+server, accuracy: 12.63, exits:['3.58', '5.17', '16.43', '25.33'] loss: 8.65

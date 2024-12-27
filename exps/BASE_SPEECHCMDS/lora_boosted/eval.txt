@@ -1,0 +1,44 @@
+========eval model:darkflpg_speechcmds_vit_100c_1E_lrsgd0.05_boosted.pth========
+logits calc compeleted
+p: 1, valid acc: 88.292, test acc: 87.996, test flops: 1.00
+p: 2, valid acc: 88.292, test acc: 87.996, test flops: 1.00
+p: 3, valid acc: 88.281, test acc: 88.005, test flops: 1.00
+p: 4, valid acc: 88.281, test acc: 88.005, test flops: 1.00
+p: 5, valid acc: 88.287, test acc: 88.024, test flops: 1.00
+p: 6, valid acc: 88.313, test acc: 88.015, test flops: 1.00
+p: 7, valid acc: 88.350, test acc: 88.096, test flops: 1.01
+p: 8, valid acc: 88.497, test acc: 88.096, test flops: 1.02
+p: 9, valid acc: 88.713, test acc: 88.233, test flops: 1.03
+p: 10, valid acc: 89.081, test acc: 88.551, test flops: 1.05
+p: 11, valid acc: 89.550, test acc: 88.905, test flops: 1.09
+p: 12, valid acc: 89.997, test acc: 89.650, test flops: 1.14
+p: 13, valid acc: 90.423, test acc: 90.332, test flops: 1.20
+p: 14, valid acc: 90.670, test acc: 90.822, test flops: 1.29
+p: 15, valid acc: 91.028, test acc: 91.231, test flops: 1.41
+p: 16, valid acc: 91.191, test acc: 91.558, test flops: 1.56
+p: 17, valid acc: 91.212, test acc: 91.940, test flops: 1.77
+p: 18, valid acc: 91.065, test acc: 91.849, test flops: 2.01
+p: 19, valid acc: 90.886, test acc: 91.767, test flops: 2.26
+p: 20, valid acc: 90.749, test acc: 91.740, test flops: 2.51
+p: 21, valid acc: 90.718, test acc: 91.704, test flops: 2.77
+p: 22, valid acc: 90.712, test acc: 91.640, test flops: 2.98
+p: 23, valid acc: 90.676, test acc: 91.640, test flops: 3.16
+p: 24, valid acc: 90.681, test acc: 91.613, test flops: 3.31
+p: 25, valid acc: 90.676, test acc: 91.595, test flops: 3.43
+p: 26, valid acc: 90.670, test acc: 91.586, test flops: 3.53
+p: 27, valid acc: 90.676, test acc: 91.577, test flops: 3.60
+p: 28, valid acc: 90.676, test acc: 91.577, test flops: 3.67
+p: 29, valid acc: 90.676, test acc: 91.577, test flops: 3.72
+p: 30, valid acc: 90.676, test acc: 91.577, test flops: 3.75
+p: 31, valid acc: 90.676, test acc: 91.577, test flops: 3.79
+p: 32, valid acc: 90.676, test acc: 91.577, test flops: 3.82
+p: 33, valid acc: 90.681, test acc: 91.577, test flops: 3.85
+p: 34, valid acc: 90.681, test acc: 91.577, test flops: 3.86
+p: 35, valid acc: 90.681, test acc: 91.577, test flops: 3.88
+p: 36, valid acc: 90.681, test acc: 91.577, test flops: 3.90
+p: 37, valid acc: 90.681, test acc: 91.577, test flops: 3.91
+p: 38, valid acc: 90.681, test acc: 91.577, test flops: 3.92
+p: 39, valid acc: 90.681, test acc: 91.577, test flops: 3.93
+Anytime:
+[87.99636528850523, 92.30349840981373, 92.38527941844616, 91.5765561108587], avg:91.06542480690595
+===eval model:darkflpg_speechcmds_vit_100c_1E_lrsgd0.05_boosted_distance.pth====

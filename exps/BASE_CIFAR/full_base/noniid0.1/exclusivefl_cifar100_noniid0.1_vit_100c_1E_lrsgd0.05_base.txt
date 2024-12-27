@@ -1,0 +1,32 @@
+alg: exclusivefl
+policy: base
+dataset: cifar100_noniid0.1
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: exps/BASE_CIFAR/full_base/noniid0.1
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+output: <_io.TextIOWrapper name='./exps/BASE_CIFAR/full_base/noniid0.1/exclusivefl_cifar100_noniid0.1_vit_100c_1E_lrsgd0.05_base.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 1.06, exits:['1.08', '1.08', '1.12', '0.97'] loss: 14.31
+========== Round 10 ==========
+server, accuracy: 3.91, exits:['3.20', '3.80', '3.90', '4.72'] loss: 11.93

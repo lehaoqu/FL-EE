@@ -1,0 +1,14 @@
+eval model:darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_loss.pth=
+===eval model:darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth===
+logits calc compeleted
+Anytime:
+[53.36, 65.78, 71.39, 71.43], avg:65.49000000000001
+===eval model:darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth===
+logits calc compeleted
+p: 1, valid acc: 55.819, test acc: 55.600, test flops: 1.11
+p: 2, valid acc: 58.619, test acc: 58.280, test flops: 1.26
+p: 3, valid acc: 60.911, test acc: 61.150, test flops: 1.41
+p: 4, valid acc: 63.292, test acc: 63.460, test flops: 1.57
+p: 5, valid acc: 64.926, test acc: 65.570, test flops: 1.75
+p: 6, valid acc: 66.351, test acc: 67.020, test flops: 1.92
+p: 7, valid acc: 67.716, test acc: 68.150, test flops: 2.08

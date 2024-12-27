@@ -1,0 +1,138 @@
+alg: darkflpg
+policy: boosted
+dataset: speechcmds
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: lora
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: exps/test/speechcmds/lora_boosted/0.99/10
+device: 3
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+is_latent: True
+s_epoches: 10
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+ensemble_weight: 0.2
+output: <_io.TextIOWrapper name='./exps/test/speechcmds/lora_boosted/0.99/10/darkflpg_speechcmds_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 5.20, exits:['3.69', '3.69', '6.42', '7.00'] loss: 9.95
+========== Round 10 ==========
+server, accuracy: 44.44, exits:['4.34', '43.94', '65.33', '64.15'] loss: 6.53
+========== Round 20 ==========
+server, accuracy: 73.56, exits:['48.25', '80.18', '83.76', '82.06'] loss: 3.78
+========== Round 30 ==========
+server, accuracy: 81.98, exits:['70.83', '85.82', '86.44', '84.83'] loss: 2.20
+========== Round 40 ==========
+server, accuracy: 84.54, exits:['76.12', '87.50', '87.88', '86.67'] loss: 1.61
+========== Round 50 ==========
+server, accuracy: 86.10, exits:['78.76', '88.62', '89.14', '87.89'] loss: 1.40
+========== Round 60 ==========
+server, accuracy: 86.43, exits:['80.06', '88.50', '89.24', '87.92'] loss: 1.22
+========== Round 70 ==========
+server, accuracy: 87.40, exits:['80.96', '89.52', '90.09', '89.01'] loss: 1.15
+========== Round 80 ==========
+server, accuracy: 88.27, exits:['82.92', '90.13', '90.49', '89.54'] loss: 1.01
+========== Round 90 ==========
+server, accuracy: 88.74, exits:['83.86', '90.39', '90.90', '89.82'] loss: 1.12
+========== Round 100 ==========
+server, accuracy: 88.96, exits:['84.30', '90.91', '90.78', '89.86'] loss: 0.96
+========== Round 110 ==========
+server, accuracy: 89.42, exits:['84.89', '91.21', '91.18', '90.38'] loss: 0.85
+========== Round 120 ==========
+server, accuracy: 89.61, exits:['85.55', '91.31', '91.24', '90.33'] loss: 0.85
+========== Round 130 ==========
+server, accuracy: 89.79, exits:['85.81', '91.48', '91.40', '90.46'] loss: 0.86
+========== Round 140 ==========
+server, accuracy: 12.86, exits:['6.75', '10.87', '15.94', '17.90'] loss: 9.37
+========== Round 150 ==========
+server, accuracy: 14.22, exits:['7.24', '11.40', '18.03', '20.21'] loss: 9.02
+========== Round 160 ==========
+server, accuracy: 15.32, exits:['7.10', '12.14', '19.17', '22.88'] loss: 8.84
+========== Round 170 ==========
+server, accuracy: 16.04, exits:['7.32', '12.30', '20.33', '24.19'] loss: 9.67
+========== Round 180 ==========
+server, accuracy: 16.80, exits:['8.48', '12.98', '20.91', '24.83'] loss: 7.00
+========== Round 190 ==========
+server, accuracy: 16.97, exits:['7.85', '12.82', '21.58', '25.63'] loss: 8.41
+========== Round 200 ==========
+server, accuracy: 17.37, exits:['8.09', '13.24', '21.93', '26.22'] loss: 7.25
+========== Round 201 ==========
+server, accuracy: 17.22, exits:['7.49', '13.08', '21.97', '26.33'] loss: 7.51
+========== Round 202 ==========
+server, accuracy: 17.48, exits:['7.79', '13.39', '22.16', '26.58'] loss: 8.42
+========== Round 203 ==========
+server, accuracy: 17.68, exits:['8.02', '13.62', '22.16', '26.92'] loss: 7.76
+========== Round 204 ==========
+server, accuracy: 17.70, exits:['8.16', '13.75', '22.25', '26.63'] loss: 8.39
+========== Round 205 ==========
+server, accuracy: 17.73, exits:['8.26', '13.57', '22.27', '26.82'] loss: 9.24
+========== Round 206 ==========
+server, accuracy: 17.80, exits:['8.20', '13.48', '22.41', '27.10'] loss: 10.08
+========== Round 207 ==========
+server, accuracy: 17.80, exits:['8.25', '13.59', '22.31', '27.05'] loss: 8.13
+========== Round 208 ==========
+server, accuracy: 17.54, exits:['7.96', '13.60', '22.11', '26.48'] loss: 7.61
+========== Round 209 ==========
+server, accuracy: 17.66, exits:['7.94', '13.44', '22.21', '27.04'] loss: 9.86
+========== Round 210 ==========
+server, accuracy: 17.46, exits:['7.58', '13.38', '22.38', '26.52'] loss: 7.27
+========== Round 211 ==========
+server, accuracy: 17.86, exits:['7.99', '13.87', '22.51', '27.08'] loss: 8.28
+========== Round 212 ==========
+server, accuracy: 17.65, exits:['8.00', '13.44', '22.36', '26.81'] loss: 7.23
+========== Round 213 ==========
+server, accuracy: 17.91, exits:['8.62', '13.57', '22.50', '26.95'] loss: 8.04
+========== Round 214 ==========
+server, accuracy: 18.12, exits:['9.08', '13.57', '22.66', '27.19'] loss: 8.66
+========== Round 215 ==========
+server, accuracy: 17.78, exits:['8.12', '13.53', '22.38', '27.08'] loss: 8.08
+========== Round 216 ==========
+server, accuracy: 17.87, exits:['8.06', '13.57', '22.75', '27.09'] loss: 7.47
+========== Round 217 ==========
+server, accuracy: 17.88, exits:['8.06', '13.71', '22.67', '27.07'] loss: 8.14
+========== Round 218 ==========
+server, accuracy: 17.74, exits:['8.07', '13.43', '22.69', '26.77'] loss: 6.88
