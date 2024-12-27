@@ -16,7 +16,8 @@ RATIO=1.7
 LINE_WIDTH = 2/RATIO
 MARKER_EDGE_WITH=2/RATIO
 MARKER_SIZE = 10/RATIO
-TEXT_SIZE = 30/RATIO
+TEXT_SIZE = 40/RATIO
+TRICKS_SIZE = 22/RATIO
 TOTAL_FLOPS = 3.45271/4
 
 
@@ -48,7 +49,7 @@ def anytime_bar(data, path, x_label, y_label, title='', y_range=(), x_range=(),y
     fig, ax = plt.subplots()
     plt.grid(color='white', linestyle='-', linewidth=0.5, axis='y', zorder=0)
     # 设置柱状图的宽度
-    bar_width = 0.15
+    bar_width = 0.11
 
     # 设置每个组的位置
     group_labels = ['Exit 1', 'Exit 2', 'Exit 3', 'Exit 4']
@@ -70,7 +71,7 @@ def anytime_bar(data, path, x_label, y_label, title='', y_range=(), x_range=(),y
     
     # 添加标签和标题
     # plt.xlabel(x_label, fontweight='bold')
-    plt.ylabel(y_label)
+    plt.ylabel(y_label, fontsize=TEXT_SIZE)
 
     plt.xticks(index + int(cnt/2) * bar_width, group_labels)
 
@@ -80,6 +81,7 @@ def anytime_bar(data, path, x_label, y_label, title='', y_range=(), x_range=(),y
 
     ax.tick_params(axis='x', which='both', top=False, bottom=False, length=0)
     ax.tick_params(axis='y', which='both', left=False, right=False, length=0)
+    plt.tick_params(axis='both', which='major', labelsize=TRICKS_SIZE)
     for spine in ax.spines.values():
         spine.set_visible(False)
 
@@ -146,6 +148,7 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
     plt.grid(color='white', linestyle='-', linewidth=0.5)
     ax.tick_params(axis='x', which='both', top=False, bottom=False, length=0)
     ax.tick_params(axis='y', which='both', left=False, right=False, length=0)
+    plt.tick_params(axis='both', which='major', labelsize=TRICKS_SIZE)
     for spine in ax.spines.values():
         spine.set_visible(False)
     # 显示图表
@@ -200,6 +203,7 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
     plt.grid(color='white', linestyle='-', linewidth=0.5)
     ax.tick_params(axis='x', which='both', top=False, bottom=False, length=0)
     ax.tick_params(axis='y', which='both', left=False, right=False, length=0)
+    plt.tick_params(axis='both', which='major', labelsize=TRICKS_SIZE)
     for spine in ax.spines.values():
         spine.set_visible(False)
     
@@ -240,11 +244,12 @@ def cifar_Full_1000():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1000_Full', title=f'CIFAR100_noniid1000_Full', x_label='Average budget (in MUL-ADD) $\\times 10^{10}$', y_label='Accuracy (%)',
-        y_range=(50, 72),
+        y_range=(60, 72),
         y_step=2,
         #  y_range=(55, 72),
         #  y_step=5,
-        #  x_range=(1.6, 4.0),
+         x_range=(1.0, 3.5),
+         x_step=0.5,
          suffix=suffix,
          )
     
@@ -741,7 +746,7 @@ def cifar_Full_1000_any():
                             data_list = [float(num) for num in numbers]
                             data[name_without_extension] = data_list
     anytime_bar(data, path=f'CIFAR100_noniid1000_Full', x_label='Exits', y_label='Accuracy (%)',
-        # y_range=(50, 72),
+        y_range=(40, 72),
         # y_step=2,
         #  y_range=(55, 72),
         #  y_step=5,
@@ -888,15 +893,16 @@ def speechcmds_LORA_any():
          y_range=(85, 95)
          )
 
-# == ANYTIME ==
-cifar_Full_1000_any()
-cifar_LORA_1000_any()
-svhn_Full_any()
-svhn_LORA_any()
-speechcmds_Full_any()
-speechcmds_LORA_any()
 
-# #== BUDGET ==
+## == ANYTIME ==
+# cifar_Full_1000_any()
+# cifar_LORA_1000_any()
+# svhn_Full_any()
+# svhn_LORA_any()
+# speechcmds_Full_any()
+# speechcmds_LORA_any()
+
+# # #== BUDGET ==
 cifar_Full_1000()    
 cifar_LORA_1000()
 cifar_Full_1()    
@@ -904,25 +910,25 @@ cifar_LORA_1()
 cifar_Full_01()    
 cifar_LORA_01()
 
-svhn_Full()
-svhn_LORA()
+# svhn_Full()
+# svhn_LORA()
 
-speechcmds_Full()
-speechcmds_LORA()
+# speechcmds_Full()
+# speechcmds_LORA()
     
 
-# = ACC ==
-cifar_Full_acc_1000()
-cifar_Full_acc_1()
-cifar_Full_acc_01()
-# # 不太行
-svhn_Full_acc()
-speechcmds_Full_acc()
+# # = ACC ==
+# cifar_Full_acc_1000()
+# cifar_Full_acc_1()
+# cifar_Full_acc_01()
+# # # 不太行
+# svhn_Full_acc()
+# speechcmds_Full_acc()
 
 
-# # == LOSS ==
-cifar_Full_loss_1000()
-cifar_Full_loss_1()
-cifar_Full_loss_01()
-svhn_Full_loss()
-speechcmds_Full_loss()
+# # # == LOSS ==
+# cifar_Full_loss_1000()
+# cifar_Full_loss_1()
+# cifar_Full_loss_01()
+# svhn_Full_loss()
+# speechcmds_Full_loss()
