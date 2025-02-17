@@ -7,6 +7,7 @@ import json
 import torch
 import numpy as np
 import random
+import wandb
 
 from utils.options import args_parser
 from utils.dataprocess import DataProcessor
@@ -141,6 +142,7 @@ class FedSim:
                 # print(f'========== Round {rnd} ==========\n')
                 acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
                 self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, exits:{acc_exits} loss: {ret_dict['loss']:.2f}\n")
+                wdb.log({"acc": ret_dict['acc'], "loss": ret_dict['loss']})
                 if rnd % 10 == 0:
                     valid_acc.append(ret_dict['acc'])
                     losses.append(ret_dict['loss'])
@@ -178,6 +180,7 @@ class FedSim:
 
 if __name__ == '__main__':
     args = args_parser()
+    wdb = wandb.init(project='example', name=f"{args.alg}")
 
     seed = args.seed
     torch.manual_seed(seed)
