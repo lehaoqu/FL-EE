@@ -1,0 +1,410 @@
+alg: darkflpa2
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: exps/GENERATOR_ABLATION/full_boosted/256/16
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: 16
+hidden_dim: 256
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 1
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: False
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+wd: 0.001
+increase: True
+ensemble_weight: 0.2
+output: <_io.TextIOWrapper name='./exps/GENERATOR_ABLATION/full_boosted/256/16/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 8.69, exits:['1.79', '0.83', '8.82', '23.32'] loss: 12.95
+========== Round 10 ==========
+server, accuracy: 38.67, exits:['15.26', '34.35', '49.30', '55.76'] loss: 7.72
+========== Round 20 ==========
+server, accuracy: 46.63, exits:['23.51', '45.63', '57.41', '59.98'] loss: 6.16
+========== Round 30 ==========
+server, accuracy: 52.05, exits:['30.30', '51.65', '61.53', '64.72'] loss: 5.40
+========== Round 40 ==========
+server, accuracy: 53.92, exits:['33.49', '55.03', '63.52', '63.65'] loss: 4.62
+========== Round 50 ==========
+server, accuracy: 58.45, exits:['37.54', '59.26', '67.74', '69.25'] loss: 3.98
+========== Round 60 ==========
+server, accuracy: 59.88, exits:['39.54', '61.22', '68.87', '69.91'] loss: 3.92
+========== Round 70 ==========
+server, accuracy: 60.38, exits:['42.34', '61.08', '68.81', '69.30'] loss: 3.12
+========== Round 80 ==========
+server, accuracy: 61.96, exits:['44.41', '63.62', '69.55', '70.27'] loss: 3.01
+========== Round 90 ==========
+server, accuracy: 61.81, exits:['44.78', '63.03', '69.64', '69.77'] loss: 2.73
+========== Round 100 ==========
+server, accuracy: 63.84, exits:['47.60', '65.24', '71.23', '71.28'] loss: 2.71
+========== Round 110 ==========
+server, accuracy: 63.90, exits:['48.58', '64.72', '71.12', '71.18'] loss: 2.62
+========== Round 120 ==========
+server, accuracy: 64.71, exits:['49.03', '66.31', '71.82', '71.67'] loss: 2.24
+========== Round 130 ==========
+server, accuracy: 64.74, exits:['50.08', '65.98', '71.67', '71.24'] loss: 2.06
+========== Round 140 ==========
+server, accuracy: 64.65, exits:['50.07', '66.44', '71.23', '70.85'] loss: 1.97
+========== Round 150 ==========
+server, accuracy: 64.84, exits:['51.22', '66.08', '71.18', '70.87'] loss: 1.79
+========== Round 160 ==========
+server, accuracy: 65.13, exits:['51.64', '66.19', '71.62', '71.06'] loss: 1.87
+========== Round 170 ==========
+server, accuracy: 65.28, exits:['52.29', '66.21', '71.18', '71.43'] loss: 1.94
+========== Round 180 ==========
+server, accuracy: 65.43, exits:['52.53', '66.56', '71.35', '71.27'] loss: 1.64
+========== Round 190 ==========
+server, accuracy: 65.51, exits:['52.98', '66.42', '71.38', '71.25'] loss: 1.59
+========== Round 200 ==========
+server, accuracy: 65.32, exits:['52.86', '66.54', '71.12', '70.75'] loss: 1.54
+========== Round 202 ==========
+server, accuracy: 65.33, exits:['53.24', '66.28', '71.12', '70.68'] loss: 1.48
+========== Round 204 ==========
+server, accuracy: 65.32, exits:['53.00', '66.33', '70.83', '71.12'] loss: 1.32
+========== Round 206 ==========
+server, accuracy: 65.65, exits:['53.41', '66.92', '71.26', '71.00'] loss: 1.66
+========== Round 208 ==========
+server, accuracy: 65.39, exits:['53.34', '66.21', '70.88', '71.11'] loss: 1.56
+========== Round 210 ==========
+server, accuracy: 65.12, exits:['53.35', '66.15', '70.84', '70.14'] loss: 1.40
+========== Round 212 ==========
+server, accuracy: 65.01, exits:['53.27', '65.88', '70.66', '70.24'] loss: 1.42
+========== Round 214 ==========
+server, accuracy: 65.08, exits:['53.52', '65.74', '70.66', '70.40'] loss: 1.43
+========== Round 216 ==========
+server, accuracy: 65.07, exits:['53.52', '65.88', '70.35', '70.52'] loss: 1.42
+========== Round 218 ==========
+server, accuracy: 65.45, exits:['53.46', '66.49', '71.05', '70.82'] loss: 1.38
+========== Round 220 ==========
+server, accuracy: 65.50, exits:['53.54', '66.38', '71.15', '70.94'] loss: 1.49
+========== Round 222 ==========
+server, accuracy: 65.07, exits:['53.40', '65.86', '70.61', '70.43'] loss: 1.49
+========== Round 224 ==========
+server, accuracy: 65.24, exits:['53.66', '66.03', '70.55', '70.72'] loss: 1.35
+========== Round 226 ==========
+server, accuracy: 65.37, exits:['53.51', '66.38', '70.88', '70.73'] loss: 1.35
+========== Round 228 ==========
+server, accuracy: 65.32, exits:['53.67', '66.34', '70.66', '70.64'] loss: 1.43
+========== Round 230 ==========
+server, accuracy: 65.30, exits:['53.57', '66.08', '70.85', '70.72'] loss: 1.33
+========== Round 232 ==========
+server, accuracy: 65.61, exits:['54.00', '66.53', '71.01', '70.88'] loss: 1.41
+========== Round 234 ==========
+server, accuracy: 65.28, exits:['53.46', '66.22', '70.83', '70.60'] loss: 1.35
+========== Round 236 ==========
+server, accuracy: 65.05, exits:['53.30', '65.83', '70.63', '70.43'] loss: 1.33
+========== Round 238 ==========
+server, accuracy: 65.19, exits:['53.83', '65.96', '70.60', '70.37'] loss: 1.40
+========== Round 240 ==========
+server, accuracy: 65.35, exits:['53.75', '66.18', '70.78', '70.70'] loss: 1.31
+========== Round 242 ==========
+server, accuracy: 65.21, exits:['53.71', '66.27', '70.55', '70.32'] loss: 1.40
+========== Round 244 ==========
+server, accuracy: 65.03, exits:['53.42', '65.96', '70.47', '70.29'] loss: 1.31
+========== Round 246 ==========
+server, accuracy: 65.37, exits:['54.05', '65.97', '70.89', '70.58'] loss: 1.34
+========== Round 248 ==========
+server, accuracy: 65.26, exits:['54.07', '65.80', '70.74', '70.43'] loss: 1.35
+========== Round 250 ==========
+server, accuracy: 65.38, exits:['54.17', '65.91', '70.76', '70.69'] loss: 1.53
+========== Round 252 ==========
+server, accuracy: 64.95, exits:['53.90', '65.60', '70.15', '70.16'] loss: 1.28
+========== Round 254 ==========
+server, accuracy: 65.21, exits:['54.41', '65.64', '70.57', '70.23'] loss: 1.47
+========== Round 256 ==========
+server, accuracy: 65.35, exits:['54.20', '66.23', '70.70', '70.28'] loss: 1.30
+========== Round 258 ==========
+server, accuracy: 65.32, exits:['54.15', '65.90', '70.75', '70.48'] loss: 1.51
+========== Round 260 ==========
+server, accuracy: 65.22, exits:['53.92', '66.02', '70.64', '70.30'] loss: 1.22
+========== Round 262 ==========
+server, accuracy: 65.40, exits:['54.38', '66.09', '70.83', '70.31'] loss: 1.30
+========== Round 264 ==========
+server, accuracy: 65.26, exits:['54.37', '65.84', '70.59', '70.24'] loss: 1.33
+========== Round 266 ==========
+server, accuracy: 65.57, exits:['54.65', '66.18', '70.87', '70.57'] loss: 1.34
+========== Round 268 ==========
+server, accuracy: 65.28, exits:['54.31', '66.09', '70.32', '70.41'] loss: 1.23
+========== Round 270 ==========
+server, accuracy: 65.32, exits:['54.25', '66.14', '70.46', '70.43'] loss: 1.18
+========== Round 272 ==========
+server, accuracy: 65.39, exits:['54.52', '66.02', '70.69', '70.35'] loss: 1.30
+========== Round 274 ==========
+server, accuracy: 65.30, exits:['54.45', '65.80', '70.65', '70.29'] loss: 1.31
+========== Round 276 ==========
+server, accuracy: 65.22, exits:['54.39', '65.75', '70.65', '70.10'] loss: 1.24
+========== Round 278 ==========
+server, accuracy: 65.33, exits:['54.56', '66.02', '70.56', '70.17'] loss: 1.25
+========== Round 280 ==========
+server, accuracy: 65.24, exits:['54.30', '65.86', '70.56', '70.23'] loss: 1.09
+========== Round 282 ==========
+server, accuracy: 65.30, exits:['54.53', '65.76', '70.43', '70.47'] loss: 1.19
+========== Round 284 ==========
+server, accuracy: 65.38, exits:['54.61', '66.01', '70.64', '70.28'] loss: 1.18
+========== Round 286 ==========
+server, accuracy: 65.13, exits:['54.37', '65.71', '70.40', '70.04'] loss: 1.18
+========== Round 288 ==========
+server, accuracy: 65.36, exits:['54.86', '65.82', '70.59', '70.19'] loss: 1.30
+========== Round 290 ==========
+server, accuracy: 65.37, exits:['54.85', '65.90', '70.46', '70.26'] loss: 1.31
+========== Round 292 ==========
+server, accuracy: 65.34, exits:['54.54', '65.95', '70.49', '70.38'] loss: 1.26
+========== Round 294 ==========
+server, accuracy: 65.28, exits:['54.65', '65.87', '70.41', '70.21'] loss: 1.25
+========== Round 296 ==========
+server, accuracy: 65.52, exits:['55.06', '66.12', '70.53', '70.39'] loss: 1.27
+========== Round 298 ==========
+server, accuracy: 65.54, exits:['55.17', '66.05', '70.54', '70.41'] loss: 1.14
+========== Round 300 ==========
+server, accuracy: 65.38, exits:['55.01', '65.70', '70.38', '70.42'] loss: 1.19
+========== Round 302 ==========
+server, accuracy: 65.70, exits:['55.27', '66.09', '70.72', '70.72'] loss: 1.29
+========== Round 304 ==========
+server, accuracy: 65.36, exits:['54.85', '65.84', '70.56', '70.21'] loss: 1.24
+========== Round 306 ==========
+server, accuracy: 65.52, exits:['55.19', '65.82', '70.61', '70.45'] loss: 1.23
+========== Round 308 ==========
+server, accuracy: 65.36, exits:['54.93', '65.70', '70.50', '70.32'] loss: 1.25
+========== Round 310 ==========
+server, accuracy: 65.31, exits:['54.73', '65.81', '70.45', '70.25'] loss: 1.24
+========== Round 312 ==========
+server, accuracy: 65.27, exits:['54.54', '65.95', '70.44', '70.15'] loss: 1.13
+========== Round 314 ==========
+server, accuracy: 65.45, exits:['54.93', '65.97', '70.54', '70.37'] loss: 1.17
+========== Round 316 ==========
+server, accuracy: 65.14, exits:['54.61', '65.54', '70.46', '69.96'] loss: 1.29
+========== Round 318 ==========
+server, accuracy: 65.32, exits:['54.88', '65.78', '70.36', '70.26'] loss: 1.23
+========== Round 320 ==========
+server, accuracy: 65.50, exits:['54.94', '65.94', '70.75', '70.37'] loss: 1.26
+========== Round 322 ==========
+server, accuracy: 65.42, exits:['55.19', '65.84', '70.61', '70.05'] loss: 1.28
+========== Round 324 ==========
+server, accuracy: 65.27, exits:['54.72', '65.83', '70.39', '70.15'] loss: 1.14
+========== Round 326 ==========
+server, accuracy: 65.37, exits:['54.93', '65.71', '70.60', '70.23'] loss: 1.16
+========== Round 328 ==========
+server, accuracy: 65.06, exits:['54.80', '65.48', '69.98', '69.96'] loss: 1.11
+========== Round 330 ==========
+server, accuracy: 65.42, exits:['55.32', '65.64', '70.56', '70.18'] loss: 1.17
+========== Round 332 ==========
+server, accuracy: 65.28, exits:['55.08', '65.46', '70.52', '70.07'] loss: 1.16
+========== Round 334 ==========
+server, accuracy: 65.17, exits:['54.89', '65.69', '70.17', '69.91'] loss: 1.12
+========== Round 336 ==========
+server, accuracy: 65.04, exits:['54.79', '65.38', '70.13', '69.85'] loss: 0.92
+========== Round 338 ==========
+server, accuracy: 65.31, exits:['55.30', '65.53', '70.37', '70.03'] loss: 1.17
+========== Round 340 ==========
+server, accuracy: 65.21, exits:['55.07', '65.52', '70.29', '69.96'] loss: 1.15
+========== Round 342 ==========
+server, accuracy: 65.11, exits:['55.07', '65.40', '70.08', '69.89'] loss: 1.09
+========== Round 344 ==========
+server, accuracy: 65.11, exits:['54.75', '65.43', '70.15', '70.09'] loss: 1.05
+========== Round 346 ==========
+server, accuracy: 65.31, exits:['55.16', '65.42', '70.47', '70.21'] loss: 1.28
+========== Round 348 ==========
+server, accuracy: 65.27, exits:['55.22', '65.41', '70.36', '70.10'] loss: 1.17
+========== Round 350 ==========
+server, accuracy: 65.31, exits:['54.95', '65.57', '70.50', '70.23'] loss: 1.08
+========== Round 352 ==========
+server, accuracy: 65.14, exits:['54.99', '65.31', '70.31', '69.96'] loss: 0.98
+========== Round 354 ==========
+server, accuracy: 65.30, exits:['55.12', '65.74', '70.27', '70.06'] loss: 1.15
+========== Round 356 ==========
+server, accuracy: 65.38, exits:['55.49', '65.51', '70.40', '70.13'] loss: 1.18
+========== Round 358 ==========
+server, accuracy: 65.15, exits:['55.12', '65.58', '70.15', '69.73'] loss: 1.10
+========== Round 360 ==========
+server, accuracy: 65.17, exits:['55.17', '65.57', '70.17', '69.78'] loss: 1.05
+========== Round 362 ==========
+server, accuracy: 65.23, exits:['55.18', '65.62', '70.20', '69.93'] loss: 1.21
+========== Round 364 ==========
+server, accuracy: 65.23, exits:['55.41', '65.45', '70.18', '69.88'] loss: 1.01
+========== Round 366 ==========
+server, accuracy: 65.22, exits:['55.26', '65.34', '70.28', '69.99'] loss: 0.98
+========== Round 368 ==========
+server, accuracy: 65.34, exits:['55.27', '65.54', '70.41', '70.14'] loss: 1.17
+========== Round 370 ==========
+server, accuracy: 65.34, exits:['55.24', '65.67', '70.39', '70.05'] loss: 1.14
+========== Round 372 ==========
+server, accuracy: 65.44, exits:['55.39', '65.81', '70.40', '70.17'] loss: 1.25
+========== Round 374 ==========
+server, accuracy: 65.16, exits:['55.02', '65.53', '70.10', '69.97'] loss: 1.05
+========== Round 376 ==========
+server, accuracy: 65.41, exits:['55.43', '65.66', '70.33', '70.24'] loss: 1.17
+========== Round 378 ==========
+server, accuracy: 65.24, exits:['55.21', '65.54', '70.27', '69.93'] loss: 1.15
+========== Round 380 ==========
+server, accuracy: 65.19, exits:['55.10', '65.63', '70.17', '69.87'] loss: 1.08
+========== Round 382 ==========
+server, accuracy: 65.23, exits:['55.21', '65.50', '70.20', '69.99'] loss: 1.10
+========== Round 384 ==========
+server, accuracy: 65.25, exits:['54.96', '65.56', '70.25', '70.22'] loss: 1.13
+========== Round 386 ==========
+server, accuracy: 65.39, exits:['55.18', '65.67', '70.50', '70.22'] loss: 1.30
+========== Round 388 ==========
+server, accuracy: 65.40, exits:['55.22', '65.74', '70.38', '70.26'] loss: 1.23
+========== Round 390 ==========
+server, accuracy: 65.30, exits:['55.25', '65.66', '70.24', '70.05'] loss: 1.10
+========== Round 392 ==========
+server, accuracy: 65.25, exits:['55.37', '65.48', '70.24', '69.90'] loss: 1.09
+========== Round 394 ==========
+server, accuracy: 65.21, exits:['55.33', '65.48', '70.16', '69.87'] loss: 1.13
+========== Round 396 ==========
+server, accuracy: 65.35, exits:['55.30', '65.63', '70.44', '70.05'] loss: 1.23
+========== Round 398 ==========
+server, accuracy: 65.43, exits:['55.32', '65.85', '70.34', '70.21'] loss: 1.18
+========== Round 400 ==========
+server, accuracy: 65.29, exits:['55.31', '65.50', '70.16', '70.19'] loss: 1.07
+========== Round 402 ==========
+server, accuracy: 65.25, exits:['55.35', '65.43', '70.20', '70.02'] loss: 1.06
+========== Round 404 ==========
+server, accuracy: 65.42, exits:['55.33', '65.75', '70.33', '70.26'] loss: 1.15
+========== Round 406 ==========
+server, accuracy: 65.31, exits:['55.28', '65.63', '70.23', '70.09'] loss: 1.00
+========== Round 408 ==========
+server, accuracy: 65.28, exits:['55.20', '65.57', '70.23', '70.12'] loss: 1.08
+========== Round 410 ==========
+server, accuracy: 65.32, exits:['55.29', '65.65', '70.32', '70.02'] loss: 1.10
+========== Round 412 ==========
+server, accuracy: 65.25, exits:['55.29', '65.60', '70.14', '69.98'] loss: 1.03
+========== Round 414 ==========
+server, accuracy: 65.30, exits:['55.38', '65.55', '70.27', '70.00'] loss: 1.09
+========== Round 416 ==========
+server, accuracy: 65.21, exits:['55.18', '65.45', '70.18', '70.01'] loss: 1.01
+========== Round 418 ==========
+server, accuracy: 65.30, exits:['55.40', '65.55', '70.27', '69.98'] loss: 1.01
+========== Round 420 ==========
+server, accuracy: 65.19, exits:['55.26', '65.54', '69.98', '69.97'] loss: 1.00
+========== Round 422 ==========
+server, accuracy: 65.26, exits:['55.45', '65.45', '70.11', '70.04'] loss: 1.05
+========== Round 424 ==========
+server, accuracy: 65.24, exits:['55.34', '65.56', '70.10', '69.94'] loss: 1.17
+========== Round 426 ==========
+server, accuracy: 65.25, exits:['55.40', '65.41', '70.21', '69.97'] loss: 1.06
+========== Round 428 ==========
+server, accuracy: 65.25, exits:['55.44', '65.50', '70.00', '70.04'] loss: 1.06
+========== Round 430 ==========
+server, accuracy: 65.23, exits:['55.37', '65.46', '70.05', '70.02'] loss: 1.10
+========== Round 432 ==========
+server, accuracy: 65.15, exits:['55.31', '65.39', '70.07', '69.84'] loss: 1.15
+========== Round 434 ==========
+server, accuracy: 65.21, exits:['55.27', '65.51', '70.06', '69.98'] loss: 1.06
+========== Round 436 ==========
+server, accuracy: 65.18, exits:['55.34', '65.49', '70.00', '69.87'] loss: 1.17
+========== Round 438 ==========
+server, accuracy: 65.21, exits:['55.30', '65.64', '70.01', '69.89'] loss: 1.11
+========== Round 440 ==========
+server, accuracy: 65.16, exits:['55.23', '65.58', '69.90', '69.93'] loss: 1.08
+========== Round 442 ==========
+server, accuracy: 65.23, exits:['55.36', '65.55', '69.99', '70.03'] loss: 1.07
+========== Round 444 ==========
+server, accuracy: 65.24, exits:['55.38', '65.57', '70.08', '69.93'] loss: 1.02
+========== Round 446 ==========
+server, accuracy: 65.28, exits:['55.38', '65.64', '70.16', '69.94'] loss: 1.08
+========== Round 448 ==========
+server, accuracy: 65.32, exits:['55.39', '65.56', '70.23', '70.12'] loss: 1.05
+========== Round 450 ==========
+server, accuracy: 65.29, exits:['55.43', '65.65', '70.14', '69.96'] loss: 1.05
+========== Round 452 ==========
+server, accuracy: 65.34, exits:['55.47', '65.74', '70.15', '70.02'] loss: 1.16
+========== Round 454 ==========
+server, accuracy: 65.23, exits:['55.40', '65.53', '69.93', '70.04'] loss: 0.99
+========== Round 456 ==========
+server, accuracy: 65.17, exits:['55.47', '65.52', '69.91', '69.79'] loss: 1.05
+========== Round 458 ==========
+server, accuracy: 65.24, exits:['55.46', '65.52', '70.08', '69.91'] loss: 1.05
+========== Round 460 ==========
+server, accuracy: 65.28, exits:['55.47', '65.59', '70.04', '70.02'] loss: 1.18
+========== Round 462 ==========
+server, accuracy: 65.27, exits:['55.46', '65.50', '70.12', '69.98'] loss: 1.06
+========== Round 464 ==========
+server, accuracy: 65.17, exits:['55.42', '65.39', '70.00', '69.87'] loss: 0.99
+========== Round 466 ==========
+server, accuracy: 65.20, exits:['55.43', '65.35', '70.10', '69.90'] loss: 1.01
+========== Round 468 ==========
+server, accuracy: 65.21, exits:['55.37', '65.48', '70.03', '69.94'] loss: 0.99
+========== Round 470 ==========
+server, accuracy: 65.23, exits:['55.52', '65.44', '69.99', '69.96'] loss: 1.06
+========== Round 472 ==========
+server, accuracy: 65.23, exits:['55.50', '65.39', '70.09', '69.94'] loss: 1.19
+========== Round 474 ==========
+server, accuracy: 65.19, exits:['55.49', '65.47', '69.95', '69.85'] loss: 1.11
+========== Round 476 ==========
+server, accuracy: 65.16, exits:['55.35', '65.44', '70.00', '69.85'] loss: 1.17
+========== Round 478 ==========
+server, accuracy: 65.22, exits:['55.42', '65.53', '69.98', '69.96'] loss: 1.13
+========== Round 480 ==========
+server, accuracy: 65.20, exits:['55.53', '65.42', '69.97', '69.87'] loss: 1.08
+========== Round 482 ==========
+server, accuracy: 65.24, exits:['55.53', '65.39', '70.08', '69.94'] loss: 1.04
+========== Round 484 ==========
+server, accuracy: 65.22, exits:['55.52', '65.40', '70.02', '69.94'] loss: 1.19
+========== Round 486 ==========
+server, accuracy: 65.25, exits:['55.44', '65.42', '70.13', '69.99'] loss: 1.15
+========== Round 488 ==========
+server, accuracy: 65.24, exits:['55.49', '65.45', '70.04', '69.96'] loss: 0.98
+========== Round 490 ==========
+server, accuracy: 65.16, exits:['55.39', '65.33', '70.09', '69.83'] loss: 1.08
+========== Round 492 ==========
+server, accuracy: 65.16, exits:['55.34', '65.46', '70.03', '69.82'] loss: 1.05
+========== Round 494 ==========
+server, accuracy: 65.18, exits:['55.37', '65.37', '70.10', '69.86'] loss: 0.96
+========== Round 496 ==========
+server, accuracy: 65.17, exits:['55.35', '65.41', '70.03', '69.90'] loss: 1.08
+========== Round 498 ==========
+server, accuracy: 65.20, exits:['55.56', '65.37', '70.05', '69.80'] loss: 0.95
+==========Summary==========
+server, max accuracy: 65.70
+server, final accuracy: 65.18 +- 0.00
+Anytime:
+[54.58, 65.11, 69.49, 69.42], avg:64.65

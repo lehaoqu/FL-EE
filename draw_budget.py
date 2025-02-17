@@ -32,9 +32,9 @@ LIGHT_GARY = '#D3D3D3'
 
 
 COLOR={'darkflpa2':LIGHT_RED, 'darkflpg': RED, 'eefl': BROWN, 'depthfl': YELLOW, 'reefl': GREEN, 'inclusivefl': BLUE, 'scalefl': PURPLE, 'exclusivefl': BROWN}
-MARKER={'darkflpa2':'v', 'darkflpg': 'v', 'eefl':'s', 'depthfl':'s', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
+MARKER={'darkflpa2':'s', 'darkflpg': 's', 'eefl':'s', 'depthfl':'v', 'reefl': 'o', 'inclusivefl': '^', 'scalefl': 'D', 'exclusivefl': 'D'}
 STYLE={'darkflpa2':'-', 'darkflpg': '-', 'eefl':'--', 'depthfl':'--', 'reefl': '--', 'inclusivefl': '--', 'scalefl': '--', 'exclusivefl': '--'}
-NAMES = {'darkflpa2':'DarkDistill+', 'darkflpg': 'DarkDistill', 'eefl':'EEFL', 'depthfl':'DepthFL', 'reefl': 'ReeFL', 'inclusivefl': 'InclusiveFL', 'scalefl': 'ScaleFL', 'exclusivefl': 'ExclusiveFL'}
+NAMES = {'darkflpa2':'DarkDistill-PL', 'darkflpg': 'DarkDistill', 'eefl':'EEFL', 'depthfl':'DepthFL', 'reefl': 'ReeFL', 'inclusivefl': 'InclusiveFL', 'scalefl': 'ScaleFL', 'exclusivefl': 'ExclusiveFL'}
 APPS = ['inclusivefl', 'scalefl', 'depthfl', 'reefl', 'darkflpg', 'darkflpa2']
 
 def args_parser():
@@ -119,7 +119,8 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
         # x_smooth = np.linspace(min(x), max(x), 200)
         # y_smooth = spl(x_smooth)
         
-        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name], markeredgecolor='white', markeredgewidth=1)
+        width = 2 if 'darkfl' in model_name else 1
+        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], marker=MARKER[model_name], linestyle=STYLE[model_name], markeredgecolor='white', markeredgewidth=1, linewidth=width)
 
 
     if len(y_range) == 2:
@@ -134,7 +135,7 @@ def budget(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1,
         if x_step > 0:
             EPS = 1e-6
             plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step),)    
-    plt.legend(ncol=3, loc="lower center")
+    # plt.legend(ncol=3, loc="lower center")
 
     # plt.title(title, fontsize=TEXT_SIZE)
     if y_none is True:
@@ -171,11 +172,18 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
     for model_name in APPS:
         # if model_name == 'scalefl' or model_name == 'exclusivefl':
         #     continue
+        if 'LORA' in path:
+            if 'darkflpa' in model_name:
+                continue
+        
         x = [i*10 for i in range(50)]
         y = data[model_name]
         if 'loss' in title and 'scalefl' in model_name:
             y = [l*4 for l in y]
-        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], linestyle=STYLE[model_name])
+        
+        width = 2 if 'darkfl' in model_name else 1
+            
+        plt.plot(x, y, color=COLOR[model_name], label=NAMES[model_name], linestyle=STYLE[model_name], linewidth=width)
 
 
     if len(y_range) == 2:
@@ -190,10 +198,10 @@ def round(data, path, title, x_label, y_label, y_range=(), x_range=(),y_step=1, 
         if x_step > 0:
             EPS = 1e-6
             plt.xticks(np.arange(x_range[0], x_range[1] + EPS, x_step), fontsize=TEXT_SIZE)    
-    if 'loss' in title:
-        plt.legend(loc='upper right')
-    else:
-        plt.legend(loc='lower right')
+    # if 'loss' in title:
+    #     plt.legend(loc='upper right')
+    # else:
+    #     plt.legend(loc='lower right')
 
     # plt.title(title, fontsize=TEXT_SIZE)
     plt.xlabel(x_label, fontsize=TEXT_SIZE)
@@ -271,9 +279,9 @@ def cifar_LORA_1000():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1000_LORA', title=f'CIFAR100_noniid1000_LORA', x_label='Average budget (in MUL-ADD) $\\times 10^{10}$', y_label='Accuracy (%)',
-        y_range=(60, 70),
+        y_range=(65, 70),
         y_step=1,
-        x_range=(1.5, 3.5),
+        x_range=(1.8, 3.5),
         x_step=0.5,
         # y_range=(54, 70),
         # y_step=2,
@@ -299,9 +307,10 @@ def cifar_Full_1():
                     data[name_without_extension] = json.load(f)
     budget(data, path=f'CIFAR100_noniid1_Full', title=f'CIFAR100_noniid1_Full', x_label='Average budget (in MUL-ADD) $\\times 10^{10}$', y_label='Accuracy (%)',
         # y_range=(66, 70.5),
-        # x_range=(1.8, 4.0),
-        y_range=(50, 72),
+        x_range=(1.2, 3.5),
+        y_range=(62, 71),
         y_step=2,
+        x_step=0.5,
         suffix=suffix,
         )
     
@@ -573,8 +582,8 @@ def svhn_Full_acc():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     round(data, path='SVHN_Full', title='SVHN_Full_acc', x_label='Round', y_label='Accuracy (%)',
-         y_range=(90, 95),
-         y_step=2,
+        #  y_range=(90, 95),
+        #  y_step=2,
          suffix=suffix
          )
 
@@ -596,8 +605,127 @@ def speechcmds_Full_acc():
                 with open(model_path+'.json', 'r') as f:
                     data[name_without_extension] = json.load(f)
     round(data, path='SpeechCmds_Full', title='SpeechCmds_Full_acc', x_label='Round', y_label='Accuracy (%)',
-         y_range=(90.5, 93.6),
-         y_step=0.5,
+        #  y_range=(90.5, 93.6),
+        #  y_step=0.5,
+         suffix=suffix
+         )
+
+
+def cifar_LORA_acc_1000():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1000'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_acc' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid1000_LORA', title=f'CIFAR100_noniid1000_LORA_acc', x_label='Round', y_label='Accuracy (%)',
+        #  y_range=(54, 66),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def cifar_LORA_acc_1():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_acc' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid1_LORA', title=f'CIFAR100_noniid1_LORA_acc', x_label='Round', y_label='Accuracy (%)',
+        #  y_range=(50, 66),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def cifar_LORA_acc_01():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid0.1'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_acc' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid0.1_LORA', title=f'CIFAR100_noniid0.1_LORA_acc', x_label='Round', y_label='Accuracy (%)',
+        #  y_range=(54, 62),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def svhn_LORA_acc():
+    suffix = 'exps/BASE_SVHN/lora_boosted/noniid'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_acc' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path='SVHN_LORA', title='SVHN_LORA_acc', x_label='Round', y_label='Accuracy (%)',
+        #  y_range=(90, 95),
+        #  y_step=2,
+         suffix=suffix
+         )
+
+def speechcmds_LORA_acc():
+    suffix = 'exps/BASE_SPEECHCMDS/lora_boosted'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_acc' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path='SpeechCmds_LORA', title='SpeechCmds_LORA_acc', x_label='Round', y_label='Accuracy (%)',
+        #  y_range=(90.5, 93.6),
+        #  y_step=0.5,
          suffix=suffix
          )
 
@@ -720,6 +848,127 @@ def speechcmds_Full_loss():
         #  y_step=0.5,
          suffix=suffix
          )
+
+
+def cifar_LORA_loss_1000():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1000'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_loss' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid1000_LORA', title=f'CIFAR100_noniid1000_LORA_loss', x_label='Round', y_label='Loss',
+        #  y_range=(54, 66),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def cifar_LORA_loss_1():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid1'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_loss' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid1_LORA', title=f'CIFAR100_noniid1_LORA_loss', x_label='Round', y_label='Loss',
+        #  y_range=(50, 66),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def cifar_LORA_loss_01():
+    suffix = 'exps/BASE_CIFAR/lora_boosted/noniid0.1'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_loss' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path=f'CIFAR100_noniid0.1_LORA', title=f'CIFAR100_noniid0.1_LORA_loss', x_label='Round', y_label='Loss',
+        #  y_range=(54, 62),
+        #  y_step=2,
+        #  x_range=(1.6, 4.0),
+         suffix=suffix
+         )
+
+def svhn_LORA_loss():
+    suffix = 'exps/BASE_SVHN/lora_boosted/noniid'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_loss' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path='SVHN_LORA', title='SVHN_LORA_loss', x_label='Round', y_label='Loss',
+        #  y_range=(90, 95),
+        #  y_step=2,
+         suffix=suffix
+         )
+
+def speechcmds_LORA_loss():
+    suffix = 'exps/BASE_SPEECHCMDS/lora_boosted'
+    eval_dir = suffix
+    file_names = os.listdir(eval_dir)
+    model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval.txt' not in f and '.' in f]))
+    model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    
+    data = {}    
+    for model_path in model_paths:
+        if '_loss' in model_path:
+            # print(model_path)
+            base_name = os.path.basename(model_path)
+            name_without_extension = os.path.splitext(base_name)[0].split('_')[0]
+            print(name_without_extension)
+            if name_without_extension != 'eefl' and name_without_extension != 'exclusivefl':
+                with open(model_path+'.json', 'r') as f:
+                    data[name_without_extension] = json.load(f)
+    round(data, path='SpeechCmds_LORA', title='SpeechCmds_LORA_loss', x_label='Round', y_label='Loss',
+        #  y_range=(90.5, 93.6),
+        #  y_step=0.5,
+         suffix=suffix
+         )
+
+
 
 
 def cifar_Full_1000_any():
@@ -894,7 +1143,7 @@ def speechcmds_LORA_any():
          )
 
 
-## == ANYTIME ==
+# # == ANYTIME ==
 # cifar_Full_1000_any()
 # cifar_LORA_1000_any()
 # svhn_Full_any()
@@ -902,16 +1151,16 @@ def speechcmds_LORA_any():
 # speechcmds_Full_any()
 # speechcmds_LORA_any()
 
-# # #== BUDGET ==
-cifar_Full_1000()    
-cifar_LORA_1000()
-cifar_Full_1()    
-cifar_LORA_1()
-cifar_Full_01()    
-cifar_LORA_01()
+# #== BUDGET ==
+# cifar_Full_1000()    
+# cifar_LORA_1000()
+# cifar_Full_1()    
+# cifar_LORA_1()
+# cifar_Full_01()    
+# cifar_LORA_01()
 
 # svhn_Full()
-# svhn_LORA()
+svhn_LORA()
 
 # speechcmds_Full()
 # speechcmds_LORA()
@@ -924,6 +1173,12 @@ cifar_LORA_01()
 # # # 不太行
 # svhn_Full_acc()
 # speechcmds_Full_acc()
+# cifar_LORA_acc_1000()
+# cifar_LORA_acc_1()
+# cifar_LORA_acc_01()
+# # # 不太行
+# svhn_LORA_acc()
+# speechcmds_LORA_acc()
 
 
 # # # == LOSS ==
@@ -932,3 +1187,9 @@ cifar_LORA_01()
 # cifar_Full_loss_01()
 # svhn_Full_loss()
 # speechcmds_Full_loss()
+
+# cifar_LORA_loss_1000()
+# cifar_LORA_loss_1()
+# cifar_LORA_loss_01()
+# svhn_LORA_loss()
+# speechcmds_LORA_loss()

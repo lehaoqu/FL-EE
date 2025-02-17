@@ -62,8 +62,9 @@ torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 random.seed(seed)
+classes = [0,34,50,97]
 
-def darkflpg_draw(label, dir, title):
+def darkflpg_draw(label, dir, title,  only_legend=False):
     DIFFS = ["Difficulty 1", "Difficulty 2", "Difficulty 3", "Difficulty 4"]
     # COLORS = ["#E0F7FA", "#B2EBF2", "#4DD0E1", "#00BFA5"]
     COLORS = [RED, PURPLE, DARK_GREEN, BROWN]
@@ -114,32 +115,44 @@ def darkflpg_draw(label, dir, title):
     X = StandardScaler().fit_transform(X)
 
     # 创建t-SNE对象，并指定降维后的维度为2
-    tsne = TSNE(n_components=2, n_iter=300)
+    tsne = TSNE(n_components=2, n_iter=350)
 
     # 对数据进行降维
     print(X.shape)
     result = tsne.fit_transform(X)
 
     # 可视化降维后的结果
+    if only_legend:
+        for idx, d in enumerate(ds):
+            # plt.scatter(result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 0], result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 1], color=COLORS[idx], label=DIFFS[idx], alpha=0.5)
+            plt.scatter([], [], color=COLORS[idx], label=DIFFS[idx], alpha=0.5)
+        legend = plt.legend(fontsize=TEXT_SIZE, ncol=4)
+        plt.tight_layout()
+        plt.axis('off')
+        plt.savefig(f'{dir}pg_legend.pdf',  bbox_inches='tight')
+        return
+    
+    
     for idx, d in enumerate(ds):
         plt.scatter(result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 0], result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 1], color=COLORS[idx], label=DIFFS[idx], alpha=0.5)
-
-    plt.legend(loc='lower right')
+        
+    # plt.legend(loc='lower right')
     # plt.xlabel('t-SNE Component 1')
     # plt.ylabel('t-SNE Component 2')
     ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
     ax.tick_params(axis='both', which='both', bottom=False, left=False)
     # plt.title(title)
     plt.show()
-    plt.savefig(f'{dir}label{label}.pdf')
+    plt.savefig(f'{dir}label{label}.pdf', bbox_inches='tight')
 
 
-darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}')
-darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
-darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
+# for c in classes:  
+#     darkflpg_draw(c, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {c}')
+# darkflpg_draw(50, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {50}')
+# darkflpg_draw(99, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {99}')
 
 
-def darkflpa_draw(label, dir, title):
+def darkflpa_draw(label, dir, title, only_legend=False):
     COLORS = [RED, PURPLE, DARK_GREEN, BROWN]
     args.diff_generator=False
     gs = []
@@ -175,21 +188,42 @@ def darkflpa_draw(label, dir, title):
     # 对数据进行降维
     print(X.shape)
     result = tsne.fit_transform(X)
+    
+    
+    # 可视化降维后的结果
+    if only_legend:
+        for idx in range(4):
+            # plt.scatter(result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 0], result[int(ALL/len(ds))*(idx):int(ALL/len(ds))*(idx+1), 1], color=COLORS[idx], label=DIFFS[idx], alpha=0.5)
+            plt.scatter([], [], color=COLORS[idx], label=f'Generator {idx}', alpha=0.5)
+        legend = plt.legend(fontsize=TEXT_SIZE, ncol=4)
+        plt.axis('off')
+        plt.savefig(f'{dir}pa_legend.pdf')
+        return
 
     # 可视化降维后的结果
     for idx in range(4):
         plt.scatter(result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 0], result[int(ALL/4)*(idx):int(ALL/4)*(idx+1), 1], color=COLORS[idx], label=f'Generator {idx}', alpha=0.5)
 
-    plt.legend(loc='lower right')
+    # plt.legend(loc='lower right')
     # plt.xlabel('t-SNE Component 1')
     # plt.ylabel('t-SNE Component 2')
     ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
     ax.tick_params(axis='both', which='both', bottom=False, left=False)
+    plt.tight_layout()
     # plt.title(title)
     plt.show()
-    plt.savefig(f'{dir}label{label}.pdf')
+    plt.savefig(f'{dir}label{label}.pdf',  bbox_inches='tight')
     
     
-darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {0}')    
-darkflpa_draw(50, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {50}')    
-darkflpa_draw(99, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {99}')
+# darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {0}')    
+# darkflpa_draw(50, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {50}')    
+# darkflpa_draw(99, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {99}')
+
+
+# darkflpg_draw(0, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {0}', only_legend=True)
+# darkflpa_draw(0, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {0}', only_legend=True)
+
+for c in classes:
+    # if c == 97: continue
+    # darkflpg_draw(c, './imgs/generator/darkflpg/', f'Pseudo latent Visualization Label: {c}')
+    darkflpa_draw(c, './imgs/generator/darkflpa/', f'Pseudo latent Visualization Label: {c}')  

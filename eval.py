@@ -347,6 +347,6 @@ if __name__ == '__main__':
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f and '.png' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
     for model_path in model_paths:
-        if 'darkflpg' in model_path and args.policy in model_path and 'G' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'budget' not in model_path:
+        if  args.policy in model_path and 'G_' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'distance' not in model_path and 'budget' not in model_path:
             print(model_path)
             eval.eval(model_path+'.pth', model_path+'.json')

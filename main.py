@@ -71,9 +71,11 @@ class FedSim:
         # exits = (i-1 for i in args.eq_depths)
         # if args.alg == 'scalefl': exits = (i+1 for _, i in enumerate(exits) if _!=len(exits-1))
         # exits = (2,5,8,11) if args.alg != 'scalefl' else (3,6,9,11)
-        
-        exits = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
-        blocks = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
+        if args.dataset == 'svhn' and args.policy == 'base' and args.ft == 'full':
+            exits, blocks = (3,5,8,11), (3,5,8,11)
+        else:
+            exits = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
+            blocks = tuple(i-1 for i in args.eq_depths) if args.alg != 'scalefl' else tuple(i if i != max(args.eq_depths) else i-1 for i in args.eq_depths)
         args.blocks = blocks
         if args.alg != 'heterofl': eq_exits = {eq_depth: exits[:int((args.eq_depths.index(eq_depth)+1)*len(exits)/len(args.eq_depths))] for eq_depth in args.eq_depths}
         else: eq_exits = {eq_depth: exits for eq_depth in args.eq_depths}

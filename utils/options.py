@@ -45,6 +45,9 @@ def args_parser():
     parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of valid for train_dataset')
     parser.add_argument('--eval_models_dir', type=str, default='script/0818-1e-1', help='dict need to evaled. config.json and model.pkl')
     parser.add_argument('--eval_test', action='store_true')
+    
+    parser.add_argument('--noise', type=int, default=-1)
+    parser.add_argument('--hidden_dim', type=int, default=-1)
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]

@@ -25,7 +25,7 @@ do
     for pl in "${pls[@]}"
     do
 
-        python eval.py eefl boosted --suffix $1/${ft}_$pl/noniid --device $2 --dataset $3 --model $4 --valid_ratio $vr --if_mode all --ft $ft
+        python eval.py eefl boosted --suffix $1/${ft}_$pl/ --device $2 --dataset $3 --model $4 --valid_ratio $vr --if_mode all --ft $ft
 
     done
 done    
