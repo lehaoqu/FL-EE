@@ -180,7 +180,7 @@ class FedSim:
 
 if __name__ == '__main__':
     args = args_parser()
-    wdb = wandb.init(project='example', name=f"{args.alg}")
+    wdb = wandb.init(project=f"ResearchPoint2_{args.dataset}", name=f"{args.alg}-{args.policy}")
 
     seed = args.seed
     torch.manual_seed(seed)

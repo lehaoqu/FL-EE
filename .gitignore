@@ -14,3 +14,4 @@ script/08*/
 *.pth
 img/
 __pycache__/
+wandb/
