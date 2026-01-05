@@ -12,12 +12,38 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
 from tqdm import tqdm
+import warnings
 
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from dataset.svhn_dataset import SVHNClassificationDataset
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Suppress specific Pydantic warnings about unsupported Field attributes
+# These originate from pydantic._internal._generate_schema when Field(...)
+# is used in a type alias or union where 'repr'/'frozen' have no effect.
+warnings.filterwarnings(
+	"ignore",
+	module=r"pydantic._internal._generate_schema"
+)
+
+# Suppress SWIG-related DeprecationWarnings from some compiled extensions
+warnings.filterwarnings(
+	"ignore",
+	message=r"builtin type SwigPyPacked has no __module__ attribute",
+	category=DeprecationWarning,
+)
+warnings.filterwarnings(
+	"ignore",
+	message=r"builtin type SwigPyObject has no __module__ attribute",
+	category=DeprecationWarning,
+)
+warnings.filterwarnings(
+	"ignore",
+	message=r"builtin type swigvarlink has no __module__ attribute",
+	category=DeprecationWarning,
+)
 
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from utils.dataloader_utils import load_dataset_loader
@@ -26,80 +52,29 @@ from dataset.utils import dataset_utils
 from utils.modelload.modelloader import CIFAR100, SVHN, IMAGENET, SPEECHCMDS, GLUE
 
 
-def load_split_pkls(prefix, total_num):
-	arrays_x = []
-	arrays_y = []
-	for i in range(total_num):
-		path = f"{prefix}{i}.pkl"
-		if not os.path.exists(path):
-			raise FileNotFoundError(f"Split file not found: {path}")
-		dic = dataset_utils.load_pkl(path)
-		# support multiple pickle formats (str keys 'x','y' or bytes keys b'data', b'fine_labels')
-		x = None
-		y = None
-		if isinstance(dic, dict):
-			if 'x' in dic:
-				x = dic.get('x')
-			elif b'x' in dic:
-				x = dic.get(b'x')
-			elif 'data' in dic:
-				x = dic.get('data')
-			elif b'data' in dic:
-				x = dic.get(b'data')
+def compare_model_instances(model_a, model_b):
+    # normalize and move to cpu for safe comparison
+    def _norm_state(sd):
+        if isinstance(sd, dict) and 'state_dict' in sd and isinstance(sd['state_dict'], dict):
+            sd = sd['state_dict']
+        return {k[len("module."): ] if k.startswith("module.") else k: v.cpu() for k, v in sd.items()}
 
-			if 'y' in dic:
-				y = dic.get('y')
-			elif b'y' in dic:
-				y = dic.get(b'y')
-			elif 'fine_labels' in dic:
-				y = dic.get('fine_labels')
-			elif b'fine_labels' in dic:
-				y = dic.get(b'fine_labels')
-		else:
-			x = dic
-			y = None
-		if y is None:
-			raise RuntimeError(f"No label array found in {path}")
-		arrays_x.append(x)
-		arrays_y.append(y)
+    sa = _norm_state(model_a.state_dict())
+    sb = _norm_state(model_b.state_dict())
 
-	X = np.concatenate(arrays_x, axis=0)
-	Y = np.concatenate(arrays_y, axis=0)
-	return X, Y
-
-
-def prepare_dataloader(X, Y, batch_size, device):
-	# X may be (N,3072) or (N,3,32,32) or (N,32,32,3)
-	X = np.array(X)
-	if X.ndim == 2:
-		# flattened
-		X = X.reshape(-1, 3, 32, 32)
-	elif X.ndim == 4 and X.shape[-1] == 3:
-		# (N,H,W,C) -> (N,C,H,W)
-		X = X.transpose(0, 3, 1, 2)
-
-	X = torch.from_numpy(X).float() / 255.0
-	Y = torch.from_numpy(np.array(Y)).long()
-
-
-	# vectorized batch transform using interpolate + broadcast normalization
-	mean = torch.tensor((0.5070751592371323, 0.48654887331495095, 0.4409178433670343)).view(1,3,1,1)
-	std = torch.tensor((0.2673342858792401, 0.2564384629170883, 0.27615047132568404)).view(1,3,1,1)
-
-	dataset = TensorDataset(X, Y)
-
-	def collate_fn(batch):
-		imgs = torch.stack([b[0] for b in batch], dim=0)
-		# imgs: (B,C,H,W) in [0,1]
-		imgs = F.interpolate(imgs, size=(224,224), mode='bilinear', align_corners=False)
-		imgs = (imgs - mean) / std
-		labels = torch.stack([b[1] for b in batch], dim=0)
-		return imgs.to(device), labels.to(device)
-
-	# use a small number of workers to parallelize data loading without overwhelming CPU
-	num_workers = min(4, max(0, (os.cpu_count() or 1) // 2))
-	loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=num_workers, pin_memory=False)
-	return loader
+    # if set(sa.keys()) != set(sb.keys()):
+    #     print(f"Keys differ: only A {set(sa)-set(sb)}, only B {set(sb)-set(sa)}")
+    #     return False, f"keys differ: only A {set(sa)-set(sb)}, only B {set(sb)-set(sa)}"
+    for k in sorted(sb.keys()):
+        a, b = sa[k], sb[k]
+        if a.shape != b.shape:
+            print('shape error')
+            return False, f"shape differ: {k} {a.shape} vs {b.shape}"
+        if not torch.equal(a, b):
+            print('value error')
+            return False, f"value differ at key: {k}"
+    print('========S============')
+    return True, "models identical"
 
 
 def adapt_batch(args, data):
@@ -118,14 +93,23 @@ def adapt_batch(args, data):
 	label = batch['labels'].view(-1)
 	return batch, label
 
+def kd_loss_func(pred, teacher, T=4.0):
+	kld_loss = nn.KLDivLoss(reduction='batchmean')
+	log_softmax = nn.LogSoftmax(dim=-1)
+	softmax = nn.Softmax(dim=1)
+	_kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
+	return _kld
 
-def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1, lr=1e-3, temperature=4.0, alpha=0.0, save_log=None, wdb=None):
+
+def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1, lr=1e-3, temperature=4.0, alpha=0.0, save_log=None, wdb=None, t_policy=None, s_policy=None):
 	teacher.to(device).eval()
 	student.to(device).train()
 
+	###################
+	# Train
+	###################
 	optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, student.parameters()), lr=lr, momentum=0.9)
 	ce_loss = nn.CrossEntropyLoss()
-	kl_loss = nn.KLDivLoss(reduction='batchmean')
 	pbar = tqdm(range(epochs), desc='Distillation', unit='epoch')
 	save_log = open(save_log, 'w') if save_log is not None else None
 
@@ -137,14 +121,21 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 			optimizer.zero_grad()
 			batch, label = adapt_batch(args, data)
 			with torch.no_grad():
-				t_logits = teacher(**batch)
-			s_logits = student(**batch)
-			for idx, s_exit_logits in enumerate(s_logits):
+				t_exits_ce_loss, t_exits_logits = t_policy.train(teacher, batch, label)
+				# t_logits = teacher(**batch)
+			# s_logits = student(**batch)
+			s_exits_ce_loss, s_exits_logits = s_policy.train(student, batch, label)
+			# print(len(s_logits), len(t_logits))
+			# print(s_logits[0], t_logits[0])
+			# max_diff = (s_logits[0] - t_logits[0]).abs().max().item()
+			# print("Max absolute difference:", max_diff)
+			# print(torch.equal(s_logits[0], t_logits[0]))
+			# assert torch.allclose(s_logits[0], t_logits[0]), "Teacher and student exit logits do not match in number!"
+			for idx, s_exit_logits in enumerate(s_exits_logits):
 				loss_ce = ce_loss(s_exit_logits, label)
-				t_soft = torch.softmax(t_logits[idx] / temperature, dim=1)
-				s_logsoft = torch.log_softmax(s_exit_logits / temperature, dim=1)
-				loss_kd = kl_loss(s_logsoft, t_soft) * (temperature ** 2)
+				loss_kd = kd_loss_func(s_exit_logits, t_exits_logits[idx], T=temperature)
 				loss += alpha * loss_ce + (1 - alpha) * loss_kd
+			# print("Loss per exit:", loss.item())
 			loss.backward()
 			optimizer.step()
 
@@ -153,11 +144,37 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 			total_samples += bs
 
 		avg_loss = total_loss / (total_samples + 1e-12)
-		pbar.set_description(f'Distillation Loss: {avg_loss:.4f}')
+		# pbar.set_description(f'Distillation Loss: {avg_loss:.4f}')
 		save_log.write(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}\n") if save_log is not None else None
 		wdb.log({"distill_train_loss": avg_loss, "epoch": epoch+1}) if wdb is not None else None
 		# print(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}")
 
+		###################
+		# Validation
+		###################
+		student.eval()
+		correct = 0
+		total = 0
+		corrects = [0 for _ in range(args.exits_num)]
+
+		with torch.no_grad():
+			for data in valid_loader:
+				batch, labels = adapt_batch(args, data)
+				exits_logits = student(**batch)
+				exits_logits = s_policy(exits_logits)
+				for i, exit_logits in enumerate(exits_logits):
+					_, predicted = torch.max(exit_logits, 1)
+					total += labels.size(0)
+					correct += (predicted == labels).sum().item()
+					corrects[i] += (predicted == labels).sum().item()
+		acc = 100.00 * correct / total
+		acc_exits = [100 * c / (total/args.exits_num) for c in corrects]
+		# args.metric['acc_exits'] = acc_exits
+		# args.metric['acc'].append(acc)
+		pbar.set_description(f'Distillation Loss: {avg_loss:.4f} | Valid Acc: {acc:.2f}%')
+		acc_exits_str = ", ".join(f"{a:.2f}" for a in acc_exits)
+		save_log.write(f"Epoch {epoch+1}/{epochs} valid acc: {acc:.2f}\n acc_exits: {acc_exits_str}") if save_log is not None else None
+		wdb.log({"distill_valid_acc": acc, "epoch": epoch+1}) if wdb is not None else None
 	return student
 
 
@@ -197,50 +214,6 @@ def load_weight_variant_model(args, teacher_model, exits=None):
 		model.load_state_dict(new_state_dict)
 		variant_models[scale] = model
 	return variant_models
-	
-
-def main():
-	parser = argparse.ArgumentParser(description='Distill teacher .pth into student model')
-	parser.add_argument('--teachers_dir', required=True, help='Dir for teachers .pth file')
-	parser.add_argument('--valid_prefix', required=False, help='Prefix for valid split files')
-	parser.add_argument('--total_num', type=int, default=100, help='Number of split files/clients')
-	parser.add_argument('--model', type=str, default='vit', help='Model name (matches utils.modelload module)')
-	parser.add_argument('--dataset', type=str, default='cifar100_noniid1000')
-	parser.add_argument('--epochs', type=int, default=500)
-	parser.add_argument('--bs', type=int, default=32)
-	parser.add_argument('--lr', type=float, default=0.05)
-	parser.add_argument('--device', type=str, default='0')
-
-	# limit PyTorch thread usage to avoid excessive CPU spin
-	max_threads = min(4, max(1, (os.cpu_count() or 1)))
-	torch.set_num_threads(max_threads)
-	os.environ.setdefault('OMP_NUM_THREADS', str(max_threads))
-	os.environ.setdefault('MKL_NUM_THREADS', str(max_threads))
-	
-	args = parser.parse_args()
-	args.scales = [0.33, 0.67]
-	args.device = torch.device('cuda:' + args.device if torch.cuda.is_available() or 'cpu' in args.device else 'cpu')
-	
-	if CIFAR100 in args.dataset or SVHN in args.dataset or SPEECHCMDS in args.dataset:
-		args.train_prefix = f'./dataset/{args.dataset}/train/'
-	elif GLUE in args.dataset:
-		args.train_prefix = f'./dataset/glue/{args.dataset}/train/'
-
-	teachers_dir = args.teachers_dir
-	file_names = os.listdir(teachers_dir)
-	model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f and '.png' not in f]))
-	model_paths = [f'./{teachers_dir}/{model_name}' for model_name in model_names]
-	for teacher_path in model_paths:
-		if 'G' in teacher_path or 'loss' in teacher_path or 'acc' in teacher_path or 'distance' in teacher_path or 'budget' in teacher_path:
-			continue
-		# TODO
-		if 'reefl' in teacher_path:
-			continue
-		print('Processing teacher model:', teacher_path)
-		args.teacher_pth = teacher_path + '.pth'
-		args.teacher_config = teacher_path + '.json'
-		args.output_prefix = teacher_path + '_variants/variant'
-		teacher_distillation(args)
 
 
 def teacher_distillation(args):
@@ -272,7 +245,7 @@ def teacher_distillation(args):
 		# Distill each variant student in widths
 		for student_width, student in variant_students.items():
 			print(f'Distilling student with depth {student_depth} & width {student_width} | prepare dataset...')
-			wdb = wandb.init(project=f"Variant_Distillation_{args.dataset}", name=f"{teacher_pth.split('/')[-1].split('_')[0]}_{teacher_pth.split('/')[3]}_depth{student_depth}_width{student_width}")
+			wdb = wandb.init(project=f"Variant_Distillation_{args.dataset}", name=f"{teacher_pth.split('/')[-1].split('_')[0]}_{teacher_pth.split('/')[3]}_depth{student_depth}_width{student_width}", reinit=True)
 			dataset_idx = 0 if student_depth == 3 else 25 if student_depth == 6 else 50 if student_depth == 9 else 75
 			dataset_train, loader_train = load_dataset_loader(args=args, file_name='train', id=dataset_idx)
 			dataset_valid, loader_valid = load_dataset_loader(args=args, file_name='valid', id=dataset_idx)
@@ -284,11 +257,73 @@ def teacher_distillation(args):
 				json.dump(student.config.to_dict(), f, ensure_ascii=False, indent=4)
 
 			# print(student.config)
-			student = distill(args, teacher, student, loader_train, loader_valid, device, epochs=args.epochs, lr=args.lr, save_log=save_log, wdb=wdb)
-			
+			# compare_model_instances(teacher, student)
+			policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
+			args.exits_num = 4
+			t_policy = policy_module.Policy(args)
+			args.exits_num = len(exits)
+			s_policy = policy_module.Policy(args)
+			student = distill(args, teacher, student, loader_train, loader_valid, device, epochs=args.epochs, lr=args.lr, save_log=save_log, wdb=wdb, t_policy=t_policy, s_policy=s_policy)
+
 			save_scale_pth = args.output_prefix + f'_depth{student_depth}_width{student_width}.pth'
 			torch.save(student.state_dict(), save_scale_pth)
 			print('Saved distilled student to', save_scale_pth)
+			wdb.finish()
+
+
+def main():
+	parser = argparse.ArgumentParser(description='Distill teacher .pth into student model')
+	parser.add_argument('--teachers_dir', required=True, help='Dir for teachers .pth file')
+	parser.add_argument('--valid_prefix', required=False, help='Prefix for valid split files')
+	parser.add_argument('--total_num', type=int, default=100, help='Number of split files/clients')
+	parser.add_argument('--model', type=str, default='vit', help='Model name (matches utils.modelload module)')
+	parser.add_argument('--dataset', type=str, default='cifar100_noniid1000')
+	parser.add_argument('--epochs', type=int, default=300)
+	parser.add_argument('--bs', type=int, default=32)
+	parser.add_argument('--lr', type=float, default=0.05)
+	parser.add_argument('--device', type=str, default='0')
+	parser.add_argument('policy', type=str, default='boosted')
+
+	spec_policy = sys.argv[1]
+	policy_module = importlib.import_module(f'trainer.policy.{spec_policy}')
+	parser = policy_module.add_args(parser)
+
+	# limit PyTorch thread usage to avoid excessive CPU spin
+	max_threads = min(4, max(1, (os.cpu_count() or 1)))
+	torch.set_num_threads(max_threads)
+	os.environ.setdefault('OMP_NUM_THREADS', str(max_threads))
+	os.environ.setdefault('MKL_NUM_THREADS', str(max_threads))
+	
+	args = parser.parse_args()
+	args.scales = [0.33, 0.67]
+	args.device = torch.device('cuda:' + args.device if torch.cuda.is_available() or 'cpu' in args.device else 'cpu')
+	
+	if CIFAR100 in args.dataset or SVHN in args.dataset or SPEECHCMDS in args.dataset:
+		args.train_prefix = f'./dataset/{args.dataset}/train/'
+	elif GLUE in args.dataset:
+		args.train_prefix = f'./dataset/glue/{args.dataset}/train/'
+
+	teachers_dir = args.teachers_dir
+	# 获取teachers_dir下面所有文件的名称
+	file_names = os.listdir(teachers_dir)
+	# 筛掉文件夹
+	file_names = [f for f in file_names if os.path.isfile(os.path.join(teachers_dir, f))]
+	# print('Found teacher files:', file_names)
+	model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f and '.png' not in f]))
+	model_paths = [f'./{teachers_dir}/{model_name}' for model_name in model_names]
+	for teacher_path in model_paths:
+		if 'G' in teacher_path or 'loss' in teacher_path or 'acc' in teacher_path or 'distance' in teacher_path or 'budget' in teacher_path:
+			continue
+		# TODO
+		if 'reefl' in teacher_path:
+			continue
+		if 'depthfl' not in teacher_path and 'darkfl' not in teacher_path:
+			continue
+		print('Processing teacher model:', teacher_path)
+		args.teacher_pth = teacher_path + '.pth'
+		args.teacher_config = teacher_path + '.json'
+		args.output_prefix = teacher_path + '_variants/variant'
+		teacher_distillation(args)
 
 
 if __name__ == '__main__':

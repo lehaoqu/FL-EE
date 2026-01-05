@@ -1,0 +1,59 @@
+alg: reefl
+policy: base
+dataset: speechcmds
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS/BASE_SPEECHCMDS/full_base
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.005
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+T: 1
+output: <_io.TextIOWrapper name='./EXPS/BASE_SPEECHCMDS/full_base/reefl_speechcmds_vit_100c_1E_lrsgd0.005_base.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 4.54, exits:['3.76', '4.04', '5.57', '4.79'] loss: 9.81
+========== Round 10 ==========
+server, accuracy: 68.66, exits:['46.31', '75.12', '76.58', '76.63'] loss: 4.96
+========== Round 20 ==========
+server, accuracy: 86.35, exits:['79.06', '88.69', '88.98', '88.66'] loss: 2.03
+========== Round 30 ==========
+server, accuracy: 88.68, exits:['83.79', '90.16', '90.40', '90.39'] loss: 1.62
+========== Round 40 ==========
+server, accuracy: 90.52, exits:['86.63', '91.77', '91.80', '91.90'] loss: 0.95
+========== Round 50 ==========
+server, accuracy: 91.02, exits:['87.36', '92.16', '92.33', '92.23'] loss: 1.00
+========== Round 60 ==========
+server, accuracy: 91.65, exits:['88.46', '92.61', '92.79', '92.75'] loss: 0.66
+========== Round 70 ==========
+server, accuracy: 92.09, exits:['89.16', '92.98', '93.15', '93.07'] loss: 0.85
+========== Round 80 ==========
+server, accuracy: 92.34, exits:['89.64', '93.20', '93.29', '93.23'] loss: 0.68
+========== Round 90 ==========
+server, accuracy: 92.41, exits:['89.86', '93.14', '93.36', '93.26'] loss: 0.67
+========== Round 100 ==========
+server, accuracy: 92.44, exits:['89.80', '93.28', '93.43', '93.25'] loss: 0.49
+========== Round 110 ==========
+server, accuracy: 92.68, exits:['90.54', '93.38', '93.50', '93.28'] loss: 0.56
+========== Round 120 ==========
+server, accuracy: 92.83, exits:['90.68', '93.48', '93.63', '93.52'] loss: 0.47
+========== Round 130 ==========
+server, accuracy: 92.97, exits:['91.05', '93.52', '93.68', '93.63'] loss: 0.46

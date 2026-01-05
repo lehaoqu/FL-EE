@@ -10,12 +10,13 @@ lr=0.05
 # noniids=(1000 1 0.1)
 noniids=(1000)
 
-
+# Example usage:
+# ./script_weight/run_cifar_base.sh boosted EXPS/BASE_CIFAR/full_boosted/noniid1000 0
 
 for noniid in "${noniids[@]}"
 do
         
-        python weight_main.py --teachers_dir $1 --device $2  --model $md --dataset cifar100_noniid$noniid
+        python weight_main.py $1 --teachers_dir $2 --device $3  --model $md --dataset cifar100_noniid$noniid
         
         # if [ "$3" != "base" ]; then
         #         # python main.py darkflpg         $3 --sw static  --ft $2 --suffix $1/${2}_${3}/noniid$noniid --device $4 --dataset cifar100_noniid$noniid --model $md --sr $sr --total_num $total_num --lr $lr --bs $bs
