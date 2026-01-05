@@ -108,7 +108,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
         exit('Error: unrecognized model')
         
     if args.load_path != '':
-        existing_model = torch.load(args.load_path)
+        existing_model = torch.load(args.load_path, weights_only=True)
         model.load_state_dict(existing_model, strict=False)
         
     if args.ft == 'classifier':
@@ -158,7 +158,7 @@ def load_model_eval(args, model_path, config_path=None):
 
         if args.ft == 'full':
             model = based_model.ExitModel(config=exit_config)
-            state_dict = torch.load(model_path)
+            state_dict = torch.load(model_path, weights_only=True)
             model.load_state_dict(state_dict)
             
         elif args.ft == 'lora':
@@ -167,7 +167,7 @@ def load_model_eval(args, model_path, config_path=None):
             model.load_state_dict(pre_model.state_dict(), strict=False)
             peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
             model = get_peft_model(model, peft_config)
-            state_dict = torch.load(model_path)
+            state_dict = torch.load(model_path, weights_only=True)
             new_dict = {}
             for n, p in state_dict.items():
                 new_dict['base_model.model.'+n]=p

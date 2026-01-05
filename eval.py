@@ -108,7 +108,8 @@ class Eval():
     def budgeted(self,):
         rnd = 40
         # TODO flops need to be measured
-        flops = [i+1 for i in range(self.n_exits)]
+        # use measured FLOPs from tester when available
+        flops = getattr(self.tester, 'flops', [i+1 for i in range(self.n_exits)])
         acc_test_list = ''
         exp_flops_list = ''
         
@@ -223,6 +224,49 @@ class Tester(object):
         args.policy = self.model.config.policy
         policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
         self.policy = policy_module.Policy(args)
+        # Measure FLOPs for the model (full forward). If `thop` is available,
+        # compute FLOPs and set `self.flops` (same value per exit). Otherwise
+        # fall back to a simple incremental placeholder.
+
+        from thop import profile
+
+        # 定义一个专用的 Module 包装器（放在类内或外均可，这里建议放外面或作为内部类）
+        class _ExitWrapper(nn.Module):
+            def __init__(self, model, dummy_input, stop_exit):
+                super().__init__()
+                self.model = model
+                self.dummy_input = dummy_input
+                self.stop_exit = stop_exit
+
+            def forward(self, _=None):
+                return self.model(**self.dummy_input, stop_exit=self.stop_exit)
+
+        # —————— 你的原有逻辑开始 ——————
+        self.flops = []
+        for exit_idx in range(self.n_exits):
+            # 构建 dummy_input（确保和你上面一致）
+            if 'cifar' in args.dataset or 'imagenet' in args.dataset:
+                dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(self.device)}
+            elif 'glue' in args.dataset or 'bert' in args.dataset:
+                dummy_input = {
+                    'input_ids': torch.zeros(1, 128, dtype=torch.long).to(self.device),
+                    'attention_mask': torch.ones(1, 128, dtype=torch.long).to(self.device)
+                }
+            else:
+                dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(self.device)}
+
+            # ✅ 使用 _ExitWrapper 包装（是 nn.Module！）
+            wrapped_model = _ExitWrapper(self.model, dummy_input, stop_exit=exit_idx).to(self.device)
+
+            # thop 需要一个 dummy input tensor（即使不用）
+            dummy_tensor_for_thop = torch.zeros(1, 1).to(self.device)
+
+            # ✅ 现在传入的是 nn.Module，不会报错
+            macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False)
+            self.flops.append(float(macs * 2))
+
+        print('============')
+        print(self.flops)
     
     def adapt_batch(self, data):
         batch = {}

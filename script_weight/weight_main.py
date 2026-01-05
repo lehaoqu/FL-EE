@@ -119,7 +119,7 @@ def adapt_batch(args, data):
 	return batch, label
 
 
-def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1, lr=1e-3, temperature=4.0, alpha=0.0, save_log=None, wdb=None):
+def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1, lr=1e-3, temperature=4.0, alpha=0.0, save_log=None):
 	teacher.to(device).eval()
 	student.to(device).train()
 
@@ -155,7 +155,6 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 		avg_loss = total_loss / (total_samples + 1e-12)
 		pbar.set_description(f'Distillation Loss: {avg_loss:.4f}')
 		save_log.write(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}\n") if save_log is not None else None
-		wdb.log({"distill_train_loss": avg_loss, "epoch": epoch+1}) if wdb is not None else None
 		# print(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}")
 
 	return student
@@ -272,7 +271,7 @@ def teacher_distillation(args):
 		# Distill each variant student in widths
 		for student_width, student in variant_students.items():
 			print(f'Distilling student with depth {student_depth} & width {student_width} | prepare dataset...')
-			wdb = wandb.init(project=f"Variant_Distillation_{args.dataset}", name=f"{teacher_pth.split('/')[-1].split('_')[0]}_{teacher_pth.split('/')[3]}_depth{student_depth}_width{student_width}")
+			wandb.init(project=f"Variant_Distillation_{args.dataset}", name=f"{teacher_pth.split('/')[-1].split('_')[0]}_{teacher_pth.split('/')[3]}_depth{student_depth}_width{student_width}")
 			dataset_idx = 0 if student_depth == 3 else 25 if student_depth == 6 else 50 if student_depth == 9 else 75
 			dataset_train, loader_train = load_dataset_loader(args=args, file_name='train', id=dataset_idx)
 			dataset_valid, loader_valid = load_dataset_loader(args=args, file_name='valid', id=dataset_idx)
@@ -284,7 +283,7 @@ def teacher_distillation(args):
 				json.dump(student.config.to_dict(), f, ensure_ascii=False, indent=4)
 
 			# print(student.config)
-			student = distill(args, teacher, student, loader_train, loader_valid, device, epochs=args.epochs, lr=args.lr, save_log=save_log, wdb=wdb)
+			student = distill(args, teacher, student, loader_train, loader_valid, device, epochs=args.epochs, lr=args.lr, save_log=save_log)
 			
 			save_scale_pth = args.output_prefix + f'_depth{student_depth}_width{student_width}.pth'
 			torch.save(student.state_dict(), save_scale_pth)
