@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import importlib
 
 from transformers import AutoTokenizer
@@ -136,8 +137,25 @@ def load_model_eval(args, model_path, config_path=None):
     dataset_arg = args.dataset
     if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE or SPEECHCMDS in dataset_arg:
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
-           
-        exit_config = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)
+        # load a base ViT config and wrap into ExitConfig
+        if config_path is not None and os.path.isfile(config_path):
+            with open(config_path, 'r') as f:
+                cfg_dict = json.load(f)
+            base_conf = based_model.Config.from_dict(cfg_dict)
+            exits = cfg_dict.get('exits', None)
+            blocks = cfg_dict.get('blocks', None)
+            policy = cfg_dict.get('policy', None)
+            alg = cfg_dict.get('alg', None)
+        else:
+            base_conf = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)
+            exits = getattr(base_conf, 'exits', None)
+            blocks = getattr(base_conf, 'blocks', None)
+            policy = getattr(base_conf, 'policy', None)
+            alg = getattr(base_conf, 'alg', None)
+
+        num_labels = 100 if CIFAR100 in dataset_arg else 10 if SVHN in dataset_arg else 200 if IMAGENET in dataset_arg else 35 if SPEECHCMDS in dataset_arg else 2
+        exit_config = based_model.ExitConfig(base_conf, num_labels=num_labels, exits=exits, policy=policy, alg=alg, blocks=blocks)
+
         if args.ft == 'full':
             model = based_model.ExitModel(config=exit_config)
             state_dict = torch.load(model_path)
