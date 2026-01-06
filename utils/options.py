@@ -49,11 +49,17 @@ def args_parser():
     parser.add_argument('--noise', type=int, default=-1)
     parser.add_argument('--hidden_dim', type=int, default=-1)
 
+    # ===== Slimmable Setting =====
+    parser.add_argument('--slimmable', action='store_true', help='whether use slimmable model')
+    parser.add_argument('--slim_ratios', type=float, nargs='+', default=[1.0, 0.75, 0.5, 0.25], help='the width ratios for slimmable model')
+
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]
     spec_policy = sys.argv[2]
     trainer_module = importlib.import_module(f'trainer.alg.{spec_alg}')
     policy_module = importlib.import_module(f'trainer.policy.{spec_policy}')
+    trainer_base_module = importlib.import_module(f'trainer.baseHFL')
     parser = trainer_module.add_args(parser)
     parser = policy_module.add_args(parser)
+    trainer_base_module.add_args(parser)
     return parser.parse_args()

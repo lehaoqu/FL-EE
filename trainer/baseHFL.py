@@ -13,13 +13,17 @@ from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from utils.dataprocess import DataProcessor
-from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors
+from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors, kd_loss_func
 
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
 
 CLASSES = {'speechcmds':35, 'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 100, 'cifar100_noniid1': 100, 'cifar100_noniid0.1': 100, 'cifar100-224-d03-1200': 100, 'sst2': 2, 'mrpc': 2, 'qqp': 2, 'qnli': 2, 'rte': 2, 'wnli': 2}
 GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
+
+def add_args(parser):
+    parser.add_argument('--T_slim', type=float, default=1, help="kd T for slim")
+    return parser
 
 class BaseClient:
     def __init__(self, id, args, dataset, model=None, depth=None, exits=None):
@@ -121,15 +125,47 @@ class BaseClient:
                 self.optim.zero_grad()
 
                 batch, label = self.adapt_batch(data)
-                
-                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
-                    self.policy.train_meta(self.model, batch, label, self.optim)
 
-                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
-                ce_loss = sum(exits_ce_loss)
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item())
+                if self.args.slimmable:
+                    ce_loss = torch.zeros(1).to(self.device)
+                    ratio_exits_logits = {}
+                    ratio_exits_ce_loss = {}
+                    for slim_ratio in self.args.slim_ratios:
+                        from utils.modelload.slimmable import set_width_ratio
+                        set_width_ratio(slim_ratio, self.model)
+                        if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                            self.policy.train_meta(self.model, batch, label, self.optim)
+
+                        exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                        ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
+                        ratio_exits_ce_loss[slim_ratio] = exits_ce_loss
+                        ratio_exits_logits[slim_ratio] = exits_logits
+                        # print(f'Client {self.id} Slim {slim_ratio} is ok')
+
+                    t_exits_logits = ratio_exits_logits[1.0]
+                    kd_loss = torch.zeros(1).to(self.device)
+                    for slim_ratio in self.args.slim_ratios:
+                        if slim_ratio == 1.0:
+                            continue
+                        for idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
+                            teacher_logits = t_exits_logits[idx].detach()
+                            kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios)-1)
+
+                    loss = ce_loss + kd_loss
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
+                    set_width_ratio(1.0, self.model)
+
+                else:
+                    if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                        self.policy.train_meta(self.model, batch, label, self.optim)
+
+                    exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                    ce_loss = sum(exits_ce_loss)
+                    ce_loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
         
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))

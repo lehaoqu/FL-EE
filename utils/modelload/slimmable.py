@@ -12,18 +12,36 @@ INTERMEDIATE_SIZE = 768  # 根据具体模型调整
 NUM_ATTENTION_HEADS = 3  # 根据具体模型调整
 
 
-def set_model_config(hidden_size, intermediate_size, num_attention_heads):
+def set_model_config(config):
     global HIDEEN_SIZE, INTERMEDIATE_SIZE, NUM_ATTENTION_HEADS
-    HIDEEN_SIZE = hidden_size
-    INTERMEDIATE_SIZE = intermediate_size
-    NUM_ATTENTION_HEADS = num_attention_heads
-
+    HIDEEN_SIZE = config.hidden_size
+    INTERMEDIATE_SIZE = config.intermediate_size
+    NUM_ATTENTION_HEADS = config.num_attention_heads
 
 def set_width_ratio(ratio, model):
+    def get_aligned_dim(origin_all_head_size, ratio):
+        return int(origin_all_head_size * ratio // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
+
     global CURRENT_WIDTH_RATIO
     CURRENT_WIDTH_RATIO = ratio
-    model.config.hidden_size = int(HIDEEN_SIZE * ratio // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
-    model.config.intermediate_size = int(INTERMEDIATE_SIZE * ratio // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
+
+    for module in model.modules():
+        if isinstance(module, ViTSelfAttention):
+            # 1. 计算当前的 hidden_dim (必须对齐 head_dim)
+            # 使用我们之前定义的 get_aligned_dim
+            current_all_head_size = get_aligned_dim(module.original_all_head_size, ratio)
+            
+            # 2. 计算对应的head size
+            current_attention_head_size = current_all_head_size // module.num_attention_heads
+            
+            # 3. 【直接修改属性】覆盖 HuggingFace 对象中的值
+            module.all_head_size = current_all_head_size
+            module.attention_head_size = current_attention_head_size
+            
+            # 验证：确保数学逻辑成立，防止报错
+            if module.all_head_size != module.num_attention_heads * module.attention_head_size:
+                raise ValueError("切片后的维度无法被 head_size 整除，请检查对齐逻辑！")
+    
 
 
 class SlimmableLinear(nn.Linear):
@@ -154,6 +172,15 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
     """
     递归将 HuggingFace ViT 模型转换为 Slimmable 版本
     """
+
+    for module in model.modules():
+        if isinstance(module, ViTSelfAttention):
+            # 备份原始参数，防止多次调整 ratio 后丢失基准
+            if not hasattr(module, 'origin_attention_head_size'):
+                module.origin_attention_head_size = module.attention_head_size
+            if not hasattr(module, 'original_all_head_size'):
+                module.original_all_head_size = module.all_head_size
+
     # 1. 替换基础层
     for name, module in model.named_children():
         if isinstance(module, nn.Linear):
@@ -245,14 +272,18 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+    def slimmable_transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
+        new_x_shape = x.size()[:-1] + (x.size()[-1]//self.attention_head_size, self.attention_head_size)
+        x = x.view(new_x_shape)
+        return x.permute(0, 2, 1, 3)
+
     # 应用 Monkey Patch
     for module in model.modules():
         if isinstance(module, ViTSelfAttention):
             # 替换 Attention 的 reshape 逻辑
-            # module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
-            module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
+            module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
+            # module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
         if isinstance(module, ViTEmbeddings):
             # 替换 Embeddings 的 forward
             module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
-
     return model

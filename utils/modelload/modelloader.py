@@ -7,6 +7,7 @@ from transformers import AutoTokenizer
 from utils.modelload.model import *
 from utils.train_utils import *
 from peft import PeftModel, PeftConfig, get_peft_model, LoraConfig, TaskType
+from utils.modelload.slimmable import convert_to_slimmable, set_model_config
 
 MNIST = 'mnist'
 CIFAR10 = 'cifar10'
@@ -130,6 +131,8 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     # for n, p in model.named_parameters():
     #     print(n, p.requires_grad)
     # exit(0)
+    model = convert_to_slimmable(model, args.slim_ratios) if args.slimmable else model
+    set_model_config(model.config) if args.slimmable else None
     return model
 
 def load_model_eval(args, model_path, config_path=None):
@@ -182,4 +185,6 @@ def load_model_eval(args, model_path, config_path=None):
     else:
         exit('Error: unrecognized model')
     
+    model = convert_to_slimmable(model, args.slim_ratios) if args.slimmable else model
+    set_model_config(model.config) if args.slimmable else None
     return model

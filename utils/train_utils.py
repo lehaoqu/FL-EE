@@ -328,3 +328,11 @@ def get_flops(model, stop_exit=3):
     # ✅ 现在传入的是 nn.Module，不会报错
     macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False, custom_ops=custom_ops_dict)
     return float(macs * 2)
+
+
+def kd_loss_func(pred, teacher, T=1.0):
+    kld_loss = nn.KLDivLoss(reduction='batchmean')
+    log_softmax = nn.LogSoftmax(dim=-1)
+    softmax = nn.Softmax(dim=1)
+    _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
+    return _kld
