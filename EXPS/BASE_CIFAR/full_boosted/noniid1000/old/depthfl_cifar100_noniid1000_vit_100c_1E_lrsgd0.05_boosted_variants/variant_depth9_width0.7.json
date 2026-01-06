@@ -257,10 +257,10 @@
     "_name_or_path": "",
     "_attn_implementation_autoset": true,
     "transformers_version": "4.47.1",
-    "hidden_size": 63,
-    "num_hidden_layers": 3,
+    "hidden_size": 132,
+    "num_hidden_layers": 9,
     "num_attention_heads": 3,
-    "intermediate_size": 252,
+    "intermediate_size": 537,
     "hidden_act": "gelu",
     "hidden_dropout_prob": 0.0,
     "attention_probs_dropout_prob": 0.0,
@@ -272,7 +272,9 @@
     "qkv_bias": true,
     "encoder_stride": 16,
     "exits": [
-        2
+        2,
+        5,
+        8
     ],
     "blocks": [
         2,
@@ -282,7 +284,7 @@
     ],
     "classifier_dropout": 0.0,
     "base_model": null,
-    "alg": "darkflpa2",
+    "alg": "depthfl",
     "policy": "boosted",
     "model_type": "vit"
 }

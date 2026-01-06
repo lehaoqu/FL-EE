@@ -1,0 +1,39 @@
+Epoch 1/300 train loss: 7.5703
+Epoch 1/300 valid acc: 1.10
+ acc_exits: 1.10
+Epoch 2/300 train loss: 7.1902
+Epoch 3/300 train loss: 6.8463
+Epoch 4/300 train loss: 6.5750
+Epoch 5/300 train loss: 6.4052
+Epoch 6/300 train loss: 6.2217
+Epoch 7/300 train loss: 5.9325
+Epoch 8/300 train loss: 6.1496
+Epoch 9/300 train loss: 5.9940
+Epoch 10/300 train loss: 5.7009
+Epoch 11/300 train loss: 5.6725
+Epoch 11/300 valid acc: 3.30
+ acc_exits: 3.30
+Epoch 12/300 train loss: 5.6865
+Epoch 13/300 train loss: 5.4006
+Epoch 14/300 train loss: 5.2633
+Epoch 15/300 train loss: 5.0353
+Epoch 16/300 train loss: 4.9091
+Epoch 17/300 train loss: 4.7327
+Epoch 18/300 train loss: 5.0794
+Epoch 19/300 train loss: 4.8492
+Epoch 20/300 train loss: 4.6613
+Epoch 21/300 train loss: 4.4775
+Epoch 21/300 valid acc: 7.69
+ acc_exits: 7.69
+Epoch 22/300 train loss: 4.3195
+Epoch 23/300 train loss: 4.2794
+Epoch 24/300 train loss: 4.0888
+Epoch 25/300 train loss: 4.0553
+Epoch 26/300 train loss: 4.1864
+Epoch 27/300 train loss: 4.2819
+Epoch 28/300 train loss: 4.1482
+Epoch 29/300 train loss: 3.8798
+Epoch 30/300 train loss: 3.9416
+Epoch 31/300 train loss: 3.9134
+Epoch 31/300 valid acc: 5.49
+ acc_exits: 5.49

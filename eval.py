@@ -265,8 +265,8 @@ class Tester(object):
             macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False)
             self.flops.append(float(macs * 2))
 
-        print('============')
         print(self.flops)
+        print('============')
     
     def adapt_batch(self, data):
         batch = {}

@@ -113,6 +113,7 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 	pbar = tqdm(range(epochs), desc='Distillation', unit='epoch')
 	save_log = open(save_log, 'w') if save_log is not None else None
 
+	acc = 0.0
 	for epoch in pbar:
 		total_loss = 0.0
 		total_samples = 0
@@ -146,16 +147,22 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 		avg_loss = total_loss / (total_samples + 1e-12)
 		# pbar.set_description(f'Distillation Loss: {avg_loss:.4f}')
 		save_log.write(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}\n") if save_log is not None else None
-		wdb.log({"distill_train_loss": avg_loss, "epoch": epoch+1}) if wdb is not None else None
+		save_log.flush()
+		wdb.log({"distill_train_loss": avg_loss}) if wdb is not None else None
 		# print(f"Epoch {epoch+1}/{epochs} train loss: {avg_loss:.4f}")
+		pbar.set_description(f'Distillation Loss: {avg_loss:.4f} | Valid Acc: {acc:.2f}%')
 
 		###################
 		# Validation
 		###################
+		if epoch % 10 != 0:
+			continue
 		student.eval()
+		teacher.eval()
 		correct = 0
 		total = 0
 		corrects = [0 for _ in range(args.exits_num)]
+		# corrects = [0 for _ in range(4)]
 
 		with torch.no_grad():
 			for data in valid_loader:
@@ -173,7 +180,8 @@ def distill(args, teacher, student, train_loader, valid_loader, device, epochs=1
 		# args.metric['acc'].append(acc)
 		pbar.set_description(f'Distillation Loss: {avg_loss:.4f} | Valid Acc: {acc:.2f}%')
 		acc_exits_str = ", ".join(f"{a:.2f}" for a in acc_exits)
-		save_log.write(f"Epoch {epoch+1}/{epochs} valid acc: {acc:.2f}\n acc_exits: {acc_exits_str}") if save_log is not None else None
+		save_log.write(f"Epoch {epoch+1}/{epochs} valid acc: {acc:.2f}\n acc_exits: {acc_exits_str}\n") if save_log is not None else None
+		save_log.flush()
 		wdb.log({"distill_valid_acc": acc, "epoch": epoch+1}) if wdb is not None else None
 	return student
 
@@ -257,7 +265,7 @@ def teacher_distillation(args):
 				json.dump(student.config.to_dict(), f, ensure_ascii=False, indent=4)
 
 			# print(student.config)
-			# compare_model_instances(teacher, student)
+			compare_model_instances(teacher, student)
 			policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
 			args.exits_num = 4
 			t_policy = policy_module.Policy(args)
@@ -295,7 +303,7 @@ def main():
 	os.environ.setdefault('MKL_NUM_THREADS', str(max_threads))
 	
 	args = parser.parse_args()
-	args.scales = [0.33, 0.67]
+	args.scales = [1, 0.3, 0.5, 0.7, 0.9]
 	args.device = torch.device('cuda:' + args.device if torch.cuda.is_available() or 'cpu' in args.device else 'cpu')
 	
 	if CIFAR100 in args.dataset or SVHN in args.dataset or SPEECHCMDS in args.dataset:

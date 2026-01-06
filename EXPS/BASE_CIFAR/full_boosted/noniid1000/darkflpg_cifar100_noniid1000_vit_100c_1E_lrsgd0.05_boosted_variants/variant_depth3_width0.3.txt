@@ -1,0 +1,1 @@
+Epoch 1/300 train loss: 7.3248
