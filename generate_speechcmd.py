@@ -28,21 +28,26 @@ import torchvision.transforms as transforms
 from dataset.utils.dataset_utils import check, separate_data, split_data, save_file, save_origin_file, load_pkl
 from dataset.speechcmd_dataset import SPEECHCOMMANDSDATASET
 from sklearn.model_selection import train_test_split
+import argparse
 
 random.seed(1)
 np.random.seed(1)
 num_clients = 100
-dir_path = "dataset/SpeechCommands/"
 train_ratio = 0.8
 
 # Allocate data to users
-def generate_speechcommands(dir_path, num_clients, niid, balance, partition, test):
+def generate_speechcommands(dir_path, num_clients, niid, balance, partition, test, alpha=1000):
+    # Set alpha in dataset_utils
+    import dataset.utils.dataset_utils as dataset_utils
+    dataset_utils.alpha = alpha
+    print(f"Using alpha: {alpha}")
+    
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     
     
     if test:
-        test_set = SPEECHCOMMANDSDATASET(root='./dataset', type='testing')
+        test_set = SPEECHCOMMANDSDATASET(root='./dataset/speechcmds', type='testing')
         dataset_image = test_set.pixel_values
         dataset_label = test_set.labels
         dataset_image = np.array([t.numpy() for t in dataset_image])
@@ -64,8 +69,8 @@ def generate_speechcommands(dir_path, num_clients, niid, balance, partition, tes
        
     # == save train valid for clients  ==
     
-    train_set = SPEECHCOMMANDSDATASET(root='./dataset', type='training')
-    valid_set = SPEECHCOMMANDSDATASET(root='./dataset', type='validation')
+    train_set = SPEECHCOMMANDSDATASET(root='./dataset/speechcmds', type='training')
+    valid_set = SPEECHCOMMANDSDATASET(root='./dataset/speechcmds', type='validation')
     
     origin_train_len = len(train_set)
     train_len = int(origin_train_len * train_ratio)
@@ -114,9 +119,26 @@ def generate_speechcommands(dir_path, num_clients, niid, balance, partition, tes
     
 
 if __name__ == "__main__":
-    niid = True if sys.argv[1] == "noniid" else False
-    balance = True if sys.argv[2] == "balance" else False
-    partition = sys.argv[3] if sys.argv[3] != "-" else None
-    test = True if sys.argv[4] == "test" else False
-
-    generate_speechcommands(dir_path, num_clients, niid, balance, partition, test)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('niid_type', choices=['iid', 'noniid'])
+    parser.add_argument('balance_type', choices=['balance', 'unbalanced'])
+    parser.add_argument('partition')
+    parser.add_argument('--alpha', type=float, default=1000, help='Alpha parameter for Dirichlet distribution')
+    args = parser.parse_args()
+    
+    niid = args.niid_type == "noniid"
+    balance = args.balance_type == "balance"
+    partition = args.partition if args.partition != "-" else None
+    
+    # Generate dir_path based on alpha
+    if niid:
+        alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
+        dir_path = f"dataset/speechcmds_noniid{alpha_str}/"
+    else:
+        dir_path = "dataset/speechcmds/"
+    
+    print("Generating training data...")
+    generate_speechcommands(dir_path, num_clients, niid, balance, partition, False, args.alpha)
+    
+    print("Generating test data...")
+    generate_speechcommands(dir_path, num_clients, niid, balance, partition, True, args.alpha)

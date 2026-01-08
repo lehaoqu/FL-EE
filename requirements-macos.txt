@@ -1,0 +1,48 @@
+# FL-EE (Federated Learning - Early Exit) Dependencies
+# Python 3.9, macOS Apple Silicon (M4 chip)
+
+# Core Deep Learning Frameworks
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+
+# Transformers and NLP
+transformers==4.30.2
+peft==0.4.0
+datasets==2.14.0
+pyarrow>=8.0.0,<15.0.0
+
+# Scientific Computing
+numpy==1.24.3
+scipy==1.10.1
+
+# Machine Learning
+scikit-learn==1.3.0
+
+# Data Processing
+pandas==2.0.3
+
+# GUI and Visualization
+streamlit==1.28.0
+
+# Progress Bars
+tqdm==4.65.0
+
+# Weights & Biases (Optional - for experiment tracking)
+wandb==0.15.5
+
+# Additional Dependencies
+pillow>=7.1.0,<10.0.0
+matplotlib==3.7.2
+requests==2.31.0
+ujson==5.8.0
+
+# Federated Learning (Optional - for speech commands dataset)
+flwr==1.5.0
+
+# Note: For Apple Silicon (M4), ensure you install PyTorch with MPS support:
+# Installation command:
+# conda create -n fl-ee python=3.9
+# conda activate fl-ee
+# pip3 install torch torchvision torchaudio
+# pip3 install -r requirements.txt

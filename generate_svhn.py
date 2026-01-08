@@ -28,15 +28,42 @@ from dataset.utils.dataset_utils import check, separate_data, split_data, save_f
 from dataset.svhn_dataset import SVHNClassificationDataset
 from sklearn.model_selection import train_test_split
 import scipy.io as sio
+import argparse
+import urllib.request
+from tqdm import tqdm
 
 random.seed(1)
 np.random.seed(1)
 num_clients = 100
-dir_path = "dataset/svhn/"
 train_ratio = 0.8
 
+def download_file(url, dest_path):
+    """Download file from URL with progress bar"""
+    if os.path.exists(dest_path):
+        print(f"File already exists: {dest_path}")
+        return
+    
+    print(f"Downloading {url} to {dest_path}...")
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    
+    class DownloadProgressBar(tqdm):
+        def update_to(self, b=1, bsize=1, tsize=None):
+            if tsize is not None:
+                self.total = tsize
+            self.update(b * bsize - self.n)
+    
+    with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=url.split('/')[-1]) as t:
+        urllib.request.urlretrieve(url, filename=dest_path, reporthook=t.update_to)
+    
+    print(f"Download completed: {dest_path}")
+
 # Allocate data to users
-def generate_svhn(dir_path, num_clients, niid, balance, partition):
+def generate_svhn(dir_path, num_clients, niid, balance, partition, alpha=1000):
+    # Set alpha in dataset_utils
+    import dataset.utils.dataset_utils as dataset_utils
+    dataset_utils.alpha = alpha
+    print(f"Using alpha: {alpha}")
+    
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
         
@@ -50,12 +77,16 @@ def generate_svhn(dir_path, num_clients, niid, balance, partition):
         return
        
     # == save train valid for clients  ==
-    # Get Cifar100 data
-
-    # trainset = torchvision.datasets.CIFAR100(
-    #     root=dir_path+"rawdata", train=True, download=True)
+    # Download SVHN data if not exists
+    train_url = "http://ufldl.stanford.edu/housenumbers/train_32x32.mat"
+    test_url = "http://ufldl.stanford.edu/housenumbers/test_32x32.mat"
     
     global_train_path = dir_path + "train_32x32.mat"
+    global_test_path = dir_path + "test_32x32.mat"
+    
+    download_file(train_url, global_train_path)
+    download_file(test_url, global_test_path)
+    
     global_trainset = sio.loadmat(global_train_path)
     
     origin_train_len = global_trainset['X'].shape[-1]
@@ -108,8 +139,22 @@ def generate_svhn(dir_path, num_clients, niid, balance, partition):
     
 
 if __name__ == "__main__":
-    niid = True if sys.argv[1] == "noniid" else False
-    balance = True if sys.argv[2] == "balance" else False
-    partition = sys.argv[3] if sys.argv[3] != "-" else None
+    parser = argparse.ArgumentParser()
+    parser.add_argument('niid_type', choices=['iid', 'noniid'])
+    parser.add_argument('balance_type', choices=['balance', 'unbalanced'])
+    parser.add_argument('partition')
+    parser.add_argument('--alpha', type=float, default=1000, help='Alpha parameter for Dirichlet distribution')
+    args = parser.parse_args()
+    
+    niid = args.niid_type == "noniid"
+    balance = args.balance_type == "balance"
+    partition = args.partition if args.partition != "-" else None
+    
+    # Generate dir_path based on alpha
+    if niid:
+        alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
+        dir_path = f"dataset/svhn_noniid{alpha_str}/"
+    else:
+        dir_path = "dataset/svhn/"
 
-    generate_svhn(dir_path, num_clients, niid, balance, partition)
+    generate_svhn(dir_path, num_clients, niid, balance, partition, args.alpha)

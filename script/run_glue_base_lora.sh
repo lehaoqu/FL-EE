@@ -6,7 +6,7 @@ total_num=100
 bs=32
 lr=0.01
 md=bert
-cp=models/google-bert/bert-12-128-uncased
+cp=models/bert_uncased_L-12_H-128_A-2
 g=0.99
 datasets=(sst2)
 

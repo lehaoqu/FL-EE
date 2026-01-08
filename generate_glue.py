@@ -8,6 +8,9 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 import pickle
+import argparse
+from datasets import load_dataset
+import csv
 
 from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer
@@ -18,11 +21,73 @@ from dataset.glue_dataset import GLUEClassificationDataset
 random.seed(1)
 np.random.seed(1)
 num_clients = 100
-dir_path = "dataset/glue/"
 train_ratio = 0.8
 
+def download_glue_task(task, dir_path):
+    """Download GLUE task dataset from HuggingFace and save as TSV files"""
+    task_path = os.path.join(dir_path, task)
+    train_file = os.path.join(task_path, 'train.tsv')
+    test_file = os.path.join(task_path, 'test.tsv')
+    
+    # Check if files already exist
+    if os.path.exists(train_file) and os.path.exists(test_file):
+        print(f"GLUE {task} dataset already exists at {task_path}")
+        return
+    
+    print(f"Downloading GLUE {task} dataset...")
+    os.makedirs(task_path, exist_ok=True)
+    
+    # Map task names to GLUE dataset names
+    task_map = {
+        'sst2': ('glue', 'sst2'),
+        'mrpc': ('glue', 'mrpc'),
+        'qqp': ('glue', 'qqp'),
+        'qnli': ('glue', 'qnli'),
+        'rte': ('glue', 'rte'),
+        'wnli': ('glue', 'wnli')
+    }
+    
+    if task not in task_map:
+        raise ValueError(f"Unsupported task: {task}")
+    
+    dataset_name, config_name = task_map[task]
+    
+    # Load dataset from HuggingFace
+    dataset = load_dataset(dataset_name, config_name)
+    
+    # Save train split
+    train_data = dataset['train']
+    with open(train_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, delimiter='\t')
+        # Write header
+        writer.writerow(train_data.column_names)
+        # Write data
+        for example in train_data:
+            writer.writerow([example[col] for col in train_data.column_names])
+    
+    # Save test/validation split (use validation as test for GLUE)
+    test_split = 'validation' if 'validation' in dataset else 'test'
+    test_data = dataset[test_split]
+    with open(test_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, delimiter='\t')
+        # Write header
+        writer.writerow(test_data.column_names)
+        # Write data
+        for example in test_data:
+            writer.writerow([example[col] for col in test_data.column_names])
+    
+    print(f"GLUE {task} dataset downloaded to {task_path}")
+    print(f"  - Train samples: {len(train_data)}")
+    print(f"  - Test samples: {len(test_data)}")
 
-def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer):
+
+
+def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer, alpha=1000):
+    # Set alpha in dataset_utils
+    import dataset.utils.dataset_utils as dataset_utils
+    dataset_utils.alpha = alpha
+    print(f"Using alpha: {alpha}")
+    
     train_dir = dir_path + task + "/train/"
     valid_dir = dir_path + task + "/valid/"
     config_path = dir_path + task + "/config.json"
@@ -37,6 +102,9 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     if not os.path.exists(valid_dir):
         os.makedirs(valid_dir)
         
+    # Download GLUE task dataset if not exists
+    download_glue_task(task, dir_path)
+    
     global_train_path = dir_path + task + '/train.tsv'
     
     global_trainset = load_tsv(global_train_path)
@@ -113,17 +181,39 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
         
         
 if __name__ == "__main__":
-    niid = True if sys.argv[1] == "noniid" else False
-    balance = True if sys.argv[2] == "balance" else False
-    partition = sys.argv[3] if sys.argv[3] != "-" else None
+    parser = argparse.ArgumentParser()
+    parser.add_argument('niid_type', choices=['iid', 'noniid'])
+    parser.add_argument('balance_type', choices=['balance', 'unbalanced'])
+    parser.add_argument('partition')
+    parser.add_argument('--alpha', type=float, default=1000, help='Alpha parameter for Dirichlet distribution')
+    parser.add_argument('--task', type=str, default='all', 
+                       choices=['all', 'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'],
+                       help='GLUE task to generate (default: all)')
+    args = parser.parse_args()
+    
+    niid = args.niid_type == "noniid"
+    balance = args.balance_type == "balance"
+    partition = args.partition if args.partition != "-" else None
+    
+    # Generate dir_path based on alpha
+    if niid:
+        alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
+        dir_path = f"dataset/glue_noniid{alpha_str}/"
+    else:
+        dir_path = "dataset/glue/"
 
     tokenizer = AutoTokenizer.from_pretrained(
-            'models/google-bert/bert-12-128-uncased',
+            'models/google/bert_uncased_L-12_H-128_A-2',
             padding_side="right",
             model_max_length=128,
             use_fast=False,
         )
-    # for task in ['sst2']:
-    for task in ['sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli']:
-    # for task in ['qqp']:
-        generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer)
+    
+    # Determine which tasks to generate
+    if args.task == 'all':
+        tasks = ['sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli']
+    else:
+        tasks = [args.task]
+    
+    for task in tasks:
+        generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer, args.alpha)

@@ -5,7 +5,7 @@ total_num=100
 
 md=bert
 bs=32
-cp=models/google-bert/bert-12-128-uncased
+cp=models/bert_uncased_L-12_H-128_A-2
 lr=0.05
 declare -a eq_ratios
 

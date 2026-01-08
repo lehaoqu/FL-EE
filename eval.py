@@ -203,7 +203,7 @@ class Eval():
                 label = dataset_label[indices[level_idx]]['labels'].item()
                 sample = dataset_label[indices[level_idx]]['input_ids']
 
-                tokenizer = BertTokenizer.from_pretrained('./models/google-bert/bert-12-128-uncased')
+                tokenizer = BertTokenizer.from_pretrained('./models/bert_uncased_L-12_H-128_A-2')
                 detokenized_tokens = tokenizer.convert_ids_to_tokens(sample)
                 filtered_tokens = [token for token in detokenized_tokens if token not in ("[CLS]", "[PAD]")]
                 detokenized_text = " ".join(filtered_tokens)

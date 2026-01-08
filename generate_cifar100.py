@@ -27,17 +27,35 @@ import torchvision.transforms as transforms
 from dataset.utils.dataset_utils import check, separate_data, split_data, save_file, save_origin_file, load_pkl
 from dataset.cifar100_dataset import CIFARClassificationDataset
 from sklearn.model_selection import train_test_split
+import argparse
 
 random.seed(1)
 np.random.seed(1)
 num_clients = 100
-dir_path = "dataset/cifar100_noniid0.1/"
 train_ratio = 0.8
 
 # Allocate data to users
-def generate_cifar100(dir_path, num_clients, niid, balance, partition):
+def generate_cifar100(dir_path, num_clients, niid, balance, partition, alpha=1000):
+    # Set alpha in dataset_utils
+    import dataset.utils.dataset_utils as dataset_utils
+    dataset_utils.alpha = alpha
+    print(f"Using alpha: {alpha}")
+    
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
+        
+    # Download and extract CIFAR-100 data
+    rawdata_path = dir_path + "rawdata/"
+    if not os.path.exists(rawdata_path):
+        os.makedirs(rawdata_path)
+    
+    cifar_path = rawdata_path + "cifar-100-python/"
+    if not os.path.exists(cifar_path + "train") or not os.path.exists(cifar_path + "test"):
+        print("Downloading CIFAR-100 dataset...")
+        # Download both train and test sets
+        trainset = torchvision.datasets.CIFAR100(root=rawdata_path, train=True, download=True)
+        testset = torchvision.datasets.CIFAR100(root=rawdata_path, train=False, download=True)
+        print("CIFAR-100 dataset downloaded successfully.")
         
     # Setup directory for train/valid data for clients
     config_path = dir_path + "config.json"
@@ -130,8 +148,22 @@ def generate_cifar100(dir_path, num_clients, niid, balance, partition):
     
 
 if __name__ == "__main__":
-    niid = True if sys.argv[1] == "noniid" else False
-    balance = True if sys.argv[2] == "balance" else False
-    partition = sys.argv[3] if sys.argv[3] != "-" else None
+    parser = argparse.ArgumentParser()
+    parser.add_argument('niid_type', choices=['iid', 'noniid'])
+    parser.add_argument('balance_type', choices=['balance', 'unbalanced'])
+    parser.add_argument('partition')
+    parser.add_argument('--alpha', type=float, default=1000, help='Alpha parameter for Dirichlet distribution')
+    args = parser.parse_args()
+    
+    niid = args.niid_type == "noniid"
+    balance = args.balance_type == "balance"
+    partition = args.partition if args.partition != "-" else None
+    
+    # Generate dir_path based on alpha
+    if niid:
+        alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
+        dir_path = f"dataset/cifar100_noniid{alpha_str}/"
+    else:
+        dir_path = "dataset/cifar100/"
 
-    generate_cifar100(dir_path, num_clients, niid, balance, partition)
+    generate_cifar100(dir_path, num_clients, niid, balance, partition, args.alpha)

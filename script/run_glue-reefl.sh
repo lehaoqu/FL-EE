@@ -1,7 +1,7 @@
 set -ex
 
 md=bert
-cp=models/google-bert/bert-12-128-uncased
+cp=models/bert_uncased_L-12_H-128_A-2
 
 sr=0.1
 total_num=120

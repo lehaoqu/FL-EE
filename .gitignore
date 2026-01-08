@@ -15,3 +15,5 @@ script/08*/
 img/
 __pycache__/
 wandb/
+EXPS/
+exps/
