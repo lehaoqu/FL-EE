@@ -52,34 +52,57 @@ def download_glue_task(task, dir_path):
     
     dataset_name, config_name = task_map[task]
     
-    # Load dataset from HuggingFace
-    dataset = load_dataset(dataset_name, config_name)
+    try:
+        # Load dataset from HuggingFace using specific loader
+        print(f"Loading dataset: {dataset_name}/{config_name}")
+        dataset = load_dataset(dataset_name, config_name, download_mode='reuse_cache_if_exists')
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+        print("Attempting with force_download...")
+        try:
+            dataset = load_dataset(dataset_name, config_name, download_mode='force_redownload')
+        except Exception as e2:
+            print(f"Failed to load dataset: {e2}")
+            raise
+    
+    # Define column mapping for each task (label first, then input columns)
+    column_mapping = {
+        'sst2': ['label', 'sentence'],
+        'mrpc': ['label', 'sentence1', 'sentence2'],
+        'qqp': ['label', 'question1', 'question2'],
+        'qnli': ['label', 'question', 'sentence'],
+        'rte': ['label', 'sentence1', 'sentence2'],
+        'wnli': ['label', 'sentence1', 'sentence2']
+    }
+    
+    ordered_columns = column_mapping.get(task)
+    if not ordered_columns:
+        raise ValueError(f"No column mapping defined for task: {task}")
     
     # Save train split
     train_data = dataset['train']
     with open(train_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, delimiter='\t')
-        # Write header
-        writer.writerow(train_data.column_names)
+        # Write header (label first, then input columns)
+        writer.writerow(ordered_columns)
         # Write data
         for example in train_data:
-            writer.writerow([example[col] for col in train_data.column_names])
+            writer.writerow([example[col] for col in ordered_columns])
     
     # Save test/validation split (use validation as test for GLUE)
     test_split = 'validation' if 'validation' in dataset else 'test'
     test_data = dataset[test_split]
     with open(test_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, delimiter='\t')
-        # Write header
-        writer.writerow(test_data.column_names)
+        # Write header (label first, then input columns)
+        writer.writerow(ordered_columns)
         # Write data
         for example in test_data:
-            writer.writerow([example[col] for col in test_data.column_names])
+            writer.writerow([example[col] for col in ordered_columns])
     
     print(f"GLUE {task} dataset downloaded to {task_path}")
     print(f"  - Train samples: {len(train_data)}")
     print(f"  - Test samples: {len(test_data)}")
-
 
 
 def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer, alpha=1000):
@@ -113,6 +136,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     # train_set = global_trainset[:train_len]
     # valid_set = global_trainset[:train_len]
     
+    # print(global_train_path)
     train_dataset = GLUEClassificationDataset(path=global_train_path, tokenizer=tokenizer, need_process=True)
 
     
@@ -125,7 +149,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     
     dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in train_dataset.input_ids]))
     # dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.input_ids]))
-    dataset_label.extend(np.vstack([t.cpu().numpy() for t in train_dataset.labels]))
+    dataset_label.extend([t.cpu().numpy().item() for t in train_dataset.labels])
     # dataset_label.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.labels]))
     dataset_mask.extend(np.vstack([t.cpu().numpy() for t in train_dataset.attention_mask]))
     # dataset_mask.extend(np.vstack([t.cpu().numpy() for t in valid_dataset.attention_mask]))
@@ -164,7 +188,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     dataset_mask = []
     
     dataset_input_id.extend(np.vstack([t.cpu().numpy() for t in test_dataset.input_ids]))
-    dataset_label.extend(np.vstack([t.cpu().numpy() for t in test_dataset.labels]))
+    dataset_label.extend([t.cpu().numpy().item() for t in test_dataset.labels])
     dataset_mask.extend(np.vstack([t.cpu().numpy() for t in test_dataset.attention_mask]))
     dataset_input_id = np.array(dataset_input_id)
     dataset_label = np.array(dataset_label)
