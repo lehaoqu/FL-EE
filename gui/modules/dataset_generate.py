@@ -2,6 +2,8 @@ import json
 import os
 import shlex
 import subprocess
+import selectors
+import time
 
 import streamlit as st
 
@@ -9,8 +11,8 @@ import streamlit as st
 def _get_conda_python_path(env_name):
     """Get the Python executable path for a conda environment or system python"""
     # Handle System Python option
-    if env_name == "System Python (python3)":
-        return "/usr/bin/python3"
+    if env_name == "System Python (python)":
+        return "/usr/bin/python"
     
     try:
         result = subprocess.run(["conda", "info", "--envs", "--json"], capture_output=True, text=True, check=True)
@@ -74,7 +76,7 @@ def _get_output_path(dataset_key, niid, alpha):
 
 def _build_command(config, niid, balance, partition, test_flag, alpha=None, glue_task=None):
     script_path = os.path.join(PROJECT_ROOT, config["script"])
-    args = ["python3", config["script"]]  # Use relative script path for conda run
+    args = ["python", "-u", config["script"]]  # Unbuffered for real-time streaming
     args.append("noniid" if niid else "iid")
     args.append("balance" if balance else "unbalanced")
     args.append(partition if partition else "-")
@@ -177,8 +179,8 @@ def show():
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
             if python_path:
-                # Replace python3 with the full conda python path
-                direct_cmd = command_preview.replace("python3", python_path)
+                # Replace python with the full conda python path
+                direct_cmd = command_preview.replace("python", python_path)
                 st.info(f"Using Python: `{python_path}`")
                 st.info(f"Executing: `{direct_cmd}`")
                 
@@ -187,17 +189,19 @@ def show():
                 error_placeholder = st.empty()
                 
                 try:
-                    # Execute command with real-time output
-                    import subprocess
+                    # Force unbuffered output for real-time streaming
+                    env = os.environ.copy()
+                    env["PYTHONUNBUFFERED"] = "1"
+
+                    # Execute command with real-time output (non-blocking)
                     process = subprocess.Popen(
                         direct_cmd,
                         shell=True,
                         cwd=PROJECT_ROOT,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        bufsize=1,
-                        universal_newlines=True
+                        bufsize=0,
+                        env=env,
                     )
                     
                     # Display process ID
@@ -205,52 +209,72 @@ def show():
                     
                     stdout_lines = []
                     stderr_lines = []
-                    max_lines = 100  # Limit output lines to prevent overflow
-                    
-                    # Read output in real-time (avoid nested expanders inside the run expander)
+
                     output_section = st.container()
                     output_section.subheader("📋 Execution Output (Live)")
+                    output_section.caption("Shows real-time stdout/stderr from the dataset generation process.")
                     stdout_container = output_section.empty()
                     stderr_container = output_section.empty()
-                    progress_info = output_section.empty()
+
+                    sel = selectors.DefaultSelector()
+                    if process.stdout is not None:
+                        sel.register(process.stdout, selectors.EVENT_READ, data="stdout")
+                    if process.stderr is not None:
+                        sel.register(process.stderr, selectors.EVENT_READ, data="stderr")
+
+                    buffers = {"stdout": "", "stderr": ""}
+                    last_ui_update = 0.0
+
+                    def _consume(name: str, chunk: bytes):
+                        text = chunk.decode("utf-8", errors="replace")
+                        text = text.replace("\r", "\n")
+                        text = buffers[name] + text
+                        parts = text.split("\n")
+                        buffers[name] = parts[-1]
+                        target = stdout_lines if name == "stdout" else stderr_lines
+                        for line in parts[:-1]:
+                            target.append(line + "\n")
 
                     while True:
-                        # Read stdout
-                        stdout_line = process.stdout.readline()
-                        if stdout_line:
-                            # Check if this is a progress line
-                            is_progress = any(indicator in stdout_line for indicator in ['%|', 'it/s]', 'iB/s]', 'B/s]', 'Downloading'])
-                            
-                            if is_progress:
-                                # Show progress in separate area
-                                progress_info.info(f"⏳ {stdout_line.strip()}")
-                                # Only keep last progress line in main output
-                                if stdout_lines and any(ind in stdout_lines[-1] for ind in ['%|', 'it/s]', 'iB/s]', 'B/s]']):
-                                    stdout_lines[-1] = stdout_line
-                                else:
-                                    stdout_lines.append(stdout_line)
-                            else:
-                                stdout_lines.append(stdout_line)
-                            
-                            # Keep only last max_lines
-                            if len(stdout_lines) > max_lines:
-                                stdout_lines = stdout_lines[-max_lines:]
-                            
-                            stdout_container.code(''.join(stdout_lines), language="bash")
-                        
-                        # Read stderr
-                        stderr_line = process.stderr.readline()
-                        if stderr_line:
-                            stderr_lines.append(stderr_line)
-                            if len(stderr_lines) > max_lines:
-                                stderr_lines = stderr_lines[-max_lines:]
+                        events = sel.select(timeout=0.1)
+                        for key, _ in events:
+                            name = key.data
+                            try:
+                                chunk = key.fileobj.read(4096)
+                            except Exception:
+                                chunk = b""
+
+                            if not chunk:
+                                try:
+                                    sel.unregister(key.fileobj)
+                                except Exception:
+                                    pass
+                                continue
+
+                            _consume(name, chunk)
+
+                        if process.poll() is not None and not sel.get_map():
+                            break
+
+                        now = time.time()
+                        if (stdout_lines or stderr_lines) and (now - last_ui_update) > 0.2:
+                            if stdout_lines:
+                                stdout_container.code("".join(stdout_lines), language="bash")
                             if stderr_lines:
                                 stderr_container.error("**Errors/Warnings:**")
-                                stderr_container.code(''.join(stderr_lines), language="bash")
-                        
-                        # Check if process finished
-                        if stdout_line == '' and stderr_line == '' and process.poll() is not None:
-                            break
+                                stderr_container.code("".join(stderr_lines), language="bash")
+                            last_ui_update = now
+
+                    for name, rest in buffers.items():
+                        if rest:
+                            target = stdout_lines if name == "stdout" else stderr_lines
+                            target.append(rest + "\n")
+
+                    if stdout_lines:
+                        stdout_container.code("".join(stdout_lines), language="bash")
+                    if stderr_lines:
+                        stderr_container.error("**Errors/Warnings:**")
+                        stderr_container.code("".join(stderr_lines), language="bash")
                     
                     return_code = process.wait()
                     

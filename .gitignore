@@ -22,4 +22,6 @@ img/
 __pycache__/
 wandb/
 EXPS/
+EXPS2/
 exps/
+front-exps/

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Download pre-trained models from HuggingFace Hub
 Downloads BERT and DeiT models used in FL-EE experiments

@@ -33,6 +33,13 @@ class Eval():
         self.eval_output = open(self.eval_output_path, 'w')
         self.eval_json = f'./{args.suffix}/'
         self.img_dir = args.img_dir
+
+    def _log(self, message: str):
+        """Write to eval file and echo to terminal."""
+        msg = message if message.endswith('\n') else message + '\n'
+        self.eval_output.write(msg)
+        self.eval_output.flush()
+        print(message, flush=True)
   
         
         
@@ -49,7 +56,7 @@ class Eval():
         if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
             return
         
-        self.eval_output.write(((f'eval model:{os.path.basename(model_path)}').center(80, '=')+'\n'))
+        self._log((f'eval model:{os.path.basename(model_path)}').center(80, '='))
         self.model = load_model_eval(self.args, model_path, config_path)
 
         # parser = argparse.ArgumentParser()
@@ -74,7 +81,7 @@ class Eval():
         self.test_exits_preds, self.test_targets, self.test_all_sample_exits_logits = self.tester.calc_logtis(self.test_dataloader)
         self.valid_exits_preds, self.valid_targets, self.valid_all_sample_exits_logits  = self.tester.calc_logtis(self.valid_dataloader)
         
-        self.eval_output.write('logits calc compeleted\n')
+        self._log('logits calc compeleted')
         
         if self.args.cosine is True:
             self.test_cos_exits, self.test_all_sample_cos_exits = self.cos_similiarity(self.test_all_sample_exits_logits)
@@ -101,8 +108,7 @@ class Eval():
             crt_list[i] += (predicted == self.test_targets).sum().item()
         
         acc_list = [100 * crt_list[i] / self.test_targets.shape[0] for i in range(self.n_exits)]
-        self.eval_output.write('Anytime:\n{}, avg:{}\n'.format(acc_list, sum(acc_list) / len(acc_list)))
-        self.eval_output.flush()
+        self._log('Anytime:\n{}, avg:{}'.format(acc_list, sum(acc_list) / len(acc_list)))
 
         
     def budgeted(self,):
@@ -128,12 +134,10 @@ class Eval():
             acc_test_np.append(acc_test)
             acc_val_np.append(acc_val)
             exp_flops_np.append(exp_flops.cpu().item())
-            self.eval_output.write('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}\n'.format(p, acc_val, acc_test, exp_flops))
-            # self.eval_output.write('{} {} {}\n'.format(p, exp_flops.item(), acc_test))
-            self.eval_output.flush()
+            self._log('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}'.format(p, acc_val, acc_test, exp_flops))
+            # self._log('{} {} {}'.format(p, exp_flops.item(), acc_test))
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
-        self.eval_output.flush()
         with open(self.eval_json+self.model_path+'_eval.json', 'w') as f:
             json.dump({'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
             
@@ -151,8 +155,7 @@ class Eval():
         cos_exits_array = np.array(all_sample_cos_exits).transpose()
         cos_exits_means = np.mean(cos_exits_array, axis=1)
         print(cos_exits_means)
-        self.eval_output.write(str(cos_exits_means)+"\n")
-        self.eval_output.flush()
+        self._log(str(cos_exits_means))
         return cos_exits_means, all_sample_cos_exits
     
     
@@ -182,7 +185,7 @@ class Eval():
                 array = np.transpose(sample, (1, 2, 0))
                 img = Image.fromarray(array.astype(np.uint8))
                 img.save(f'{self.img_dir}/{self.model_path}_dlevel_{dlevel}_l_{label}.png')
-                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
+                self._log(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}')
         else:
         
             label_list = []
@@ -207,8 +210,8 @@ class Eval():
                 detokenized_tokens = tokenizer.convert_ids_to_tokens(sample)
                 filtered_tokens = [token for token in detokenized_tokens if token not in ("[CLS]", "[PAD]")]
                 detokenized_text = " ".join(filtered_tokens)
-                self.eval_output.write(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}' + "\n")
-                self.eval_output.write(f'label: {label}, sample: {detokenized_text}' + "\n")
+                self._log(f'{self.model_path}_dlevel_{dlevel}_l_{label}: {all_sample_cos_exits[indices[level_idx]]}')
+                self._log(f'label: {label}, sample: {detokenized_text}')
     
             
             
@@ -390,6 +393,7 @@ if __name__ == '__main__':
     file_names = os.listdir(eval_dir)
     model_names = list(set(['.'.join(f.split('.')[:-1]) for f in file_names if 'eval' not in f and '.' in f and '.png' not in f]))
     model_paths = [f'./{eval_dir}/{model_name}' for model_name in model_names]
+    # print(model_paths)
     for model_path in model_paths:
         if  args.policy in model_path and 'G_' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'distance' not in model_path and 'budget' not in model_path:
             print(model_path)
