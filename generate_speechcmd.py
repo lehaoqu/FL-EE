@@ -36,7 +36,7 @@ num_clients = 100
 train_ratio = 0.8
 
 # Allocate data to users
-def generate_speechcommands(dir_path, num_clients, niid, balance, partition, test, alpha=1000):
+def generate_speechcmds(dir_path, num_clients, niid, balance, partition, test, alpha=1000):
     # Set alpha in dataset_utils
     import dataset.utils.dataset_utils as dataset_utils
     dataset_utils.alpha = alpha
@@ -47,7 +47,7 @@ def generate_speechcommands(dir_path, num_clients, niid, balance, partition, tes
     
     
     if test:
-        test_set = SPEECHCOMMANDSDATASET(root='./dataset/speechcmds', type='testing')
+        test_set = SPEECHCOMMANDSDATASET(root='./dataset/SpeechCmds', type='testing')
         dataset_image = test_set.pixel_values
         dataset_label = test_set.labels
         dataset_image = np.array([t.numpy() for t in dataset_image])
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         dir_path = "dataset/speechcmds/"
     
     print("Generating training data...")
-    generate_speechcommands(dir_path, num_clients, niid, balance, partition, False, args.alpha)
+    generate_speechcmds(dir_path, num_clients, niid, balance, partition, False, args.alpha)
     
     print("Generating test data...")
-    generate_speechcommands(dir_path, num_clients, niid, balance, partition, True, args.alpha)
+    generate_speechcmds(dir_path, num_clients, niid, balance, partition, True, args.alpha)

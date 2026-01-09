@@ -32,6 +32,33 @@ def _get_conda_python_path(env_name):
         return None
 
 
+def _scan_available_datasets():
+    """Scan dataset directory for available datasets with config.json"""
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dataset_dir = os.path.join(project_root, "dataset")
+    
+    available_datasets = []
+    
+    if not os.path.exists(dataset_dir):
+        return available_datasets
+    
+    # Scan for directories with config.json
+    for item in os.listdir(dataset_dir):
+        item_path = os.path.join(dataset_dir, item)
+        if os.path.isdir(item_path):
+            # Check if config.json exists directly in this folder
+            if os.path.exists(os.path.join(item_path, "config.json")):
+                available_datasets.append(item)
+            else:
+                # Check subdirectories (e.g., glue/sst2/config.json)
+                for subitem in os.listdir(item_path):
+                    subitem_path = os.path.join(item_path, subitem)
+                    if os.path.isdir(subitem_path) and os.path.exists(os.path.join(subitem_path, "config.json")):
+                        available_datasets.append(f"{item}/{subitem}")
+    
+    return sorted(available_datasets)
+
+
 DATASET_OPTIONS = [
     "cifar100_noniid1000",
     "cifar100_noniid1",
@@ -91,12 +118,24 @@ def show():
         with col1:
             st.subheader("Model & Data Settings")
             
-            dataset = st.selectbox(
-                "Dataset",
-                DATASET_OPTIONS,
-                format_func=lambda key: DATASET_DISPLAY_NAMES.get(key, key)
-            )
-            st.caption("Dataset choices mirror the default scripts for CIFAR-100, SVHN, Speech Commands, and GLUE.")
+            # Scan available datasets
+            available_datasets = _scan_available_datasets()
+            
+            if available_datasets:
+                st.caption(f"📁 Found {len(available_datasets)} dataset(s) in dataset/ directory")
+                dataset = st.selectbox(
+                    "Dataset",
+                    available_datasets,
+                    help="Auto-detected datasets with config.json"
+                )
+            else:
+                st.warning("⚠️ No datasets found in dataset/ directory. Please generate datasets first.")
+                dataset = st.text_input(
+                    "Dataset (manual input)",
+                    value="cifar100_noniid1000",
+                    help="Manually specify dataset name"
+                )
+            
             model = st.selectbox("Model (model)", ["vit", "bert"])
             slimmable = st.checkbox(
                 "Enable slimmable (--slimmable)",
@@ -135,7 +174,17 @@ def show():
         with col4:
             st.subheader("Fine-tuning & Suffix")
             fine_tuning = st.selectbox("Fine-tuning Type (ft)", ["full", "lora"])
-            suffix = st.text_input("Result Suffix", value="cifar100/vit_base/noniid1000", help="Path suffix for results")
+            
+            # Generate suggested suffix based on dataset and model
+            dataset_base = dataset.split('_')[0] if '_' in dataset else dataset
+            suggested_suffix = f"{dataset_base}/{model}_base/{dataset.replace(dataset_base + '_', '')}" if '_' in dataset else f"{dataset_base}/{model}_base/iid"
+            
+            suffix = st.text_input(
+                "Result Suffix", 
+                value=suggested_suffix,
+                help="Path suffix for results. Auto-generated based on dataset and model selection."
+            )
+            st.caption(f"💡 Suggested: `{suggested_suffix}`")
         
         st.divider()
         st.write("**Generated Command:**")
@@ -143,9 +192,13 @@ def show():
         slim_ratios_arg = ""
         if slimmable and slim_ratios_list and not slim_ratios_error:
             slim_ratios_arg = " --slim_ratios " + " ".join(str(v) for v in slim_ratios_list)
+        
+        # Add "front-exps/" prefix to suffix
+        full_suffix = f"front-exps/{suffix}" if suffix and not suffix.startswith("front-exps/") else suffix
+        
         cmd = (
             f"python3 main.py {algorithm} {fine_tuning} --sr {sample_ratio} --total_num {total_num} --lr {learning_rate} "
-            f"--bs {batch_size} --device {device} --dataset {dataset} --model {model} --suffix {suffix}{slimmable_flag}{slim_ratios_arg}"
+            f"--bs {batch_size} --device {device} --dataset {dataset} --model {model} --suffix {full_suffix}{slimmable_flag}{slim_ratios_arg}"
         )
         st.code(cmd, language="bash")
 

@@ -25,17 +25,16 @@ train_ratio = 0.8
 
 def download_glue_task(task, dir_path):
     """Download GLUE task dataset from HuggingFace and save as TSV files"""
-    task_path = os.path.join(dir_path, task)
-    train_file = os.path.join(task_path, 'train.tsv')
-    test_file = os.path.join(task_path, 'test.tsv')
+    train_file = os.path.join(dir_path, 'train.tsv')
+    test_file = os.path.join(dir_path, 'test.tsv')
     
     # Check if files already exist
     if os.path.exists(train_file) and os.path.exists(test_file):
-        print(f"GLUE {task} dataset already exists at {task_path}")
+        print(f"GLUE {task} dataset already exists at {dir_path}")
         return
     
     print(f"Downloading GLUE {task} dataset...")
-    os.makedirs(task_path, exist_ok=True)
+    os.makedirs(dir_path, exist_ok=True)
     
     # Map task names to GLUE dataset names
     task_map = {
@@ -100,7 +99,7 @@ def download_glue_task(task, dir_path):
         for example in test_data:
             writer.writerow([example[col] for col in ordered_columns])
     
-    print(f"GLUE {task} dataset downloaded to {task_path}")
+    print(f"GLUE {task} dataset downloaded to {dir_path}")
     print(f"  - Train samples: {len(train_data)}")
     print(f"  - Test samples: {len(test_data)}")
 
@@ -111,9 +110,9 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     dataset_utils.alpha = alpha
     print(f"Using alpha: {alpha}")
     
-    train_dir = dir_path + task + "/train/"
-    valid_dir = dir_path + task + "/valid/"
-    config_path = dir_path + task + "/config.json"
+    train_dir = dir_path + "train/"
+    valid_dir = dir_path + "valid/"
+    config_path = dir_path + "config.json"
     
     if check(config_path, train_dir, valid_dir, num_clients, niid, balance, partition):
         return
@@ -128,7 +127,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     # Download GLUE task dataset if not exists
     download_glue_task(task, dir_path)
     
-    global_train_path = dir_path + task + '/train.tsv'
+    global_train_path = dir_path + 'train.tsv'
     
     global_trainset = load_tsv(global_train_path)
     train_len = int(len(global_trainset) * train_ratio)
@@ -181,7 +180,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     statistic, niid, balance, partition)
     
     # == test ==
-    test_path = dir_path + task + '/test.tsv'
+    test_path = dir_path + 'test.tsv'
     test_dataset = GLUEClassificationDataset(path=test_path, tokenizer=tokenizer, need_process=True)
     dataset_input_id = []
     dataset_label = []
@@ -194,7 +193,7 @@ def generate_glue(dir_path, task, num_clients, niid, balance, partition, tokeniz
     dataset_label = np.array(dataset_label)
     dataset_mask = np.array(dataset_mask)
     test_data = {'input_ids': dataset_input_id, 'attention_mask': dataset_mask, 'labels': dataset_label}
-    test_pkl_path = dir_path + task + '/test.pkl'
+    test_pkl_path = dir_path + 'test.pkl'
     with open(test_pkl_path, 'wb') as f:
             pickle.dump(test_data, f)
         
@@ -219,12 +218,11 @@ if __name__ == "__main__":
     balance = args.balance_type == "balance"
     partition = args.partition if args.partition != "-" else None
     
-    # Generate dir_path based on alpha
-    if niid:
-        alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
-        dir_path = f"dataset/glue_noniid{alpha_str}/"
+    # Determine which tasks to generate
+    if args.task == 'all':
+        tasks = ['sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli']
     else:
-        dir_path = "dataset/glue/"
+        tasks = [args.task]
 
     tokenizer = AutoTokenizer.from_pretrained(
             'models/google/bert_uncased_L-12_H-128_A-2',
@@ -233,11 +231,13 @@ if __name__ == "__main__":
             use_fast=False,
         )
     
-    # Determine which tasks to generate
-    if args.task == 'all':
-        tasks = ['sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli']
-    else:
-        tasks = [args.task]
-    
+    # Generate each task separately
     for task in tasks:
+        # Generate dir_path based on task and alpha (no glue parent directory)
+        if niid:
+            alpha_str = str(args.alpha).rstrip('0').rstrip('.') if '.' in str(args.alpha) else str(int(args.alpha))
+            dir_path = f"dataset/{task}_noniid{alpha_str}/"
+        else:
+            dir_path = f"dataset/{task}/"
+        
         generate_glue(dir_path, task, num_clients, niid, balance, partition, tokenizer, args.alpha)

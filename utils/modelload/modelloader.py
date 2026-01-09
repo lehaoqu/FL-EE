@@ -33,6 +33,9 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     model_arg = args.model
     dataset_arg = args.dataset
     class_num = check_class_num(dataset_arg)
+    
+    # Check if dataset starts with any GLUE task name
+    is_glue = any(dataset_arg.startswith(task) for task in GLUE)
 
     if MNIST in dataset_arg:
         if MLP in model_arg:
@@ -42,7 +45,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     if CIFAR10 in dataset_arg:
         if CNN in model_arg:
             model = CNNCifar(args=args, dim_out=class_num)
-    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE or IMAGENET in dataset_arg or SPEECHCMDS in dataset_arg:
+    if CIFAR100 in dataset_arg or SVHN in dataset_arg or is_glue or IMAGENET in dataset_arg or SPEECHCMDS in dataset_arg:
         
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
         
@@ -97,7 +100,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             
             # exit(0)
         
-        if dataset_arg in GLUE:
+        if is_glue:
             tokenizer = AutoTokenizer.from_pretrained(
                 config_path,
                 padding_side="right",
@@ -138,7 +141,10 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
 def load_model_eval(args, model_path, config_path=None):
     model_arg = args.model
     dataset_arg = args.dataset
-    if CIFAR100 in dataset_arg or SVHN in dataset_arg or dataset_arg in GLUE or SPEECHCMDS in dataset_arg:
+    # Check if dataset starts with any GLUE task name
+    is_glue = any(dataset_arg.startswith(task) for task in GLUE)
+    
+    if CIFAR100 in dataset_arg or SVHN in dataset_arg or is_glue or SPEECHCMDS in dataset_arg:
         based_model = importlib.import_module(f'utils.modelload.{model_arg}')
         # load a base ViT config and wrap into ExitConfig
         if config_path is not None and os.path.isfile(config_path):
