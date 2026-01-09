@@ -207,49 +207,50 @@ def show():
                     stderr_lines = []
                     max_lines = 100  # Limit output lines to prevent overflow
                     
-                    # Read output in real-time
-                    with st.expander("📋 Execution Output (Live)", expanded=True):
-                        stdout_container = st.empty()
-                        stderr_container = st.empty()
-                        progress_info = st.empty()
-                        
-                        while True:
-                            # Read stdout
-                            stdout_line = process.stdout.readline()
-                            if stdout_line:
-                                # Check if this is a progress line
-                                is_progress = any(indicator in stdout_line for indicator in ['%|', 'it/s]', 'iB/s]', 'B/s]', 'Downloading'])
-                                
-                                if is_progress:
-                                    # Show progress in separate area
-                                    progress_info.info(f"⏳ {stdout_line.strip()}")
-                                    # Only keep last progress line in main output
-                                    if stdout_lines and any(ind in stdout_lines[-1] for ind in ['%|', 'it/s]', 'iB/s]', 'B/s]']):
-                                        stdout_lines[-1] = stdout_line
-                                    else:
-                                        stdout_lines.append(stdout_line)
+                    # Read output in real-time (avoid nested expanders inside the run expander)
+                    output_section = st.container()
+                    output_section.subheader("📋 Execution Output (Live)")
+                    stdout_container = output_section.empty()
+                    stderr_container = output_section.empty()
+                    progress_info = output_section.empty()
+
+                    while True:
+                        # Read stdout
+                        stdout_line = process.stdout.readline()
+                        if stdout_line:
+                            # Check if this is a progress line
+                            is_progress = any(indicator in stdout_line for indicator in ['%|', 'it/s]', 'iB/s]', 'B/s]', 'Downloading'])
+                            
+                            if is_progress:
+                                # Show progress in separate area
+                                progress_info.info(f"⏳ {stdout_line.strip()}")
+                                # Only keep last progress line in main output
+                                if stdout_lines and any(ind in stdout_lines[-1] for ind in ['%|', 'it/s]', 'iB/s]', 'B/s]']):
+                                    stdout_lines[-1] = stdout_line
                                 else:
                                     stdout_lines.append(stdout_line)
-                                
-                                # Keep only last max_lines
-                                if len(stdout_lines) > max_lines:
-                                    stdout_lines = stdout_lines[-max_lines:]
-                                
-                                stdout_container.code(''.join(stdout_lines), language="bash")
+                            else:
+                                stdout_lines.append(stdout_line)
                             
-                            # Read stderr
-                            stderr_line = process.stderr.readline()
-                            if stderr_line:
-                                stderr_lines.append(stderr_line)
-                                if len(stderr_lines) > max_lines:
-                                    stderr_lines = stderr_lines[-max_lines:]
-                                if stderr_lines:
-                                    stderr_container.error("**Errors/Warnings:**")
-                                    stderr_container.code(''.join(stderr_lines), language="bash")
+                            # Keep only last max_lines
+                            if len(stdout_lines) > max_lines:
+                                stdout_lines = stdout_lines[-max_lines:]
                             
-                            # Check if process finished
-                            if stdout_line == '' and stderr_line == '' and process.poll() is not None:
-                                break
+                            stdout_container.code(''.join(stdout_lines), language="bash")
+                        
+                        # Read stderr
+                        stderr_line = process.stderr.readline()
+                        if stderr_line:
+                            stderr_lines.append(stderr_line)
+                            if len(stderr_lines) > max_lines:
+                                stderr_lines = stderr_lines[-max_lines:]
+                            if stderr_lines:
+                                stderr_container.error("**Errors/Warnings:**")
+                                stderr_container.code(''.join(stderr_lines), language="bash")
+                        
+                        # Check if process finished
+                        if stdout_line == '' and stderr_line == '' and process.poll() is not None:
+                            break
                     
                     return_code = process.wait()
                     

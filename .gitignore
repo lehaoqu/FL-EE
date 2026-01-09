@@ -7,7 +7,13 @@ dataset/glue/
 dataset/svhn/
 dataset/imagenet/
 dataset/emnist/
-dataset/SpeechCommands/
+dataset/speechcmds/
+dataset/sst2/
+dataset/mrpc/
+dataset/wnli/
+dataset/qqp/
+dataset/qnli/
+dataset/rte/
 cifar*/
 models/
 script/08*/

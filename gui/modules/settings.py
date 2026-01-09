@@ -69,6 +69,25 @@ def show():
     
     st.divider()
     
+    # Hugging Face endpoint (for offline mirror / proxy)
+    st.subheader("🌐 Hugging Face Endpoint")
+    default_hf = st.session_state.get("hf_endpoint", os.environ.get("HF_ENDPOINT", ""))
+    hf_endpoint = st.text_input(
+        "HF_ENDPOINT",
+        value=default_hf,
+        help="Set a mirror or proxy, e.g. https://hf-mirror.com. Leave empty to use default."
+    )
+    if hf_endpoint != st.session_state.get("hf_endpoint"):
+        st.session_state["hf_endpoint"] = hf_endpoint
+        if hf_endpoint:
+            os.environ["HF_ENDPOINT"] = hf_endpoint
+            st.success(f"✅ HF_ENDPOINT set to: {hf_endpoint}")
+        else:
+            os.environ.pop("HF_ENDPOINT", None)
+            st.info("HF_ENDPOINT cleared; using default Hugging Face endpoint")
+
+    st.divider()
+
     # Other settings
     st.subheader("⚙️ General Settings")
     st.checkbox("Enable verbose logging", value=False)
