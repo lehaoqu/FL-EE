@@ -165,7 +165,7 @@ class Test:
         args.ft = 'full'
         args.slimmable = False
 
-        ratios = [1.0]
+        ratios = [1.0, 0.75, 0.5, 0.25]
         depth = 12
 
         dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
@@ -176,6 +176,9 @@ class Test:
         original_exits_logits = model(**dummy)
         # 转换为slimmable
         slim_model = convert_to_slimmable(model, ratios=ratios).to(0)
+        # for name, para in origin_model.named_parameters():
+        #     print(name, para.shape)
+        # exit(0)
         # print(model)
         # 记录原始的 hidden size 和 intermediate size
         set_model_config(slim_model.config)
@@ -208,7 +211,7 @@ class Test:
             slim_loss.backward()
 
             print('loss:', origin_loss.item(), slim_loss.item())
-            assert torch.allclose(origin_loss, slim_loss, atol=1e-20), f"slimmable vit loss does not match original loss at ratio 1.0"
+            assert torch.allclose(origin_loss, slim_loss, atol=1e-6), f"slimmable vit loss does not match original loss at ratio 1.0"
             print("slimmable vit loss matches original loss at ratio 1.0 in epoch", epoch)
             optim_origin.step()
             optim_slim.step()

@@ -35,20 +35,20 @@ class FedSim:
             args.eq_ratios = (0,0,0,1)
 
         self.model_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.pth'
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}.pth'
         self.generator_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_G.pth'
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}_G.pth'
         output_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.txt'   
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}.txt'   
         self.acc_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_acc.json'
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}_acc.json'
         self.loss_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_loss.json'
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}_loss.json'
         self.config_save_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}.json'    
+                    f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}.json'    
                     
         self.distance_path = f'./{args.suffix}/{args.alg}_{args.dataset}_{args.model}_' \
-            f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}_distance.json'
+            f'{args.total_num}c_{args.epoch}E_lr{args.optim}{args.lr}_{args.policy}{args.slim_str}_distance.json'
 
         self.output = open(output_path, 'a')
         args.output = self.output
@@ -180,8 +180,9 @@ class FedSim:
 
 if __name__ == '__main__':
     args = args_parser()
+    args.slim_str = f'_slim_{str(args.slim_ratios).replace(" ","").replace(",","-")}' if args.slimmable else ''
     projext_name = f"ResearchPoint_Exit_{args.dataset}" if not args.slimmable else f"ResearchPoint_Slimmable_{args.dataset}"
-    wdb = wandb.init(project=projext_name, name=f"{args.alg}-{args.policy}-{args.ft}")
+    wdb = wandb.init(project=projext_name, name=f"{args.alg}-{args.policy}-{args.ft}{args.slim_str}")
 
     seed = args.seed
     torch.manual_seed(seed)

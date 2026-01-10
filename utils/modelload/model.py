@@ -89,6 +89,7 @@ class BaseModule(nn.Module):
                 # === get shape & total size ===
                 shape = param.shape
                 param_size = 1
+                # print(name, shape)
                 for s in shape:
                     param_size *= s
 

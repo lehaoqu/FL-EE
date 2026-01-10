@@ -18,9 +18,12 @@ def set_model_config(config):
     INTERMEDIATE_SIZE = config.intermediate_size
     NUM_ATTENTION_HEADS = config.num_attention_heads
 
+
+def get_aligned_dim(origin_all_head_size, ratio):
+    return int(origin_all_head_size * ratio // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
+
+
 def set_width_ratio(ratio, model):
-    def get_aligned_dim(origin_all_head_size, ratio):
-        return int(origin_all_head_size * ratio // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
 
     global CURRENT_WIDTH_RATIO
     CURRENT_WIDTH_RATIO = ratio
@@ -41,8 +44,18 @@ def set_width_ratio(ratio, model):
             # 验证：确保数学逻辑成立，防止报错
             if module.all_head_size != module.num_attention_heads * module.attention_head_size:
                 raise ValueError("切片后的维度无法被 head_size 整除，请检查对齐逻辑！")
-    
 
+        # if isinstance(module, ViTEmbeddings):
+        #     # 切片 cls_token 和 position_embeddings
+        #     hidden_size = get_aligned_dim(HIDEEN_SIZE, ratio)
+            
+        #     module.position_embeddings = nn.Parameter(module.original_position_embeddings[:, :, :hidden_size])
+        #     module.cls_token = nn.Parameter(module.original_cls_token[:, :, :hidden_size])
+        #     if module.mask_token is not None:
+        #         module.mask_token = nn.Parameter(module.original_mask_token[:, :, :hidden_size])
+        #     else:
+        #         module.mask_token = None
+    
 
 class SlimmableLinear(nn.Linear):
     def forward(self, input):
@@ -84,7 +97,7 @@ class SwitchableLayerNorm(nn.Module):
         # 键必须是字符串，所以我们将 ratio 转为 string
         self.norm_dict = nn.ModuleDict()
         for r in ratios:
-            dim = int(original_dim * r)
+            dim = get_aligned_dim(original_dim, r)
             self.norm_dict[str(r).replace('.', 'p')] = nn.LayerNorm(dim, eps=eps)
 
     def forward(self, x):
@@ -110,7 +123,8 @@ class SlimmableConv2d(nn.Conv2d):
         # input shape: [B, C_in, H, W]
         # output channels (hidden_size) 需要切片
         in_channels = input.shape[1]
-        out_channels = int(self.out_channels * CURRENT_WIDTH_RATIO)
+        out_channels = get_aligned_dim(self.out_channels, CURRENT_WIDTH_RATIO)
+        # print(f'SlimmableConv2d: in_channels={in_channels}, out_channels={out_channels}')
         
         weight = self.weight[:out_channels, :in_channels, :, :]
         bias = self.bias[:out_channels] if self.bias is not None else None
@@ -180,6 +194,15 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
                 module.origin_attention_head_size = module.attention_head_size
             if not hasattr(module, 'original_all_head_size'):
                 module.original_all_head_size = module.all_head_size
+        # if isinstance(module, ViTEmbeddings):
+        #     # 备份原始 hidden size
+        #     if not hasattr(module, 'original_cls_token'):
+        #         module.original_cls_token = module.cls_token
+        #     if not hasattr(module, 'original_mask_token'):
+        #         module.original_mask_token = module.mask_token
+        #     if not hasattr(module, 'original_position_embeddings'):
+        #         module.original_position_embeddings = module.position_embeddings
+
 
     # 1. 替换基础层
     for name, module in model.named_children():
@@ -206,7 +229,7 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             # 小模型的初始化策略很重要，通常直接随机或复制切片均可
             for r in ratios:
                 if r != 1.0:
-                    dim = int(original_dim * r)
+                    dim = get_aligned_dim(original_dim, r)
                     new_layer.norm_dict[str(r).replace('.', 'p')].weight.data = module.weight.data[:dim].clone()
                     new_layer.norm_dict[str(r).replace('.', 'p')].bias.data = module.bias.data[:dim].clone()
 
@@ -231,46 +254,28 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
     # 我们需要在 forward 钩子中处理切片，或者修改 Embeddings 类的 forward
     # 简单起见，我们对 ViTEmbeddings 进行 Monkey Patch
     
-    def slimmable_embeddings_forward(self, pixel_values, bool_masked_pos=None, interpolate_pos_encoding=False, **kwargs):
-        """
-        修改后的 Embeddings forward 函数，增加了 **kwargs 以兼容不同版本的 transformers
-        """
-        # 1. 正常计算 patch embeddings
-        # 注意：某些版本的 patch_embeddings 可能也接受 bool_masked_pos，
-        # 但标准的 nn.Conv2d (我们替换后的 SlimmableConv2d) 只接受 input。
-        # 这里我们只传 pixel_values 即可。
+    def slimmable_embeddings_forward(
+        self,
+        pixel_values: torch.Tensor,
+        bool_masked_pos: Optional[torch.BoolTensor] = None,
+        interpolate_pos_encoding: bool = False,
+    ) -> torch.Tensor:
         batch_size, num_channels, height, width = pixel_values.shape
         embeddings = self.patch_embeddings(pixel_values, interpolate_pos_encoding=interpolate_pos_encoding)
 
-        # 2. 处理 bool_masked_pos (用于 MAE 等掩码预训练任务)
-        # 如果你的任务是分类，通常这里是 None。如果有值，我们需要根据 mask 调整 embeddings
-        if bool_masked_pos is not None:
-            seq_len = embeddings.shape[1]
-            mask_token = self.mask_token.expand(batch_size, seq_len, -1)
-            # replace the masked visual tokens by mask_token
-            w = bool_masked_pos.unsqueeze(-1).type_as(mask_token)
-            embeddings = embeddings * (1 - w) + mask_token * w
+        # bool_masked_pos = False
 
-        # 3. 添加位置编码 (核心修改点：切片)
-        if interpolate_pos_encoding:
-            embeddings = embeddings + self.interpolate_pos_encoding(embeddings, height, width)
-        else:
-            # [关键修改] 对 position_embeddings 进行切片以匹配当前的 hidden_size
-            # self.position_embeddings shape: [1, num_patches + 1, hidden_size]
-            
-            # 获取当前 embeddings 的实际宽度 (可能是 768, 或者是 384 等)
-            current_dim = embeddings.shape[-1]
-            
-            # 对 position_embeddings 的最后一维进行切片
-            # 注意：这里假设 position_embeddings 已经包含了 cls_token 的位置
-            # 如果长度不匹配（比如输入图片尺寸变了），可能还需要对第二维切片，但通常分类任务图片尺寸固定
-            pos_embed = self.position_embeddings[:, :embeddings.shape[1], :current_dim]
-            
-            embeddings = embeddings + pos_embed
+        # add the [CLS] token to the embedded patch tokens
+        cls_tokens = self.cls_token[:, :, :get_aligned_dim(self.cls_token.shape[-1], CURRENT_WIDTH_RATIO)].expand(batch_size, -1, -1)
+        embeddings = torch.cat((cls_tokens, embeddings), dim=1)
 
-        # 4. Dropout 和 LayerNorm (如果有)
+        # add positional encoding to each token, interpolate_pos_encoding=False
+        embeddings = embeddings + self.position_embeddings[:, :, :get_aligned_dim(self.position_embeddings.shape[-1], CURRENT_WIDTH_RATIO)]
+
         embeddings = self.dropout(embeddings)
+
         return embeddings
+
 
     def slimmable_transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         new_x_shape = x.size()[:-1] + (x.size()[-1]//self.attention_head_size, self.attention_head_size)
@@ -283,7 +288,7 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             # 替换 Attention 的 reshape 逻辑
             module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
             # module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
-        # if isinstance(module, ViTEmbeddings):
-        #     # 替换 Embeddings 的 forward
-        #     module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
+        if isinstance(module, ViTEmbeddings):
+            # 替换 Embeddings 的 forward
+            module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
     return model

@@ -131,6 +131,7 @@ class BaseClient:
                     ratio_exits_logits = {}
                     ratio_exits_ce_loss = {}
                     for slim_ratio in self.args.slim_ratios:
+                        # print(f'Client {self.id} Slim {slim_ratio} Training...')
                         from utils.modelload.slimmable import set_width_ratio
                         set_width_ratio(slim_ratio, self.model)
                         if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
@@ -178,9 +179,30 @@ class BaseClient:
         
 
     def clone_model(self, target):
+        # print(f'======Client{self.id} Depth {self.eq_depth} clone Begin=====')
+        # for n, p in target.named_parameters():
+        #     print(n, p.shape)
         p_tensors = target.parameters_to_tensor(is_split=True)
         idx = self.args.eq_depths.index(self.eq_depth)
+
+        client_origin_tensors = self.model.parameters_to_tensor(is_split=True)
+        for i in range(len(client_origin_tensors)):
+            assert p_tensors[i].shape == client_origin_tensors[i].shape, f"Client {self.id} clone model error at block {i}, server shape: {p_tensors[i].shape}, client shape: {client_origin_tensors[i].shape}"
+
+    
         self.model.tensor_to_parameters(torch.cat(p_tensors[:idx+1], 0))
+
+
+        for n, p in self.model.named_parameters():
+            assert torch.allclose(p, target.state_dict()[n], atol=1e-6), f"Client {self.id} clone model error at param {n}"
+        
+        client_downloaded_tensors = self.model.parameters_to_tensor(is_split=True)
+        for i in range(len(client_downloaded_tensors)):
+            assert client_origin_tensors[i].shape == client_downloaded_tensors[i].shape, f"Client {self.id} clone model error after download at block {i}, before shape: {client_origin_tensors[i].shape}, after shape: {client_downloaded_tensors[i].shape}"
+        # print(f"original tensors shape: {[t.shape for t in client_origin_tensors]}")
+        # print(f"downloaded tensors shape: {[t.shape for t in client_downloaded_tensors]}")
+        # print(f"server tensors shape: {[t.shape for t in p_tensors]}")
+        # print(f'======Client{self.id} Depth {self.eq_depth} clone Completed=====')
         
     
     def clone_policy(self, target):
