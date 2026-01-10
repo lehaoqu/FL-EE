@@ -22,7 +22,7 @@ CLASSES = {'speechcmds':35, 'imagenet':200, 'svhn':10, 'cifar100_noniid1000': 10
 GLUE = {'sst2', 'mrpc', 'qqp', 'qnli', 'rte', 'wnli'}
 
 def add_args(parser):
-    parser.add_argument('--T_slim', type=float, default=1, help="kd T for slim")
+    parser.add_argument('--T_slim', type=float, default=3.0, help="kd T for slim")
     return parser
 
 class BaseClient:

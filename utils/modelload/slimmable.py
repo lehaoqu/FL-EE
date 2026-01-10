@@ -283,7 +283,7 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             # 替换 Attention 的 reshape 逻辑
             module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
             # module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
-        if isinstance(module, ViTEmbeddings):
-            # 替换 Embeddings 的 forward
-            module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
+        # if isinstance(module, ViTEmbeddings):
+        #     # 替换 Embeddings 的 forward
+        #     module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
     return model

@@ -56,6 +56,8 @@ class ExitConfig(ViTConfig):
         base_model=None,
         alg=None,
         policy=None,
+        slimmable=False,
+        slim_ratios=[1.0],
         **kwargs,
     ):
         super().__init__(
@@ -82,6 +84,8 @@ class ExitConfig(ViTConfig):
         self.base_model = base_model
         self.alg = alg
         self.policy = policy
+        self.slimmable = slimmable
+        self.slim_ratios = slim_ratios
 
 
 class ViTExitLayer(nn.Module):

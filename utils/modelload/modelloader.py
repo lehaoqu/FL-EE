@@ -134,8 +134,12 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     # for n, p in model.named_parameters():
     #     print(n, p.requires_grad)
     # exit(0)
-    model = convert_to_slimmable(model, args.slim_ratios) if args.slimmable else model
-    set_model_config(model.config) if args.slimmable else None
+    if args.slimmable:
+        model = convert_to_slimmable(model, args.slim_ratios)
+        set_model_config(model.config)
+        model.config.slimmable = True
+        model.config.slim_ratios = args.slim_ratios
+
     return model
 
 def load_model_eval(args, model_path, config_path=None):
