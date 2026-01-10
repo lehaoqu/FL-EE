@@ -142,6 +142,13 @@ class FedSim:
                 # print(f'========== Round {rnd} ==========\n')
                 acc_exits = [f"{num:.2f}" for num in ret_dict['acc_exits']]
                 self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, exits:{acc_exits} loss: {ret_dict['loss']:.2f}\n")
+
+                acc_exit_slim = ret_dict.get('acc_exit_slim', [])
+                if acc_exit_slim:
+                    # acc_exit_slim: list over slim_ratios -> list over exits
+                    for ratio_idx, exits_vals in enumerate(acc_exit_slim):
+                        exits_fmt = [f"{num:.2f}" for num in exits_vals]
+                        self.output.write(f"  slim[{self.args.slim_ratios[ratio_idx]}]: exits:{exits_fmt}\n")
                 wdb.log({"acc": ret_dict['acc'], "loss": ret_dict['loss']})
                 if rnd % 10 == 0:
                     valid_acc.append(ret_dict['acc'])

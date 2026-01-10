@@ -220,26 +220,50 @@ class BaseClient:
 
     def local_valid(self):
         self.model.eval()
-        correct = 0
-        total = 0
-        corrects = [0 for _ in range(self.exits_num)]
+        from utils.modelload.slimmable import set_width_ratio
+
+        slim_ratios = getattr(self.args, 'slim_ratios', [1.0]) if getattr(self.args, 'slimmable', False) else [1.0]
+        if 1.0 not in slim_ratios:
+            slim_ratios = list(slim_ratios) + [1.0]
+
+        acc_exit_slim = []
+        acc_base = None
+        acc_exits_base = None
 
         with torch.no_grad():
-            for data in self.loader_valid:
-                batch, labels = self.adapt_batch(data)
-                
-                exits_logits = self.model(**batch)
-                exits_logits = self.policy(exits_logits)
-                
-                for i, exit_logits in enumerate(exits_logits):
-                    _, predicted = torch.max(exit_logits, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    corrects[i] += (predicted == labels).sum().item()
-        acc = 100.00 * correct / total
-        acc_exits = [100 * c / (total/self.exits_num) for c in corrects]
-        self.metric['acc_exits'] = acc_exits
-        self.metric['acc'].append(acc)
+            for ratio in slim_ratios:
+                set_width_ratio(ratio, self.model)
+                correct = 0
+                total = 0
+                corrects = [0 for _ in range(self.exits_num)]
+
+                for data in self.loader_valid:
+                    batch, labels = self.adapt_batch(data)
+
+                    exits_logits = self.model(**batch)
+                    exits_logits = self.policy(exits_logits)
+
+                    for i, exit_logits in enumerate(exits_logits):
+                        _, predicted = torch.max(exit_logits, 1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                        corrects[i] += (predicted == labels).sum().item()
+
+                acc = 100.00 * correct / total
+                acc_exits = [100 * c / (total / self.exits_num) for c in corrects]
+                acc_exit_slim.append(acc_exits)
+
+                if abs(ratio - 1.0) < 1e-6:
+                    acc_base = acc
+                    acc_exits_base = acc_exits
+
+        # restore to full width
+        set_width_ratio(1.0, self.model)
+
+        # record metrics (base metrics use ratio=1.0 for backward compatibility)
+        self.metric['acc_exits'] = acc_exits_base if acc_exits_base is not None else acc_exit_slim[-1]
+        self.metric['acc'].append(acc_base if acc_base is not None else acc_exit_slim[-1][0])
+        self.metric['acc_exit_slim'] = acc_exit_slim
 
     def reset_optimizer(self, decay=True):
         if not decay:
@@ -293,7 +317,8 @@ class BaseServer:
         self.metric = {
             'acc': DataProcessor(),
             'loss': DataProcessor(),
-            'acc_exits': []
+            'acc_exits': [],
+            'acc_exit_slim': []
         }
         
         # == ratio of each classes for each eq ==  
@@ -455,29 +480,52 @@ class BaseServer:
 
     def valid_all(self):
         self.global_model.eval()
-        correct = 0
-        total = 0
+        from utils.modelload.slimmable import set_width_ratio
+
         exit_num = len(self.eq_exits[max(self.eq_depths)])
-        corrects = [0 for _ in range(exit_num)]
+        slim_ratios = getattr(self.args, 'slim_ratios', [1.0]) if getattr(self.args, 'slimmable', False) else [1.0]
+        if 1.0 not in slim_ratios:
+            slim_ratios = list(slim_ratios) + [1.0]
+
+        acc_exit_slim_round = []
+        acc_base = None
+        acc_exits_base = None
 
         with torch.no_grad():
             dataloader = self.test_dataloader if self.args.eval_test else self.valid_dataloader
-            for data in dataloader:
-            # for data in self.test_dataloader:
-                batch, labels = self.adapt_batch(data)
-                
-                exits_logits = self.global_model(**batch)
-                exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
-                
-                for i, exit_logits in enumerate(exits_logits):
-                    _, predicted = torch.max(exit_logits, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    corrects[i] += (predicted == labels).sum().item()
-        acc = 100.00 * correct / total
-        acc_exits = [100 * c / (total/exit_num) for c in corrects]
-        self.metric['acc'].append(acc)
-        self.metric['acc_exits'].append(acc_exits)
+            for ratio in slim_ratios:
+                set_width_ratio(ratio, self.global_model)
+
+                correct = 0
+                total = 0
+                corrects = [0 for _ in range(exit_num)]
+
+                for data in dataloader:
+                    batch, labels = self.adapt_batch(data)
+
+                    exits_logits = self.global_model(**batch)
+                    exits_logits = self.eq_policy[max(self.eq_depths)](exits_logits)
+                    
+                    for i, exit_logits in enumerate(exits_logits):
+                        _, predicted = torch.max(exit_logits, 1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                        corrects[i] += (predicted == labels).sum().item()
+
+                acc = 100.00 * correct / total
+                acc_exits = [100 * c / (total/exit_num) for c in corrects]
+                acc_exit_slim_round.append(acc_exits)
+
+                if abs(ratio - 1.0) < 1e-6:
+                    acc_base = acc
+                    acc_exits_base = acc_exits
+
+        # restore
+        set_width_ratio(1.0, self.global_model)
+
+        self.metric['acc'].append(acc_base if acc_base is not None else acc_exit_slim_round[-1][0])
+        self.metric['acc_exits'].append(acc_exits_base if acc_exits_base is not None else acc_exit_slim_round[-1])
+        self.metric['acc_exit_slim'].append(acc_exit_slim_round)
         
         for client in self.clients:
             c_metric = client.metric
@@ -492,14 +540,30 @@ class BaseServer:
         std = self.metric['acc'].std()
         acc_exits = [sum(col) / len(col) for col in zip(*self.metric['acc_exits'])]
 
+        acc_exit_slim = []
+        if self.metric['acc_exit_slim']:
+            # metric['acc_exit_slim'] shape: list over rounds -> (list over ratios -> list over exits)
+            # average over rounds for each ratio/exit
+            rounds = len(self.metric['acc_exit_slim'])
+            ratios_len = len(self.metric['acc_exit_slim'][0])
+            exits_len = len(self.metric['acc_exit_slim'][0][0]) if ratios_len > 0 else 0
+            for r_idx in range(ratios_len):
+                avg_exits = []
+                for e_idx in range(exits_len):
+                    vals = [self.metric['acc_exit_slim'][rnd][r_idx][e_idx] for rnd in range(rounds)]
+                    avg_exits.append(sum(vals) / len(vals))
+                acc_exit_slim.append(avg_exits)
+
         self.metric['acc'].clear()
         self.metric['loss'].clear()
         self.metric['acc_exits'].clear()
+        self.metric['acc_exit_slim'].clear()
 
         return {'loss': loss,
                 'acc': acc,
                 'std': std,
-                'acc_exits': acc_exits}
+                'acc_exits': acc_exits,
+                'acc_exit_slim': acc_exit_slim}
         
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)
