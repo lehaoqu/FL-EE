@@ -43,9 +43,9 @@ class Eval():
   
         
         
-    def eval(self, model_path, config_path):
+    def eval(self, model_path, config_path, model=None):
 
-        if 'cifar' in args.dataset:
+        if 'cifar' in self.args.dataset:
             if not os.path.exists(self.img_dir):
                 os.makedirs(self.img_dir)
         
@@ -56,8 +56,10 @@ class Eval():
         if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
             return
         
-        self._log((f'eval model:{os.path.basename(model_path)}').center(80, '='))
-        self.model = load_model_eval(self.args, model_path, config_path)
+        if model is None:
+            self.model = load_model_eval(self.args, model_path, config_path)
+        else:
+            self.model = model
 
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
@@ -116,6 +118,7 @@ class Eval():
         # TODO flops need to be measured
         # use measured FLOPs from tester when available
         flops = getattr(self.tester, 'flops', [i+1 for i in range(self.n_exits)])
+        self._log('Exits FLOPs: {}'.format(flops))
         acc_test_list = ''
         exp_flops_list = ''
         
@@ -138,7 +141,12 @@ class Eval():
             # self._log('{} {} {}'.format(p, exp_flops.item(), acc_test))
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
-        with open(self.eval_json+self.model_path+'_eval.json', 'w') as f:
+        if self.model.config.slimmable:
+            from utils.modelload.slimmable import CURRENT_WIDTH_RATIO
+            file_path = self.eval_json+self.model_path+f'_slim_{CURRENT_WIDTH_RATIO}_eval.json'
+        else:
+            file_path = self.eval_json+self.model_path+'_eval.json'
+        with open(file_path, 'w') as f:
             json.dump({'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
             
     def cos_similiarity(self, all_sample_exits_logits):
@@ -397,4 +405,5 @@ if __name__ == '__main__':
     for model_path in model_paths:
         if  args.policy in model_path and 'G_' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'distance' not in model_path and 'budget' not in model_path:
             print(model_path)
+            eval._log((f'eval model:{os.path.basename(model_path)}').center(80, '='))
             eval.eval(model_path+'.pth', model_path+'.json')

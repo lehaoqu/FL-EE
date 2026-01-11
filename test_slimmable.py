@@ -216,6 +216,22 @@ class Test:
             optim_origin.step()
             optim_slim.step()
 
+    def test_slimmable_load(self):
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.policy = 'boosted'
+        args.alg = 'depthfl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'full'
+        
+        from utils.modelload.modelloader import load_model_eval
+        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
+        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
+        model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        print(model)
 
 
 
@@ -232,4 +248,5 @@ t = Test()
 # t.test_slimmable_conv2d()
 # t.test_slimmable_linear()
 # t.test_slimmable_layernorm()
-t.test_slimmable_vit()
+# t.test_slimmable_vit()
+t.test_slimmable_load()

@@ -258,7 +258,7 @@
     "_attn_implementation_autoset": true,
     "transformers_version": "4.47.1",
     "hidden_size": 192,
-    "num_hidden_layers": 3,
+    "num_hidden_layers": 12,
     "num_attention_heads": 3,
     "intermediate_size": 768,
     "hidden_act": "gelu",
@@ -272,7 +272,10 @@
     "qkv_bias": true,
     "encoder_stride": 16,
     "exits": [
-        2
+        2,
+        5,
+        8,
+        11
     ],
     "blocks": [
         2,
@@ -282,7 +285,14 @@
     ],
     "classifier_dropout": 0.0,
     "base_model": null,
-    "alg": "depthfl",
+    "alg": "inclusivefl",
     "policy": "boosted",
+    "slimmable": true,
+    "slim_ratios": [
+        1.0,
+        0.75,
+        0.5,
+        0.25
+    ],
     "model_type": "vit"
 }

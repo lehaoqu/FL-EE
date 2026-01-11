@@ -114,7 +114,13 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     if args.load_path != '':
         existing_model = torch.load(args.load_path, weights_only=True)
         model.load_state_dict(existing_model, strict=False)
-        
+    
+    if args.slimmable:
+        model = convert_to_slimmable(model, args.slim_ratios)
+        set_model_config(model.config)
+        model.config.slimmable = True
+        model.config.slim_ratios = args.slim_ratios
+
     if args.ft == 'classifier':
         for n, p in model.named_parameters():
             if 'classifier' not in n:
@@ -134,11 +140,6 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     # for n, p in model.named_parameters():
     #     print(n, p.requires_grad)
     # exit(0)
-    if args.slimmable:
-        model = convert_to_slimmable(model, args.slim_ratios)
-        set_model_config(model.config)
-        model.config.slimmable = True
-        model.config.slim_ratios = args.slim_ratios
 
     return model
 
@@ -159,24 +160,32 @@ def load_model_eval(args, model_path, config_path=None):
             blocks = cfg_dict.get('blocks', None)
             policy = cfg_dict.get('policy', None)
             alg = cfg_dict.get('alg', None)
+            slimmable = cfg_dict.get('slimmable', False)
+            slim_ratios = cfg_dict.get('slim_ratios', None)
         else:
             base_conf = based_model.Config.from_pretrained(pretrained_model_name_or_path=config_path)
             exits = getattr(base_conf, 'exits', None)
             blocks = getattr(base_conf, 'blocks', None)
             policy = getattr(base_conf, 'policy', None)
             alg = getattr(base_conf, 'alg', None)
+            slimmable = getattr(base_conf, 'slimmable', False)
+            slim_ratios = getattr(base_conf, 'slim_ratios', None)
 
         num_labels = 100 if CIFAR100 in dataset_arg else 10 if SVHN in dataset_arg else 200 if IMAGENET in dataset_arg else 35 if SPEECHCMDS in dataset_arg else 2
-        exit_config = based_model.ExitConfig(base_conf, num_labels=num_labels, exits=exits, policy=policy, alg=alg, blocks=blocks)
+        exit_config = based_model.ExitConfig(base_conf, num_labels=num_labels, exits=exits, policy=policy, alg=alg, blocks=blocks, slimmable=slimmable, slim_ratios=slim_ratios)
 
         if args.ft == 'full':
             model = based_model.ExitModel(config=exit_config)
+            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
+            
             state_dict = torch.load(model_path, weights_only=True)
             model.load_state_dict(state_dict)
             
         elif args.ft == 'lora':
             model = based_model.ExitModel(config=exit_config)
             pre_model = based_model.Model.from_pretrained(pretrained_model_name_or_path=args.config_path)
+            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
+            
             model.load_state_dict(pre_model.state_dict(), strict=False)
             peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
             model = get_peft_model(model, peft_config)
@@ -195,6 +204,5 @@ def load_model_eval(args, model_path, config_path=None):
     else:
         exit('Error: unrecognized model')
     
-    model = convert_to_slimmable(model, args.slim_ratios) if args.slimmable else model
-    set_model_config(model.config) if args.slimmable else None
+    set_model_config(model.config) if model.config.slimmable else None
     return model
