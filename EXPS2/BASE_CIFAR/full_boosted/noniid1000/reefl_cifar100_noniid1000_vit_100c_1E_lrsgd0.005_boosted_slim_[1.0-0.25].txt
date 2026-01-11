@@ -1,0 +1,36 @@
+alg: reefl
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2/BASE_CIFAR/full_boosted/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.005
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [1.0, 0.25]
+T: 1
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[1.0-0.25]
+output: <_io.TextIOWrapper name='./EXPS2/BASE_CIFAR/full_boosted/noniid1000/reefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.005_boosted_slim_[1.0-0.25].txt' mode='a' encoding='UTF-8'>

@@ -241,36 +241,36 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
 
 def show():
     """显示 Evaluate 页面"""
-    st.header("Evaluate")
-    st.write("Run evaluation on trained models from front-exps directory.")
+    st.header("评估")
+    st.write("对 front-exps 目录下已训练模型运行评估")
     
     def _with_front_prefix(path: str) -> str:
         """Ensure suffix is under front-exps for downstream eval script."""
         return path if path.startswith("front-exps/") else f"front-exps/{path}"
     
     # --- Configuration ---
-    with st.expander("Evaluation Configuration", expanded=True):
+    with st.expander("评估配置", expanded=True):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("Model & Data Settings")
+            st.subheader("模型与数据设置")
             
             # Scan available suffixes
             available_suffixes = _scan_exps_suffixes()
             
             if available_suffixes:
-                st.caption(f"📁 Found {len(available_suffixes)} experiment(s) with trained models")
+                st.caption(f"📁 在 front-exps 中发现 {len(available_suffixes)} 个已训练实验")
                 suffix = st.selectbox(
-                    "Experiment Suffix",
+                    "实验后缀",
                     available_suffixes,
-                    help="Auto-detected from front-exps directory"
+                    help="从 front-exps 目录自动检测"
                 )
             else:
-                st.warning("⚠️ No trained models found in from t/ directory.")
+                st.warning("⚠️ 在 front-exps/ 中未发现已训练模型。")
                 suffix = st.text_input(
-                    "Experiment Suffix (manual input)",
+                    "实验后缀（手动输入）",
                     value="front-exps/test/cifar100/vit_base",
-                    help="Manually specify experiment suffix (should start with front-exps/)"
+                    help="手动指定实验后缀（应以 front-exps/ 开头）"
                 )
             
             # Scan available datasets from dataset directory
@@ -286,43 +286,43 @@ def show():
             
             if available_datasets:
                 dataset = st.selectbox(
-                    "Dataset",
+                    "数据集",
                     sorted(available_datasets),
-                    help="Dataset to evaluate on"
+                    help="用于评估的数据集"
                 )
             else:
-                dataset = st.text_input("Dataset", value="cifar100_noniid1000")
+                dataset = st.text_input("数据集", value="cifar100_noniid1000")
             
-            model = st.selectbox("Model", ["vit", "bert"])
+            model = st.selectbox("模型", ["vit", "bert"])
         
         with col2:
-            st.subheader("Evaluation Settings")
-            st.caption("Algorithm is fixed to **eefl** for this UI; other variants are not shown here.")
+            st.subheader("评估设置")
+            st.caption("本界面固定使用算法 **eefl**；其他变体未列出。")
             algorithm = "eefl"
-            boosted = st.selectbox("Boosted Mode", ["boosted", "base", "l2w"])
+            boosted = st.selectbox("Boost 模式", ["boosted", "base", "l2w"])
             
             valid_ratio = st.number_input(
-                "Validation Ratio",
+                "验证比例",
                 value=0.2,
                 min_value=0.0,
                 max_value=1.0,
                 step=0.05,
                 format="%.2f",
-                help="Ratio of data to use for validation"
+                help="用于验证的数据比例"
             )
             
             if_mode = st.selectbox(
-                "Inference Mode",
+                "推理模式",
                 ["all", "anytime", "budgeted"],
-                help="all: both anytime and budgeted, anytime: early exit at any layer, budgeted: with budget constraints"
+                help="all: 同时包含 anytime 与 budgeted；anytime: 任意层提前退出；budgeted: 带预算约束"
             )
             
-            device = st.text_input("Device (GPU)", value="0", help="e.g., 0 for GPU:0, or cpu")
+            device = st.text_input("设备 (GPU)", value="0", help="例如 0 表示 GPU:0，或填 cpu")
             
-            fine_tuning = st.selectbox("Fine-tuning Type", ["full", "lora"])
+            fine_tuning = st.selectbox("微调方式", ["full", "lora"])
         
         st.divider()
-        st.write("**Generated Command:**")
+        st.write("**生成的命令：**")
         suffix_prefixed = _with_front_prefix(suffix)
         cmd = (
             f"python -u eval.py {algorithm} {boosted} --suffix {suffix_prefixed} --device {device} "
@@ -331,16 +331,16 @@ def show():
         st.code(cmd, language="bash")
     
     # --- Run Evaluation ---
-    with st.expander("Run Evaluation", expanded=True):
+    with st.expander("运行评估", expanded=True):
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "fl-ee")
         if conda_env != "fl-ee":
             st.info(f"🐍 Using global conda environment: **{conda_env}**")
         else:
-            st.caption("💡 Set conda environment in Settings page for consistent usage")
+            st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
-        if st.button("Run Evaluation", type="primary", use_container_width=True):
-            st.info(f"Starting evaluation with conda environment '{conda_env}'...")
+        if st.button("运行评估", type="primary", use_container_width=True):
+            st.info(f"使用 Conda 环境 '{conda_env}' 开始执行评估…")
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             
             # Get direct python path from conda environment
@@ -348,8 +348,8 @@ def show():
             if python_path:
                 # Replace python with the full conda python path
                 direct_cmd = cmd.replace("python", python_path)
-                st.info(f"Using Python: `{python_path}`")
-                st.info(f"Executing: `{direct_cmd}`")
+                st.info(f"Python 解释器：`{python_path}`")
+                st.info(f"执行命令：`{direct_cmd}`")
                 
                 try:
                     # Force unbuffered Python output for real-time streaming
@@ -368,15 +368,15 @@ def show():
                     )
                     
                     # Display process ID
-                    st.info(f"🔧 **Process ID (PID): {process.pid}** - You can manually stop it using: `kill {process.pid}`")
+                    st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
                     
                     stdout_lines = []
                     stderr_lines = []
                     
                     # Read output in real-time without nesting expanders
                     output_section = st.container()
-                    output_section.subheader("📋 Execution Output (Live)")
-                    output_section.caption("Shows real-time stdout/stderr from the evaluation process.")
+                    output_section.subheader("📋 执行输出（实时）")
+                    output_section.caption("显示评估进程的实时 stdout/stderr 输出。")
                     stdout_container = output_section.empty()
                     stderr_label_container = output_section.empty()
                     stderr_container = output_section.empty()
@@ -429,7 +429,7 @@ def show():
                             if stdout_lines:
                                 stdout_container.code("".join(stdout_lines), language="bash")
                             if stderr_lines:
-                                stderr_label_container.error("**Errors/Warnings:**")
+                                stderr_label_container.error("**错误 / 警告：**")
                                 stderr_container.code("".join(stderr_lines), language="bash")
                             last_ui_update = now
 
@@ -442,25 +442,25 @@ def show():
                     if stdout_lines:
                         stdout_container.code("".join(stdout_lines), language="bash")
                     if stderr_lines:
-                        stderr_label_container.error("**Errors/Warnings:**")
+                        stderr_label_container.error("**错误 / 警告：**")
                         stderr_container.code("".join(stderr_lines), language="bash")
                     
                     return_code = process.wait()
                     
                     # Show execution result
                     if return_code == 0:
-                        st.success(f"✅ Evaluation completed successfully (exit code: {return_code})")
+                        st.success(f"✅ 评估完成（退出码：{return_code}）")
                         eval_output_path = os.path.join(project_root, suffix_prefixed, "eval.txt")
                         if os.path.exists(eval_output_path):
-                            st.info(f"📄 **Evaluation results saved to:** `{suffix_prefixed}/eval.txt`")
+                            st.info(f"📄 **评估结果已保存到：** `{suffix_prefixed}/eval.txt`")
                     else:
-                        st.error(f"❌ Evaluation failed with exit code: {return_code}")
+                        st.error(f"❌ 评估失败，退出码：{return_code}")
                         
                 except Exception as e:
-                    st.error(f"Error executing command: {e}")
+                    st.error(f"执行命令时出错：{e}")
             else:
-                st.error(f"❌ Could not find Python executable for conda environment '{conda_env}'")
-                st.info("Please check if the environment exists and try setting it in Settings page.")
+                st.error(f"❌ 未找到 Conda 环境 '{conda_env}' 的 Python 可执行文件")
+                st.info("请确认该环境存在，并在“设置”页重新配置。")
 
     # --- Plot Curves (Budget) ---
     with st.expander("Plot Curves", expanded=True):

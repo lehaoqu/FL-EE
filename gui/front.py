@@ -69,12 +69,12 @@ st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
 
 # 页面字典
 PAGES = {
-    "Home": home,
-    "Models": model_download,
-    "Dataset": dataset_generate,
-    "Training": generate,
-    "Evaluation": evaluate,
-    "Settings": settings,
+    "首页": home,
+    "模型下载": model_download,
+    "数据集生成": dataset_generate,
+    "训练与监控": generate,
+    "模型评估": evaluate,
+    "设置": settings,
 }
 
 
@@ -82,7 +82,7 @@ def main():
     """主入口函数"""
     with st.sidebar:
         st.title("FL-EE")
-        selection = st.radio("Navigation", list(PAGES.keys()), label_visibility="collapsed")
+        selection = st.radio("导航", list(PAGES.keys()), label_visibility="collapsed")
 
     # 显示选中的页面
     page_module = PAGES[selection]

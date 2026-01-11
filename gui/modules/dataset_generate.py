@@ -32,22 +32,22 @@ def _get_conda_python_path(env_name):
 DATASET_CONFIGS = {
     "CIFAR-100": {
         "script": "generate_cifar100.py",
-        "description": "Generates CIFAR-100 splits (the same defaults from script/run_cifar_base.sh).",
+            "description": "生成 CIFAR-100 的默认划分（与 script/run_cifar_base.sh 保持一致）",
         "needs_test_flag": False,
     },
     "SVHN": {
         "script": "generate_svhn.py",
-        "description": "Produces SVHN splits used by the base runs.",
+        "description": "生成基线实验使用的 SVHN 数据划分",
         "needs_test_flag": False,
     },
     "Speech Commands": {
         "script": "generate_speechcmd.py",
-        "description": "Partitions SpeechCommands data and generates both train and test sets automatically.",
+        "description": "划分 SpeechCommands 数据并生成训练集与测试集",
         "needs_test_flag": False,
     },
     "GLUE (SST-2 etc.)": {
         "script": "generate_glue.py",
-        "description": "Prepares GLUE tasks such as SST-2 by tokenizing and splitting into clients.",
+        "description": "为 GLUE 任务（如 SST-2）做分词和客户端划分",
         "needs_test_flag": False,
         "glue_tasks": ["all", "sst2", "mrpc", "qqp", "qnli", "rte", "wnli"],
     },
@@ -93,12 +93,12 @@ def _build_command(config, niid, balance, partition, test_flag, alpha=None, glue
 
 
 def show():
-    st.header("Dataset Generation")
+    st.header("数据集生成")
     st.write(
-        "Run the official generation scripts so the dataset folders under `dataset/` match the defaults used by the training runs."
+        "运行官方生成脚本，使 `dataset/` 下的文件结构与训练脚本的默认设置一致。"
     )
 
-    dataset_key = st.selectbox("Target dataset", list(DATASET_CONFIGS.keys()))
+    dataset_key = st.selectbox("目标数据集", list(DATASET_CONFIGS.keys()))
     config = DATASET_CONFIGS[dataset_key]
     st.caption(config["description"])
     
@@ -106,30 +106,30 @@ def show():
     glue_task = None
     if dataset_key == "GLUE (SST-2 etc.)" and "glue_tasks" in config:
         glue_task = st.selectbox(
-            "GLUE Task",
+            "GLUE 任务",
             config["glue_tasks"],
-            help="Select specific task or 'all' to generate all tasks (sst2, mrpc, qqp, qnli, rte, wnli)"
+            help="选择具体任务或选择 all 生成全部任务（sst2、mrpc、qqp、qnli、rte、wnli）"
         )
         if glue_task != "all":
-            st.caption(f"Will generate only **{glue_task.upper()}** dataset")
+            st.caption(f"仅生成 **{glue_task.upper()}** 任务的数据集")
         else:
-            st.caption("Will generate **all 6 tasks**: sst2, mrpc, qqp, qnli, rte, wnli")
+            st.caption("将生成 **全部 6 个任务**：sst2、mrpc、qqp、qnli、rte、wnli")
 
-    st.subheader("Partition Options")
+    st.subheader("划分选项")
     col1, col2 = st.columns(2)
     with col1:
-        distribution = st.selectbox("Distribution", ["iid", "noniid"])
+        distribution = st.selectbox("数据分布", ["iid", "noniid"])
         niid = distribution == "noniid"
 
         alpha = None
         if niid:
             alpha = st.selectbox(
-                "Alpha (Dirichlet concentration)", 
+                "Alpha（Dirichlet 浓度）", 
                 [0.1, 1.0, 1000.0],
                 index=2,
-                help="Controls non-IID data heterogeneity. Lower values = more heterogeneous."
+                help="控制非 IID 数据的异质性，值越小表示越异质。"
             )
-        balance = st.checkbox("Balance labels across clients (pass 'balance')", value=True)
+        balance = st.checkbox("平衡各客户端间的标签（传入 'balance'）", value=True)
     with col2:
         default_partition = "dir" if niid else "pat"
         
@@ -144,22 +144,22 @@ def show():
             st.session_state["last_distribution"] = distribution
 
         partition = st.text_input(
-            "Partition tag",
+            "划分标签",
             value=st.session_state["partition_value"],
-            help="Use '-' to keep the existing partition naming (script treats '-' as None).",
+            help="使用 '-' 保持默认划分命名（脚本将 '-' 视为 None）",
         )
         # Only update session state when user actually changes the input
         if partition != st.session_state["partition_value"]:
             st.session_state["partition_value"] = partition
             
-        st.caption(f"Distribution '{distribution}' defaults to partition '{default_partition}'.")
+        st.caption(f"分布模式 '{distribution}' 默认使用划分标签 '{default_partition}'。")
         test_flag = False
         if config.get("needs_test_flag"):
-            test_flag = st.checkbox("Generate explicit test split", value=True)
+            test_flag = st.checkbox("生成单独测试集", value=True)
 
     # --- Command Preview and Execution ---
-    with st.expander("Run Dataset Generation Script", expanded=True):
-        st.subheader("Command Preview")
+    with st.expander("运行数据生成脚本", expanded=True):
+        st.subheader("命令预览")
         command_args, env_vars = _build_command(config, niid, balance, partition.strip(), test_flag, alpha, glue_task)
         
         # Build command preview
@@ -169,20 +169,20 @@ def show():
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "fl-ee")
         if conda_env != "fl-ee":
-            st.info(f"🐍 Using global conda environment: **{conda_env}**")
+            st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
         else:
-            st.caption("💡 Set conda environment in Settings page for consistent usage")
+            st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
-        if st.button("Generate dataset", type="primary", use_container_width=True):
-            st.info(f"Starting dataset generation with conda environment '{conda_env}'...")
+        if st.button("生成数据集", type="primary", use_container_width=True):
+            st.info(f"使用 Conda 环境 '{conda_env}' 开始生成数据集…")
             
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
             if python_path:
                 # Replace python with the full conda python path
                 direct_cmd = command_preview.replace("python", python_path)
-                st.info(f"Using Python: `{python_path}`")
-                st.info(f"Executing: `{direct_cmd}`")
+                st.info(f"Python 解释器：`{python_path}`")
+                st.info(f"执行命令：`{direct_cmd}`")
                 
                 # Create placeholder for real-time output
                 output_placeholder = st.empty()
@@ -204,15 +204,15 @@ def show():
                         env=env,
                     )
                     
-                    # Display process ID
-                    st.info(f"🔧 **Process ID (PID): {process.pid}** - You can manually stop it using: `kill {process.pid}`")
+                    # 显示进程号
+                    st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
                     
                     stdout_lines = []
                     stderr_lines = []
 
                     output_section = st.container()
-                    output_section.subheader("📋 Execution Output (Live)")
-                    output_section.caption("Shows real-time stdout/stderr from the dataset generation process.")
+                    output_section.subheader("📋 执行输出（实时）")
+                    output_section.caption("实时展示数据生成过程的标准输出与错误输出。")
                     stdout_container = output_section.empty()
                     stderr_container = output_section.empty()
 
@@ -261,7 +261,7 @@ def show():
                             if stdout_lines:
                                 stdout_container.code("".join(stdout_lines), language="bash")
                             if stderr_lines:
-                                stderr_container.error("**Errors/Warnings:**")
+                                stderr_container.error("**错误 / 警告：**")
                                 stderr_container.code("".join(stderr_lines), language="bash")
                             last_ui_update = now
 
@@ -273,7 +273,7 @@ def show():
                     if stdout_lines:
                         stdout_container.code("".join(stdout_lines), language="bash")
                     if stderr_lines:
-                        stderr_container.error("**Errors/Warnings:**")
+                        stderr_container.error("**错误 / 警告：**")
                         stderr_container.code("".join(stderr_lines), language="bash")
                     
                     return_code = process.wait()
@@ -281,15 +281,15 @@ def show():
                     # Show execution result
                     if return_code == 0:
                         output_path = _get_output_path(dataset_key, niid, alpha)
-                        st.success(f"✅ Dataset generation completed successfully (exit code: {return_code})")
-                        st.info(f"📁 **Output saved to:** `{output_path}`")
-                        st.caption("Files generated: config.json, train/ folder, valid/ folder" + 
-                                  (" and test.pkl (for some datasets)" if config.get("needs_test_flag") else ""))
+                        st.success(f"✅ 数据生成完成（退出码：{return_code}）")
+                        st.info(f"📁 **输出位置：** `{output_path}`")
+                        st.caption("生成文件：config.json、train/、valid/" + 
+                                  (" 以及 test.pkl（取决于数据集）" if config.get("needs_test_flag") else ""))
                     else:
-                        st.error(f"❌ Dataset generation failed with exit code: {return_code}")
+                        st.error(f"❌ 数据生成失败，退出码：{return_code}")
                         
                 except Exception as e:
-                    st.error(f"Error executing command: {e}")
+                    st.error(f"执行命令时出错：{e}")
             else:
-                st.error(f"❌ Could not find Python executable for conda environment '{conda_env}'")
-                st.info("Please check if the environment exists and try setting it in Settings page.")
+                st.error(f"❌ 未找到 Conda 环境 '{conda_env}' 的 Python 可执行文件")
+                st.info("请确认该环境存在，并在“设置”页重新配置。")

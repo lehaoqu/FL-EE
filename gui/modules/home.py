@@ -2,6 +2,6 @@ import streamlit as st
 
 
 def show():
-    """显示 Home 页面"""
-    st.header("Home")
-    st.write("Welcome to the FL-EE interface. Use the sidebar to navigate between pages.")
+    """显示首页"""
+    st.header("首页")
+    st.write("欢迎使用 FL-EE 图形界面，请通过侧边栏进行页面切换。")

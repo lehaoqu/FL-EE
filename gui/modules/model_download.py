@@ -33,25 +33,25 @@ MODEL_CONFIGS = {
     "BERT-12-128": {
         "model_name": "google/bert_uncased_L-12_H-128_A-2",
         "model_key": "bert-12-128",
-        "description": "BERT with 12 layers, hidden size 128, 2 attention heads, uncased",
+            "description": "12 层、隐藏维度 128、2 个注意力头的 BERT（uncased）",
         "type": "bert"
     },
     "BERT-12-256": {
         "model_name": "google/bert_uncased_L-12_H-256_A-4",
         "model_key": "bert-12-256",
-        "description": "BERT with 12 layers, hidden size 256, 4 attention heads, uncased",
+        "description": "12 层、隐藏维度 256、4 个注意力头的 BERT（uncased）",
         "type": "bert"
     },
     "DeiT-Tiny": {
         "model_name": "facebook/deit-tiny-patch16-224",
         "model_key": "deit-tiny",
-        "description": "Data-efficient Image Transformer (Tiny version) with patch size 16",
+        "description": "数据高效的图像 Transformer（Tiny 版），patch 大小 16",
         "type": "vision"
     },
     "DeiT-Small": {
         "model_name": "facebook/deit-small-patch16-224",
         "model_key": "deit-small",
-        "description": "Data-efficient Image Transformer (Small version) with patch size 16",
+        "description": "数据高效的图像 Transformer（Small 版），patch 大小 16",
         "type": "vision"
     },
 }
@@ -60,20 +60,20 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 
 
 def show():
-    st.header("Model Download")
+    st.header("模型下载")
     st.write(
-        "Download pre-trained models from HuggingFace Hub. Models will be saved to the `./models/` directory."
+        "从 HuggingFace Hub 下载预训练模型，默认保存到 ./models/ 目录。"
     )
 
     # Model selection
-    st.subheader("Select Models to Download")
+    st.subheader("选择要下载的模型")
     
     selected_models = []
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**BERT Models**")
+        st.write("**BERT 模型**")
         for key in ["BERT-12-128", "BERT-12-256"]:
             config = MODEL_CONFIGS[key]
             if st.checkbox(
@@ -84,7 +84,7 @@ def show():
                 selected_models.append(key)
     
     with col2:
-        st.write("**Vision Models**")
+        st.write("**视觉模型**")
         for key in ["DeiT-Tiny", "DeiT-Small"]:
             config = MODEL_CONFIGS[key]
             if st.checkbox(
@@ -95,25 +95,25 @@ def show():
                 selected_models.append(key)
 
     # Download options
-    st.subheader("Download Options")
+    st.subheader("下载选项")
     save_dir = st.text_input(
-        "Save Directory",
+        "保存目录",
         value="./models",
-        help="Directory where models will be saved (relative to project root)"
+        help="模型保存路径（相对项目根目录）"
     )
 
     # --- Command Preview and Execution ---
-    with st.expander("Download Selected Models", expanded=True):
+    with st.expander("下载已选择的模型", expanded=True):
         if not selected_models:
-            st.warning("⚠️ No models selected. Please select at least one model to download.")
+            st.warning("⚠️ 未选择模型，请至少选择一个模型后再下载。")
             return
         
-        st.subheader("Selected Models")
+        st.subheader("已选模型")
         for model_key in selected_models:
             config = MODEL_CONFIGS[model_key]
             st.write(f"- **{model_key}**: `{config['model_name']}`")
         
-        st.subheader("Command Preview")
+        st.subheader("命令预览")
         # Build command with selected models
         command_args = ["python", "download_models.py"]
         command_args.append("--models")
@@ -127,12 +127,12 @@ def show():
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "fl-ee")
         if conda_env != "fl-ee":
-            st.info(f"🐍 Using global conda environment: **{conda_env}**")
+            st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
         else:
-            st.caption("💡 Set conda environment in Settings page for consistent usage")
+            st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
-        if st.button("Download Models", type="primary", use_container_width=True):
-            st.info(f"Starting model download with conda environment '{conda_env}'...")
+        if st.button("开始下载", type="primary", use_container_width=True):
+            st.info(f"使用 Conda 环境 '{conda_env}' 开始下载模型…")
             
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
@@ -143,8 +143,8 @@ def show():
                 if save_dir != "./models":
                     direct_cmd += f" --save-dir {shlex.quote(save_dir)}"
                 
-                st.info(f"Using Python: `{python_path}`")
-                st.info(f"Executing: `{direct_cmd}`")
+                st.info(f"Python 解释器：`{python_path}`")
+                st.info(f"执行命令：`{direct_cmd}`")
                 
                 try:
                     # Force unbuffered output for real-time streaming
@@ -162,15 +162,15 @@ def show():
                         env=env,
                     )
                     
-                    # Display process ID
-                    st.info(f"🔧 **Process ID (PID): {process.pid}** - You can manually stop it using: `kill {process.pid}`")
+                    # 显示进程号
+                    st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
                     
                     stdout_lines = []
                     stderr_lines = []
 
                     output_section = st.container()
-                    output_section.subheader("📋 Download Output (Live)")
-                    output_section.caption("Shows real-time stdout/stderr from the download process.")
+                    output_section.subheader("📋 下载输出（实时）")
+                    output_section.caption("实时展示下载过程的标准输出与错误输出。")
                     stdout_container = output_section.empty()
                     stderr_container = output_section.empty()
 
@@ -219,7 +219,7 @@ def show():
                             if stdout_lines:
                                 stdout_container.code("".join(stdout_lines), language="bash")
                             if stderr_lines:
-                                stderr_container.error("**Errors/Warnings:**")
+                                stderr_container.error("**错误 / 警告：**")
                                 stderr_container.code("".join(stderr_lines), language="bash")
                             last_ui_update = now
 
@@ -231,21 +231,21 @@ def show():
                     if stdout_lines:
                         stdout_container.code("".join(stdout_lines), language="bash")
                     if stderr_lines:
-                        stderr_container.error("**Errors/Warnings:**")
+                        stderr_container.error("**错误 / 警告：**")
                         stderr_container.code("".join(stderr_lines), language="bash")
                     
                     return_code = process.wait()
                     
                     # Show execution result
                     if return_code == 0:
-                        st.success(f"✅ Model download completed successfully (exit code: {return_code})")
-                        st.info(f"📁 **Models saved to:** `{os.path.join(PROJECT_ROOT, save_dir)}`")
-                        st.caption("You can now use these models in your training scripts.")
+                        st.success(f"✅ 模型下载完成（退出码：{return_code}）")
+                        st.info(f"📁 **模型已保存到：** `{os.path.join(PROJECT_ROOT, save_dir)}`")
+                        st.caption("可以在训练脚本中直接使用这些模型。")
                     else:
-                        st.error(f"❌ Model download failed with exit code: {return_code}")
+                        st.error(f"❌ 模型下载失败，退出码：{return_code}")
                         
                 except Exception as e:
-                    st.error(f"Error executing command: {e}")
+                    st.error(f"执行命令时出错：{e}")
             else:
-                st.error(f"❌ Could not find Python executable for conda environment '{conda_env}'")
-                st.info("Please check if the environment exists and try setting it in Settings page.")
+                st.error(f"❌ 未找到 Conda 环境 '{conda_env}' 的 Python 可执行文件")
+                st.info("请确认该环境存在，并在“设置”页重新配置。")
