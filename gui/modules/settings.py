@@ -30,7 +30,7 @@ def show():
     all_options = ["System Python (python)"] + env_options
     
     if env_options:
-        default_index = all_options.index("fl-ee") if "fl-ee" in all_options else 0
+        default_index = all_options.index("searchr1") if "searchr1" in all_options else 0
         selected_env = st.selectbox(
             "Python 环境",
             all_options,
@@ -45,7 +45,7 @@ def show():
             st.success(f"✅ 使用 Conda 环境：**{selected_env}**")
     else:
         st.warning("⚠️ 未能检测到 Conda 环境")
-        fallback_options = ["System Python (python)", "fl-ee"]
+        fallback_options = ["System Python (python)", "searchr1"]
         selected_env = st.selectbox(
             "Python 环境",
             fallback_options,
@@ -88,7 +88,7 @@ def show():
 
     st.divider()
 
-    # 其他设置
-    st.subheader("⚙️ 常规设置")
-    st.checkbox("启用详细日志", value=False)
-    st.selectbox("默认数据集", ["cifar100", "imagenet", "glue", "speechcmd", "svhn"])
+    # # 其他设置
+    # st.subheader("⚙️ 常规设置")
+    # st.checkbox("启用详细日志", value=False)
+    # st.selectbox("默认数据集", ["cifar100", "imagenet", "glue", "speechcmd", "svhn"])

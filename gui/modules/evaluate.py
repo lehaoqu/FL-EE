@@ -4,6 +4,7 @@ import json
 import subprocess
 import selectors
 import time
+import io
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -18,6 +19,7 @@ class EvalRunItem:
     model: str
     ft: str
     mode: str
+    slim: str = ""
 
 
 def _get_conda_python_path(env_name):
@@ -121,52 +123,55 @@ def _is_eval_target_pth(filename: str) -> bool:
 
 
 def _scan_eval_complete_items() -> List[EvalRunItem]:
-    """Scan front-exps and return eval-complete runs.
-
-    Eval complete (per user spec): within a folder, every target .pth has a matching *_eval.json.
-    """
+    """Recursively collect all *_eval.json under front-exps (no all-pth requirement)."""
     exps_dir = _front_exps_dir()
     if not os.path.exists(exps_dir):
         return []
 
-    # Deduplicate by display label (path + algorithm) to avoid repeated-looking entries.
-    items_by_label: Dict[str, EvalRunItem] = {}
+    items: List[EvalRunItem] = []
 
     for root, _dirs, files in os.walk(exps_dir):
-        pths = [f for f in files if _is_eval_target_pth(f)]
-        if not pths:
-            continue
-
-        # A folder is considered eval-complete only if every target .pth has *_eval.json.
-        stems = [os.path.splitext(f)[0] for f in pths]
-        expected_eval = {f"{s}_eval.json" for s in stems}
-        file_set = set(files)
-        if not expected_eval.issubset(file_set):
-            continue
-
         rel_dir = os.path.relpath(root, exps_dir)
         ft = _infer_ft_from_rel_dir(rel_dir)
 
-        for stem in sorted(stems):
-            eval_json = os.path.join(root, f"{stem}_eval.json")
+        for fname in files:
+            if not fname.endswith("_eval.json"):
+                continue
+            stem = fname[:-10]  # strip _eval.json
             policy, dataset, model, mode = _parse_stem(stem)
-            # User-facing label: path first, then algorithm.
-            label = f"{rel_dir} | {policy}".strip()
-            items_by_label.setdefault(
-                label,
+            slim = ""
+            if "slim" in stem:
+                slim = stem.split("slim", 1)[1].strip("_")
+
+            label_parts = [rel_dir, policy]
+            if slim:
+                label_parts.append(f"slim:{slim}")
+            label = " | ".join(p for p in label_parts if p)
+
+            items.append(
                 EvalRunItem(
                     label=label,
-                    eval_json_path=eval_json,
+                    eval_json_path=os.path.join(root, fname),
                     rel_dir=rel_dir,
                     policy=policy,
                     dataset=dataset,
                     model=model,
                     ft=ft,
                     mode=mode,
-                ),
+                    slim=slim,
+                )
             )
 
-    return sorted(items_by_label.values(), key=lambda x: x.label)
+    # Deduplicate exact same label/path pairs if any
+    seen = set()
+    uniq_items = []
+    for it in sorted(items, key=lambda x: x.label):
+        key = (it.label, it.eval_json_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq_items.append(it)
+    return uniq_items
 
 
 def _plot_budget_curves(selected: List[EvalRunItem]):
@@ -205,7 +210,8 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         marker = (getattr(db, "MARKER", {}) if db else {}).get(item.policy, "o")
         style = (getattr(db, "STYLE", {}) if db else {}).get(item.policy, "-")
         name = (getattr(db, "NAMES", {}) if db else {}).get(item.policy, item.policy)
-        label = f"{name} ({item.dataset}, {item.mode}, {item.ft})".strip()
+        extra = f", {item.slim}" if item.slim else ""
+        label = f"{name} ({item.dataset}, {item.mode}, {item.ft}{extra})".strip()
 
         ax.plot(
             x,
@@ -228,15 +234,24 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         ax.legend(
             handles,
             labels,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 1.18),
-            ncol=min(3, len(labels)),
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.28),
+            ncol=min(2, len(labels)),
             frameon=False,
             fontsize=10,
         )
 
-    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.25)
     st.pyplot(fig, use_container_width=True)
+    return fig
+
+
+def _fig_to_bytes(fig, fmt: str, dpi: int = 300) -> bytes:
+    buf = io.BytesIO()
+    fig.savefig(buf, format=fmt, dpi=dpi, bbox_inches="tight")
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def show():
@@ -331,10 +346,10 @@ def show():
         st.code(cmd, language="bash")
     
     # --- Run Evaluation ---
-    with st.expander("运行评估", expanded=True):
+    with st.expander("运行评估脚本", expanded=True):
         # Get conda environment from global settings
-        conda_env = st.session_state.get("conda_env", "fl-ee")
-        if conda_env != "fl-ee":
+        conda_env = st.session_state.get("conda_env", "searchr1")
+        if conda_env != "searchr1":
             st.info(f"🐍 Using global conda environment: **{conda_env}**")
         else:
             st.caption("💡 可在“设置”页统一配置 Conda 环境")
@@ -463,27 +478,47 @@ def show():
                 st.info("请确认该环境存在，并在“设置”页重新配置。")
 
     # --- Plot Curves (Budget) ---
-    with st.expander("Plot Curves", expanded=True):
-        st.write("Select eval-complete runs (dataset + model + policy + ft) and draw budget curves.")
+    with st.expander("绘制不同预算的准确率曲线图", expanded=True):
+        st.write("选择任意可用的 *_eval.json（数据集 + 模型 + 策略 + 微调）并绘制预算曲线。")
 
         eval_items = _scan_eval_complete_items()
         if not eval_items:
-            st.warning("⚠️ No eval-complete runs found under front-exps/.")
-            st.caption("Definition: in a folder, every target .pth has a matching *_eval.json.")
+            st.warning("⚠️ 未在 front-exps/ 下找到任何 *_eval.json 文件。")
+            st.caption("扫描 front-exps/ 下的所有子目录，自动收集 *_eval.json（无需整目录齐全）。")
             return
 
         label_to_item: Dict[str, EvalRunItem] = {it.label: it for it in eval_items}
         selected_labels = st.multiselect(
-            "Eval-complete runs",
+            "已发现的评估结果",
             options=list(label_to_item.keys()),
             default=[],
-            help="Multi-select runs that already have *_eval.json.",
+            help="从 front-exps/ 递归收集到的 *_eval.json 中选择要绘制的曲线。",
         )
         selected_items = [label_to_item[lbl] for lbl in selected_labels]
 
-        if st.button("Draw Budget Curves", use_container_width=True):
+        if st.button("绘制曲线", use_container_width=True):
             if not selected_items:
-                st.warning("Please select at least one run.")
+                st.warning("请至少选择一个评估结果。")
             else:
-                _plot_budget_curves(selected_items)
+                fig = _plot_budget_curves(selected_items)
+                if fig:
+                    png_bytes = _fig_to_bytes(fig, "png", dpi=300)
+                    pdf_bytes = _fig_to_bytes(fig, "pdf", dpi=300)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.download_button(
+                            "Download PNG (300 DPI)",
+                            data=png_bytes,
+                            file_name="budget_curves.png",
+                            mime="image/png",
+                            use_container_width=True,
+                        )
+                    with c2:
+                        st.download_button(
+                            "Download PDF (vector)",
+                            data=pdf_bytes,
+                            file_name="budget_curves.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                        )
 

@@ -205,8 +205,8 @@ def show():
     # --- Part 2: Run Training ---
     with st.expander("运行训练脚本", expanded=True):
         # Get conda environment from global settings
-        conda_env = st.session_state.get("conda_env", "fl-ee")
-        if conda_env != "fl-ee":
+        conda_env = st.session_state.get("conda_env", "searchr1")
+        if conda_env != "searchr1":
             st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
         else:
             st.caption("💡 可在“设置”页统一配置 Conda 环境")
