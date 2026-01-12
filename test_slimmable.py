@@ -232,9 +232,10 @@ class Test:
         args.ft = 'full'
         
         from utils.modelload.modelloader import load_model_eval
-        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
-        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
+        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].json'
+        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].pth'
         model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        # set_width_ratio(0.25, model)
         print(model)
 
 
@@ -252,8 +253,8 @@ class Test:
         args.device = 0
         
         from utils.modelload.modelloader import load_model_eval
-        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
-        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
+        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].json'
+        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].pth'
         slim_model = load_model_eval(args, model_path=model_path, config_path=config_path)
         
         config_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'

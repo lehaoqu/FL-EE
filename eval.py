@@ -10,7 +10,7 @@ import json
 
 from tqdm import tqdm
 from transformers import BertTokenizer
-from utils.modelload.slimmable import CURRENT_WIDTH_RATIO
+import utils.modelload.slimmable as slimmable_module
 from utils.train_utils import get_flops
 
 from utils.options import args_parser
@@ -55,17 +55,18 @@ class Eval():
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
         
-
-        
         if model is None:
             self.model = load_model_eval(self.args, model_path, config_path)
         else:
             self.model = model
 
+        # print('slim', self.model.config.slimmable)
         if self.model.config.slimmable:
-            if os.path.exists(self.eval_json+self.model_path+f'_slim_{CURRENT_WIDTH_RATIO}_eval.json'):
+            # print('current width ratio:', slimmable_module.CURRENT_WIDTH_RATIO)
+            if os.path.exists(self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'):
                 return
         else:
+            # print('not slimmable')
             if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
                 return
 
@@ -150,7 +151,7 @@ class Eval():
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
         if self.model.config.slimmable:
-            file_path = self.eval_json+self.model_path+f'_slim_{CURRENT_WIDTH_RATIO}_eval.json'
+            file_path = self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
         else:
             file_path = self.eval_json+self.model_path+'_eval.json'
         with open(file_path, 'w') as f:

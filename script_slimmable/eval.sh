@@ -14,7 +14,7 @@ pl=$5
 
 for noniid in "${noniids[@]}"
 do
-    python slimmable_eval.py eefl boosted --suffix $1/${ft}_$pl/noniid$noniid --device $2 --dataset cifar100_noniid$noniid --model $3 --valid_ratio $vr --if_mode all --ft $ft
+    python eval_slimmable.py eefl boosted --suffix $1/${ft}_$pl/noniid$noniid --device $2 --dataset cifar100_noniid$noniid --model $3 --valid_ratio $vr --if_mode all --ft $ft
 done
 
 # for ft in "${fts[@]}" 
