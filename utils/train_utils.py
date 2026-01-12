@@ -303,7 +303,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss', rt_exits_diff=Fa
     else: return diff_pred
 
 
-def get_flops(model, stop_exit=3):
+def get_flops(args, model, stop_exit=3):
     from utils.modelload.slimmable import convert_to_slimmable, custom_ops_dict, set_width_ratio
     from thop import profile
     # 定义一个专用的 Module 包装器（放在类内或外均可，这里建议放外面或作为内部类）
@@ -317,13 +317,21 @@ def get_flops(model, stop_exit=3):
         def forward(self, _=None):
             return self.model(**self.dummy_input, stop_exit=self.stop_exit)
 
-    dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(0)}
+    if 'cifar' in args.dataset or 'imagenet' in args.dataset:
+        dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
+    elif 'glue' in args.dataset or 'bert' in args.dataset:
+        dummy_input = {
+            'input_ids': torch.zeros(1, 128, dtype=torch.long).to(args.device),
+            'attention_mask': torch.ones(1, 128, dtype=torch.long).to(args.device)
+        }
+    else:
+        dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
 
     # ✅ 使用 _ExitWrapper 包装（是 nn.Module！）
-    wrapped_model = _ExitWrapper(model, dummy_input, stop_exit=stop_exit).to(0)
+    wrapped_model = _ExitWrapper(model, dummy_input, stop_exit=stop_exit).to(args.device)
 
     # thop 需要一个 dummy input tensor（即使不用）
-    dummy_tensor_for_thop = torch.zeros(1, 1).to(0)
+    dummy_tensor_for_thop = torch.zeros(1, 1).to(args.device)
 
     # ✅ 现在传入的是 nn.Module，不会报错
     macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False, custom_ops=custom_ops_dict)

@@ -10,6 +10,8 @@ import json
 
 from tqdm import tqdm
 from transformers import BertTokenizer
+from utils.modelload.slimmable import CURRENT_WIDTH_RATIO
+from utils.train_utils import get_flops
 
 from utils.options import args_parser
 from utils.dataloader_utils import load_dataset_loader
@@ -53,13 +55,19 @@ class Eval():
         name_without_extension = os.path.splitext(base_name)[0]
         self.model_path = name_without_extension
         
-        if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
-            return
+
         
         if model is None:
             self.model = load_model_eval(self.args, model_path, config_path)
         else:
             self.model = model
+
+        if self.model.config.slimmable:
+            if os.path.exists(self.eval_json+self.model_path+f'_slim_{CURRENT_WIDTH_RATIO}_eval.json'):
+                return
+        else:
+            if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
+                return
 
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
@@ -142,7 +150,6 @@ class Eval():
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
         if self.model.config.slimmable:
-            from utils.modelload.slimmable import CURRENT_WIDTH_RATIO
             file_path = self.eval_json+self.model_path+f'_slim_{CURRENT_WIDTH_RATIO}_eval.json'
         else:
             file_path = self.eval_json+self.model_path+'_eval.json'
@@ -255,29 +262,10 @@ class Tester(object):
         # —————— 你的原有逻辑开始 ——————
         self.flops = []
         for exit_idx in range(self.n_exits):
-            # 构建 dummy_input（确保和你上面一致）
-            if 'cifar' in args.dataset or 'imagenet' in args.dataset:
-                dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(self.device)}
-            elif 'glue' in args.dataset or 'bert' in args.dataset:
-                dummy_input = {
-                    'input_ids': torch.zeros(1, 128, dtype=torch.long).to(self.device),
-                    'attention_mask': torch.ones(1, 128, dtype=torch.long).to(self.device)
-                }
-            else:
-                dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(self.device)}
-
-            # ✅ 使用 _ExitWrapper 包装（是 nn.Module！）
-            wrapped_model = _ExitWrapper(self.model, dummy_input, stop_exit=exit_idx).to(self.device)
-
-            # thop 需要一个 dummy input tensor（即使不用）
-            dummy_tensor_for_thop = torch.zeros(1, 1).to(self.device)
-
-            # ✅ 现在传入的是 nn.Module，不会报错
-            macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False)
-            self.flops.append(float(macs * 2))
-
-        print(self.flops)
-        print('============')
+            exit_flops = get_flops(args, self.model, stop_exit=exit_idx)
+            self.flops.append(exit_flops)
+        # print(self.flops)
+        # print('============')
     
     def adapt_batch(self, data):
         batch = {}

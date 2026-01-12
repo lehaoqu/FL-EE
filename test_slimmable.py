@@ -32,6 +32,7 @@ class Test:
         self.dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
         self.ratios = [1.0, 0.75, 0.5, 0.25]
 
+
     def adma_optim(self, model):
         param_optimizer = list(model.named_parameters())
         no_decay = ['bias', 'gamma', 'beta']
@@ -42,6 +43,7 @@ class Test:
         ]
         optim = torch.optim.AdamW(params=optimizer_grouped_parameters, lr=0.005, betas=(0.9, 0.999), eps=1e-08)
         return optim
+
 
     def test_slimmable_conv2d(self):
         data = torch.randn(1, int(64*1.0), 56, 56).to(0)
@@ -115,6 +117,7 @@ class Test:
             print("slimmable linear loss matches original loss at ratio 1.0 in epoch", epoch)
             optim_origin.step()
             optim_slim.step()
+
 
     def test_slimmable_layernorm(self):
         data = torch.randn(1, int(512*1.0)).to(0)
@@ -216,6 +219,7 @@ class Test:
             optim_origin.step()
             optim_slim.step()
 
+
     def test_slimmable_load(self):
         class A: pass
         args = A()
@@ -234,6 +238,38 @@ class Test:
         print(model)
 
 
+    def test_slimmbale_flops(self):
+        from utils.train_utils import get_flops
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.policy = 'boosted'
+        args.alg = 'depthfl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'full'
+        args.device = 0
+        
+        from utils.modelload.modelloader import load_model_eval
+        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
+        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
+        slim_model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        
+        config_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+        model_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
+        origin_model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        
+        set_width_ratio(1.0, slim_model)
+        
+        for depth in [0,1,2,3]:
+            slim_flops = get_flops(args, slim_model, stop_exit=depth)
+            origin_flops = get_flops(args,origin_model, stop_exit=depth)
+
+            assert slim_flops == origin_flops, f"slimmable vit flops {slim_flops} does not match original flops {origin_flops} at ratio 1.0 and depth {depth}"
+            print(f"slimmable vit flops {slim_flops} matches original flops {origin_flops} at ratio 1.0 and depth {depth}")
+
+
 
         # flops = {}
         # for ratio in ratios:
@@ -249,4 +285,5 @@ t = Test()
 # t.test_slimmable_linear()
 # t.test_slimmable_layernorm()
 # t.test_slimmable_vit()
-t.test_slimmable_load()
+# t.test_slimmable_load()
+t.test_slimmbale_flops()

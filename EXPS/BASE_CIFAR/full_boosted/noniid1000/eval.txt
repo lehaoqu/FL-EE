@@ -24,3 +24,28 @@ p: 19, valid acc: 68.284, test acc: 68.090, test flops: 1242912896.00
 p: 20, valid acc: 69.261, test acc: 68.780, test flops: 1372334080.00
 p: 21, valid acc: 69.799, test acc: 69.670, test flops: 1500127744.00
 p: 22, valid acc: 69.958, test acc: 69.970, test flops: 1609282688.00
+p: 23, valid acc: 70.277, test acc: 69.860, test flops: 1704576640.00
+p: 24, valid acc: 70.287, test acc: 70.110, test flops: 1784749568.00
+p: 25, valid acc: 70.397, test acc: 70.070, test flops: 1850904064.00
+p: 26, valid acc: 70.377, test acc: 70.170, test flops: 1905192704.00
+p: 27, valid acc: 70.397, test acc: 70.280, test flops: 1947563136.00
+p: 28, valid acc: 70.476, test acc: 70.310, test flops: 1982635520.00
+p: 29, valid acc: 70.486, test acc: 70.310, test flops: 2009202304.00
+p: 30, valid acc: 70.426, test acc: 70.290, test flops: 2032146304.00
+p: 31, valid acc: 70.426, test acc: 70.290, test flops: 2048527360.00
+p: 32, valid acc: 70.397, test acc: 70.300, test flops: 2065223552.00
+p: 33, valid acc: 70.397, test acc: 70.300, test flops: 2077929344.00
+p: 34, valid acc: 70.407, test acc: 70.300, test flops: 2087747584.00
+p: 35, valid acc: 70.407, test acc: 70.300, test flops: 2097460736.00
+p: 36, valid acc: 70.407, test acc: 70.300, test flops: 2103446144.00
+p: 37, valid acc: 70.407, test acc: 70.300, test flops: 2108381568.00
+p: 38, valid acc: 70.407, test acc: 70.300, test flops: 2113474304.00
+p: 39, valid acc: 70.407, test acc: 70.300, test flops: 2118934656.00
+Anytime:
+[53.67, 64.89, 70.54, 70.3], avg:64.85000000000001
+======eval model:scalefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted======
+=====eval model:darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted=====
+======eval model:depthfl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted======
+======eval model:reefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.005_boosted=======
+====eval model:exclusivefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted====
+====eval model:inclusivefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted====

@@ -39,7 +39,7 @@ if __name__ == '__main__':
             print(slim_ratios)
             # eval loop for each slim ratio
             for ratio in slim_ratios:
-                print(f"Evaluating at slim ratio: {ratio}")
+                # print(f"Evaluating at slim ratio: {ratio}")
                 if full_model.config.slimmable:
                     from utils.modelload.slimmable import set_width_ratio
                     

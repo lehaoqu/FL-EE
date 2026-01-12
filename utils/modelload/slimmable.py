@@ -177,7 +177,7 @@ def count_slimmable_conv2d(m, x, y):
 custom_ops_dict = {
     SlimmableLinear: count_slimmable_linear,
     # 如果用了 SwitchableLayerNorm
-    SwitchableLayerNorm: count_switchable_layernorm,
+    # SwitchableLayerNorm: count_switchable_layernorm,
     SlimmableConv2d: count_slimmable_conv2d,
 }
 
