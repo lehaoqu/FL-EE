@@ -12,7 +12,7 @@ warnings.simplefilter('always', UserWarning)
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
-from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure
+from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, kd_loss_func
 from utils.modelload.model import BaseModule
 from torch.utils.data import ConcatDataset
 from trainer.policy.l2w import MLP_tanh
@@ -109,26 +109,69 @@ class Client(BaseClient):
 
                 batch, label = self.adapt_batch(data)
                 
-                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
-                    self.policy.train_meta(self.model, batch, label, self.optim)
+                if self.args.slimmable:
+                    from utils.modelload.slimmable import set_width_ratio
 
-                exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
-                ce_loss = sum(exits_ce_loss)
-                if epoch == self.epoch-1:
-                    for index in range(label.shape[0]):
-                        diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
-                        self.sample_exits_diff[sample_idx] = exits_diff.detach()
-                        self.sample_y[sample_idx] = label[index]
-                        # self.diff_distribute[int(diff.cpu().item())] += 1
-                        if 'attention_mask' in data.keys():
-                            attention_mask = data['attention_mask'].cpu().tolist()
-                            sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
-                            self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
-                        sample_idx += 1
+                    ce_loss = torch.zeros(1).to(self.device)
+                    ratio_exits_logits = {}
+
+                    for slim_ratio in self.args.slim_ratios:
+                        set_width_ratio(slim_ratio, self.model)
+
+                        if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                            self.policy.train_meta(self.model, batch, label, self.optim)
+
+                        exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                        ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
+                        ratio_exits_logits[slim_ratio] = exits_logits
+
+                    t_exits_logits = ratio_exits_logits[1.0]
+                    kd_loss = torch.zeros(1).to(self.device)
+                    for slim_ratio in self.args.slim_ratios:
+                        if slim_ratio == 1.0:
+                            continue
+                        for logit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
+                            teacher_logits = t_exits_logits[logit_idx].detach()
+                            kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios) - 1)
+
+                    if epoch == self.epoch-1:
+                        for index in range(label.shape[0]):
+                            diff, exits_diff = difficulty_measure([t_exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                            self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                            self.sample_y[sample_idx] = label[index]
+                            if 'attention_mask' in data.keys():
+                                attention_mask = data['attention_mask'].cpu().tolist()
+                                sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                                self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                            sample_idx += 1
+
+                    loss = ce_loss + kd_loss
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
+                    set_width_ratio(1.0, self.model)
+
+                else:
+                    if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                        self.policy.train_meta(self.model, batch, label, self.optim)
+
+                    exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                    ce_loss = sum(exits_ce_loss)
+                    if epoch == self.epoch-1:
+                        for index in range(label.shape[0]):
+                            diff, exits_diff = difficulty_measure([exits_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                            self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                            self.sample_y[sample_idx] = label[index]
+                            # self.diff_distribute[int(diff.cpu().item())] += 1
+                            if 'attention_mask' in data.keys():
+                                attention_mask = data['attention_mask'].cpu().tolist()
+                                sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                                self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                            sample_idx += 1
   
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item()) 
+                    ce_loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item()) 
         # print(self.diff_distribute)
                     
         # === record loss ===

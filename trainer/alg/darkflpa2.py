@@ -5,7 +5,7 @@ import random
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
-from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure
+from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_probs, exit_policy, difficulty_measure, kd_loss_func
 
 
 
@@ -55,44 +55,13 @@ def add_args(parser):
     return parser
 
 class Client(BaseClient):
-    
-    def train(self):
-        # === train ===
-        self.model.to(self.device)
-        batch_loss = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                self.optim.zero_grad()
-
-                batch, label = self.adapt_batch(data)
-                
-                if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
-                    self.policy.train_meta(self.model, batch, label, self.optim)
-
-                exits_ce_loss, _ = self.policy.train(self.model, batch, label)
-                ce_loss = sum(exits_ce_loss)
-                ce_loss.backward()
-                self.optim.step()
-                batch_loss.append(ce_loss.detach().cpu().item())
-        # === record loss ===
-        self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
-    
-    def get_embedding(self,):
-        self.model.eval()
-        embedding_outputs = []
-        for epoch in range(self.epoch):
-            for idx, data in enumerate(self.loader_train):
-                batch, label = self.adapt_batch(data)
-                batch['rt_embedding'] = True
-                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
-        return embedding_outputs
-        
 
     def run(self):
         self.train()
 
 
 class Server(BaseServer):
+    
     def run(self):
         self.sample()
         self.downlink()
