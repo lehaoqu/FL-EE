@@ -2,8 +2,10 @@ import json
 import os
 import re
 import subprocess
+import time
 
 import pandas as pd
+import altair as alt
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -79,6 +81,7 @@ DATASET_DISPLAY_NAMES = {
 
 
 SLIM_RATIOS_DEFAULT = "[1.0, 0.75, 0.5, 0.25]"
+EQ_RATIOS_DEFAULT = "0.25 0.25 0.25 0.25"
 
 
 def _parse_slim_ratios(raw_text: str):
@@ -101,6 +104,26 @@ def _parse_slim_ratios(raw_text: str):
     if not ratios:
         return [], "列表中必须包含至少一个数值"
 
+    return ratios, None
+
+
+def _parse_eq_ratios(raw_text: str):
+    stripped = (raw_text or "").strip()
+    if not stripped:
+        return [], "请输入四个比例，用空格分隔"
+    parts = re.split(r"[\s,]+", stripped)
+    ratios = []
+    for part in parts:
+        if not part:
+            continue
+        try:
+            ratios.append(float(part))
+        except ValueError:
+            return [], f"无法解析比例: {part}"
+    if len(ratios) != 4:
+        return [], "必须填写四个比例"
+    if abs(sum(ratios) - 1.0) > 1e-6:
+        return [], "四个比例之和需为 1.0"
     return ratios, None
 
 
@@ -158,20 +181,6 @@ def show():
                 elif slim_ratios_list:
                     st.caption("Slim 比例将作为 --slim_ratios 传入命令。")
         with col2:
-            st.subheader("训练超参数")
-            batch_size = st.number_input("批大小 (bs)", value=32, min_value=8, max_value=256, step=8)
-            learning_rate = st.number_input("学习率 (lr)", value=0.05, min_value=0.001, max_value=0.1, step=0.001, format="%.4f")
-            sample_ratio = st.number_input("采样比例 (sr)", value=0.1, min_value=0.01, max_value=1.0, step=0.05, format="%.2f")
-            total_num = st.number_input("客户端总数 (total_num)", value=100, min_value=10, max_value=1000, step=10)
-        
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            st.subheader("算法与设备")
-            algorithm = st.selectbox("算法", ["eefl", "darkflpg", "darkflpa2", "depthfl", "scalefl", "reefl"])
-            device = st.text_input("设备 (GPU)", value="0", help="例如 0 表示 GPU:0，或填 cpu")
-            
-        with col4:
             st.subheader("微调与结果后缀")
             fine_tuning = st.selectbox("微调方式 (ft)", ["full", "lora"])
             
@@ -185,6 +194,41 @@ def show():
                 help="结果路径后缀，默认根据数据集与模型生成。"
             )
             st.caption(f"💡 推荐：`{suggested_suffix}`")
+            
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            st.subheader("训练超参数")
+            batch_size = st.number_input("批大小 (bs)", value=32, min_value=8, max_value=256, step=8)
+            learning_rate = st.number_input("学习率 (lr)", value=0.05, min_value=0.001, max_value=0.1, step=0.001, format="%.4f")
+            sample_ratio = st.number_input("采样比例 (sr)", value=0.1, min_value=0.01, max_value=1.0, step=0.05, format="%.2f")
+            total_num = st.number_input("客户端总数 (total_num)", value=100, min_value=10, max_value=1000, step=10)
+            eq_ratios_text = st.text_input("设备比例 (eq_ratios，四个数相加为1)", value=EQ_RATIOS_DEFAULT)
+            eq_ratios_list, eq_ratios_error = _parse_eq_ratios(eq_ratios_text)
+            if eq_ratios_error:
+                st.warning(eq_ratios_error)
+                eq_ratios_list = []
+            else:
+                eq_counts = [v * total_num for v in eq_ratios_list]
+                exit_caps = [1, 2, 3, 4]  # 可容纳的出口数量（对应四档设备）
+                # chart_df = pd.DataFrame({"可容纳出口数": exit_caps, "设备数": eq_counts})
+                # chart = (
+                #     alt.Chart(chart_df)
+                #     .mark_bar(size=22)
+                #     .encode(
+                #         x=alt.X("可容纳出口数:O", title="可容纳的出口数量", axis=alt.Axis(labelAngle=0)),
+                #         y=alt.Y("设备数:Q", title="设备数"),
+                #     )
+                #     .properties(height=160)
+                # )
+                # st.altair_chart(chart, use_container_width=True)
+            
+        with col4:
+            st.subheader("算法与设备")
+            algorithm = st.selectbox("异构联邦学习算法", ["eefl", "darkflpg", "darkflpa2", "depthfl", "scalefl", "reefl"])
+            policy = st.selectbox("早退网络训练算法（ply）", ["base", "boosted", "l2w"], help="对应 main.py 的第二个位置参数")
+            device = st.text_input("设备 (GPU)", value="0", help="例如 0 表示 GPU:0，或填 cpu")
+
         
         st.divider()
         st.write("**生成的命令：**")
@@ -192,13 +236,16 @@ def show():
         slim_ratios_arg = ""
         if slimmable and slim_ratios_list and not slim_ratios_error:
             slim_ratios_arg = " --slim_ratios " + " ".join(str(v) for v in slim_ratios_list)
+        eq_ratios_arg = ""
+        if eq_ratios_list:
+            eq_ratios_arg = " --eq_ratios " + " ".join(str(v) for v in eq_ratios_list)
         
         # Add "front-exps/" prefix to suffix
         full_suffix = f"front-exps/{suffix}" if suffix and not suffix.startswith("front-exps/") else suffix
         
         cmd = (
-            f"python3 main.py {algorithm} {fine_tuning} --sr {sample_ratio} --total_num {total_num} --lr {learning_rate} "
-            f"--bs {batch_size} --device {device} --dataset {dataset} --model {model} --suffix {full_suffix}{slimmable_flag}{slim_ratios_arg}"
+            f"python3 main.py {algorithm} {policy} --ft {fine_tuning} --sr {sample_ratio} --total_num {total_num} --lr {learning_rate} "
+            f"--bs {batch_size} --device {device} --dataset {dataset} --model {model} --suffix {full_suffix}{slimmable_flag}{slim_ratios_arg}{eq_ratios_arg}"
         )
         st.code(cmd, language="bash")
 
@@ -207,33 +254,38 @@ def show():
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "searchr1")
         if conda_env != "searchr1":
-            st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
+            # st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
+            pass
         else:
             st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
         if st.button("运行 main.py", type="primary", use_container_width=True):
-            st.info(f"使用 Conda 环境 '{conda_env}' 开始执行 main.py…")
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # st.info(f"使用 Conda 环境 '{conda_env}' 开始执行 main.py…")
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
             if python_path:
                 # Replace python3 with the full conda python path
                 direct_cmd = cmd.replace("python3", python_path)
-                st.info(f"Python 解释器：`{python_path}`")
-                st.info(f"执行命令：`{direct_cmd}`")
+                # st.info(f"Python 解释器：`{python_path}`")
+                # st.info(f"执行命令：`{direct_cmd}`")
                 
                 try:
                     # Execute command with real-time output
+                    env = os.environ.copy()
+                    env["PYTHONUNBUFFERED"] = "1"
+
                     process = subprocess.Popen(
                         direct_cmd,
                         shell=True,
                         cwd=project_root,
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
                         text=True,
                         bufsize=1,
-                        universal_newlines=True
+                        universal_newlines=True,
+                        env=env
                     )
                     
                     # Store process in session state
@@ -241,61 +293,44 @@ def show():
                     st.session_state["train_process_running"] = True
                     
                     # Display process ID
-                    st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
+                    # st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
                     
                     stdout_lines = []
-                    stderr_lines = []
                     max_lines = 100  # Limit output lines to prevent overflow
                     
                     # Read output in real-time
                     with st.expander("📋 执行输出（实时）", expanded=True):
                         stdout_container = st.empty()
-                        stderr_container = st.empty()
                         progress_info = st.empty()
                         
-                        while True:
+                        for stdout_line in iter(process.stdout.readline, ''):
                             # Check for stop request
                             if st.session_state.get("train_stop_requested", False):
                                 process.terminate()
                                 st.warning("🛑 已按用户请求终止训练进程")
                                 break
-                            
-                            # Read stdout
-                            stdout_line = process.stdout.readline()
+
                             if stdout_line:
-                                # Check if this is a progress line
                                 is_progress = any(indicator in stdout_line for indicator in ['%|', 'it/s]', 'iB/s]', 'B/s]', 'Downloading'])
-                                
+
                                 if is_progress:
-                                    # Show progress in separate area
                                     progress_info.info(f"⏳ {stdout_line.strip()}")
-                                    # Only keep last progress line in main output
                                     if stdout_lines and any(ind in stdout_lines[-1] for ind in ['%|', 'it/s]', 'iB/s]', 'B/s]']):
                                         stdout_lines[-1] = stdout_line
                                     else:
                                         stdout_lines.append(stdout_line)
                                 else:
                                     stdout_lines.append(stdout_line)
-                                
-                                # Keep only last max_lines
+
                                 if len(stdout_lines) > max_lines:
                                     stdout_lines = stdout_lines[-max_lines:]
-                                
+
                                 stdout_container.code(''.join(stdout_lines), language="bash")
-                            
-                            # Read stderr
-                            stderr_line = process.stderr.readline()
-                            if stderr_line:
-                                stderr_lines.append(stderr_line)
-                                if len(stderr_lines) > max_lines:
-                                    stderr_lines = stderr_lines[-max_lines:]
-                                if stderr_lines:
-                                    stderr_container.error("**错误 / 警告：**")
-                                    stderr_container.code(''.join(stderr_lines), language="bash")
-                            
-                            # Check if process finished
-                            if stdout_line == '' and stderr_line == '' and process.poll() is not None:
+
+                            if process.poll() is not None:
                                 break
+
+                            time.sleep(0.05)
                     
                     return_code = process.wait()
                     
@@ -309,7 +344,7 @@ def show():
                     st.error(f"执行命令时出错：{e}")
             else:
                 st.error(f"❌ 未找到 Conda 环境 '{conda_env}' 的 Python 可执行文件")
-                st.info("请确认该环境存在，并在“设置”页重新配置。")
+                # st.info("请确认该环境存在，并在“设置”页重新配置。")
 
     # --- Part 3: Weights & Biases Integration ---
     st.divider()
@@ -376,7 +411,8 @@ def show():
 
     # 如果已登录，显示项目选择下拉框
     if st.session_state.get('wandb_logged_in', False):
-        st.info(f"✅ 已登录 W&B，实体：**{st.session_state.get('wandb_entity')}**")
+        # st.info(f"✅ 已登录 W&B，实体：**{st.session_state.get('wandb_entity')}**")
+        pass
         
         # 添加实时刷新控制
         col_refresh_ctrl1, col_refresh_ctrl2, col_refresh_ctrl3 = st.columns([1, 1, 1])
@@ -393,7 +429,6 @@ def show():
         
         try:
             import wandb
-            import time
             
             api = st.session_state.get('wandb_api')
             if not api:
@@ -502,8 +537,6 @@ def show():
                                             
                                             if has_data:
                                                 # 创建多条线的图表
-                                                import altair as alt
-                                                
                                                 # 准备数据：将多条线的数据转换为 long format
                                                 chart_data_list = []
                                                 for run_name, values in metric_chart_data.items():
@@ -530,11 +563,14 @@ def show():
                                                     
                                                     st.altair_chart(chart, use_container_width=True)
                                             else:
-                                                st.info(f"该指标暂无数据：{metric}")
+                                                # st.info(f"该指标暂无数据：{metric}")
+                                                pass
                                 else:
-                                    st.info("这些运行中没有可用的训练历史。")
+                                    # st.info("这些运行中没有可用的训练历史。")
+                                    pass
                             else:
-                                st.info("该项目下尚无运行记录。")
+                                # st.info("该项目下尚无运行记录。")
+                                pass
                         
                         # --- Tab 2: 网页嵌入视图 (Iframe) ---
                         with tab_web:

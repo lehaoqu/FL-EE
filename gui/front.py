@@ -16,7 +16,7 @@ section[data-testid="stSidebar"] .stRadio label > div:first-child {
 /* 针对 Radio 选项的标签进行卡片化样式设置 */
 section[data-testid="stSidebar"] .stRadio label {
     background-color: transparent;
-    padding: 14px 24px;
+    padding: 8px 24px;
     border-radius: 0px;
     margin-bottom: 0px;
     margin-left: -24px;
@@ -58,13 +58,65 @@ section[data-testid="stSidebar"] .stRadio label:has(input:checked) p {
 }
 
 section[data-testid="stSidebar"] h1 {
-    margin-bottom: 24px;
+    margin-bottom: 12px;
     font-size: 28px;
     font-weight: 700;
 }
 </style>
 '''
 st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
+
+
+COMPACT_CSS = '''
+<style>
+/* Reduce vertical whitespace to show more content */
+div.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+/* Tighter typography */
+div[data-testid="stMarkdownContainer"] p {
+    margin: 0.2rem 0;
+    line-height: 1.25;
+}
+
+/* Reduce default spacing between widgets */
+div.element-container {
+    margin-bottom: 0.35rem;
+}
+
+/* Reduce label spacing */
+div[data-testid="stWidgetLabel"] {
+    margin-bottom: 0.1rem;
+}
+
+/* Headings take less vertical space */
+h1, h2, h3 {
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+/* Captions and alerts are usually very tall */
+.stCaption {
+    margin-top: 0.1rem;
+    margin-bottom: 0.1rem;
+}
+
+div[data-testid="stAlert"] {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Expanders */
+div[data-testid="stExpander"] {
+    margin-bottom: 0.35rem;
+}
+</style>
+'''
+st.markdown(COMPACT_CSS, unsafe_allow_html=True)
 
 
 # 页面字典

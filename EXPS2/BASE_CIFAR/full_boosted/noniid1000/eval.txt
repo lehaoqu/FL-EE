@@ -1360,3 +1360,89 @@ eval model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-
 Setting width ratio to 1.0
 logits calc compeleted
 Exits FLOPs: [582838272.0, 1107873792.0, 1632909312.0, 2157944832.0]
+p: 1, valid acc: 22.320, test acc: 22.300, test flops: 583153344.00
+p: 2, valid acc: 22.320, test acc: 22.310, test flops: 583048320.00
+p: 3, valid acc: 22.330, test acc: 22.300, test flops: 583153280.00
+p: 4, valid acc: 22.350, test acc: 22.320, test flops: 583573376.00
+p: 5, valid acc: 22.360, test acc: 22.340, test flops: 584570944.00
+p: 6, valid acc: 22.449, test acc: 22.480, test flops: 587091072.00
+p: 7, valid acc: 22.569, test acc: 22.670, test flops: 590766272.00
+p: 8, valid acc: 22.738, test acc: 22.980, test flops: 598064256.00
+p: 9, valid acc: 23.007, test acc: 23.350, test flops: 607567488.00
+p: 10, valid acc: 23.346, test acc: 23.690, test flops: 620430784.00
+p: 11, valid acc: 23.984, test acc: 24.320, test flops: 636601920.00
+p: 12, valid acc: 24.771, test acc: 25.040, test flops: 661121088.00
+p: 13, valid acc: 26.226, test acc: 26.280, test flops: 697348544.00
+p: 14, valid acc: 27.870, test acc: 28.160, test flops: 747594368.00
+p: 15, valid acc: 29.574, test acc: 30.250, test flops: 810861184.00
+p: 16, valid acc: 32.453, test acc: 32.620, test flops: 890194112.00
+p: 17, valid acc: 35.512, test acc: 35.710, test flops: 992365952.00
+p: 18, valid acc: 38.820, test acc: 39.020, test flops: 1113019136.00
+p: 19, valid acc: 42.118, test acc: 42.270, test flops: 1239342592.00
+p: 20, valid acc: 45.247, test acc: 45.310, test flops: 1376114432.00
+p: 21, valid acc: 47.788, test acc: 47.720, test flops: 1505640704.00
+p: 22, valid acc: 49.870, test acc: 49.770, test flops: 1617788288.00
+p: 23, valid acc: 51.435, test acc: 51.800, test flops: 1720485120.00
+p: 24, valid acc: 52.471, test acc: 52.810, test flops: 1797297920.00
+p: 25, valid acc: 53.169, test acc: 53.380, test flops: 1862612352.00
+p: 26, valid acc: 53.677, test acc: 53.610, test flops: 1912123136.00
+p: 27, valid acc: 53.766, test acc: 53.920, test flops: 1951606016.00
+p: 28, valid acc: 53.796, test acc: 54.150, test flops: 1986783232.00
+p: 29, valid acc: 53.976, test acc: 54.260, test flops: 2011722496.00
+p: 30, valid acc: 53.996, test acc: 54.350, test flops: 2035086592.00
+p: 31, valid acc: 54.016, test acc: 54.310, test flops: 2051992704.00
+p: 32, valid acc: 54.065, test acc: 54.250, test flops: 2066956160.00
+p: 33, valid acc: 54.105, test acc: 54.290, test flops: 2078507008.00
+p: 34, valid acc: 54.145, test acc: 54.270, test flops: 2089532672.00
+p: 35, valid acc: 54.185, test acc: 54.300, test flops: 2096305664.00
+p: 36, valid acc: 54.155, test acc: 54.340, test flops: 2102973696.00
+p: 37, valid acc: 54.205, test acc: 54.320, test flops: 2108854016.00
+p: 38, valid acc: 54.205, test acc: 54.340, test flops: 2114734336.00
+p: 39, valid acc: 54.205, test acc: 54.370, test flops: 2119407104.00
+Anytime:
+[22.3, 39.36, 51.78, 54.32], avg:41.94
+eval model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9]
+Setting width ratio to 0.9
+logits calc compeleted
+Exits FLOPs: [470581056.0, 889681536.0, 1308782016.0, 1727882496.0]
+p: 1, valid acc: 21.104, test acc: 20.740, test flops: 470832512.00
+p: 2, valid acc: 21.114, test acc: 20.750, test flops: 470748704.00
+p: 3, valid acc: 21.114, test acc: 20.770, test flops: 470916352.00
+p: 4, valid acc: 21.134, test acc: 20.810, test flops: 471628832.00
+p: 5, valid acc: 21.174, test acc: 20.840, test flops: 472802304.00
+p: 6, valid acc: 21.253, test acc: 20.890, test flops: 474688224.00
+p: 7, valid acc: 21.303, test acc: 21.000, test flops: 477747712.00
+p: 8, valid acc: 21.483, test acc: 21.210, test flops: 482734976.00
+p: 9, valid acc: 21.652, test acc: 21.520, test flops: 491703744.00
+p: 10, valid acc: 21.971, test acc: 21.880, test flops: 501384960.00
+p: 11, valid acc: 22.449, test acc: 22.350, test flops: 515131456.00
+p: 12, valid acc: 23.077, test acc: 23.220, test flops: 534535776.00
+p: 13, valid acc: 24.063, test acc: 24.210, test flops: 562364032.00
+p: 14, valid acc: 25.558, test acc: 25.380, test flops: 600627968.00
+p: 15, valid acc: 27.232, test acc: 27.110, test flops: 650961920.00
+p: 16, valid acc: 29.305, test acc: 29.330, test flops: 723256768.00
+p: 17, valid acc: 31.806, test acc: 31.550, test flops: 798317632.00
+p: 18, valid acc: 34.725, test acc: 34.160, test flops: 890477824.00
+p: 19, valid acc: 36.947, test acc: 36.880, test flops: 995378688.00
+p: 20, valid acc: 39.727, test acc: 39.340, test flops: 1107529984.00
+p: 21, valid acc: 41.610, test acc: 41.820, test flops: 1210670592.00
+p: 22, valid acc: 43.185, test acc: 43.510, test flops: 1300358144.00
+p: 23, valid acc: 44.121, test acc: 44.980, test flops: 1377304960.00
+p: 24, valid acc: 44.819, test acc: 45.680, test flops: 1438326016.00
+p: 25, valid acc: 45.486, test acc: 46.140, test flops: 1490755456.00
+p: 26, valid acc: 45.835, test acc: 46.400, test flops: 1533210368.00
+p: 27, valid acc: 45.905, test acc: 46.570, test flops: 1565062016.00
+p: 28, valid acc: 45.885, test acc: 46.600, test flops: 1591088128.00
+p: 29, valid acc: 46.044, test acc: 46.760, test flops: 1612546048.00
+p: 30, valid acc: 45.955, test acc: 46.850, test flops: 1628094720.00
+p: 31, valid acc: 45.974, test acc: 46.760, test flops: 1642386048.00
+p: 32, valid acc: 45.994, test acc: 46.760, test flops: 1654120832.00
+p: 33, valid acc: 46.074, test acc: 46.770, test flops: 1664556416.00
+p: 34, valid acc: 46.104, test acc: 46.760, test flops: 1672225920.00
+p: 35, valid acc: 46.114, test acc: 46.830, test flops: 1679602048.00
+p: 36, valid acc: 46.154, test acc: 46.850, test flops: 1686643072.00
+p: 37, valid acc: 46.234, test acc: 46.890, test flops: 1692258944.00
+p: 38, valid acc: 46.263, test acc: 46.910, test flops: 1694941184.00
+p: 39, valid acc: 46.263, test acc: 46.930, test flops: 1698252160.00
+Anytime:
+[20.73, 35.71, 45.58, 46.94], avg:37.239999999999995

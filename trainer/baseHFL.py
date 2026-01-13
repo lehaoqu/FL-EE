@@ -494,7 +494,7 @@ class BaseServer:
         with torch.no_grad():
             dataloader = self.test_dataloader if self.args.eval_test else self.valid_dataloader
             for ratio in slim_ratios:
-                set_width_ratio(ratio, self.global_model)
+                set_width_ratio(ratio, self.global_model) if self.args.slimmable else None
 
                 correct = 0
                 total = 0
@@ -521,7 +521,7 @@ class BaseServer:
                     acc_exits_base = acc_exits
 
         # restore
-        set_width_ratio(1.0, self.global_model)
+        set_width_ratio(1.0, self.global_model) if self.args.slimmable else None
 
         self.metric['acc'].append(acc_base if acc_base is not None else acc_exit_slim_round[-1][0])
         self.metric['acc_exits'].append(acc_exits_base if acc_exits_base is not None else acc_exit_slim_round[-1])

@@ -1,7 +1,22 @@
+import os
+import warnings
+
+# Silence known noisy third-party warnings as early as possible (before importing deps)
+warnings.filterwarnings(
+    "ignore",
+    module=r"pydantic\._internal\._generate_schema",
+)
+warnings.filterwarnings(
+    "ignore",
+    module=r"wandb\.analytics\.sentry",
+)
+
+# Reduce Weights & Biases console noise
+os.environ.setdefault("WANDB_SILENT", "true")
+
 import importlib
 import sys
 import numpy as np
-import os
 import copy
 import json
 import torch
@@ -144,7 +159,7 @@ class FedSim:
                 self.output.write(f"server, accuracy: {ret_dict['acc']:.2f}, exits:{acc_exits} loss: {ret_dict['loss']:.2f}\n")
 
                 acc_exit_slim = ret_dict.get('acc_exit_slim', [])
-                if acc_exit_slim:
+                if acc_exit_slim and self.args.slimmable:
                     # acc_exit_slim: list over slim_ratios -> list over exits
                     for ratio_idx, exits_vals in enumerate(acc_exit_slim):
                         exits_fmt = [f"{num:.2f}" for num in exits_vals]
