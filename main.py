@@ -1,4 +1,5 @@
 import os
+import time
 import warnings
 
 # Silence known noisy third-party warnings as early as possible (before importing deps)
@@ -132,6 +133,7 @@ class FedSim:
         best_rnd = 0
         valid_acc = []
         losses = []
+        wall_start_time = time.time()
         try:
             for rnd in tqdm(range(self.server.total_round), desc='Communication Round', leave=False):
                 # ===================== train =====================
@@ -164,7 +166,12 @@ class FedSim:
                     for ratio_idx, exits_vals in enumerate(acc_exit_slim):
                         exits_fmt = [f"{num:.2f}" for num in exits_vals]
                         self.output.write(f"  slim[{self.args.slim_ratios[ratio_idx]}]: exits:{exits_fmt}\n")
-                wdb.log({"acc": ret_dict['acc'], "loss": ret_dict['loss']})
+                wdb.log({
+                    "round": rnd,
+                    "acc": ret_dict['acc'],
+                    "loss": ret_dict['loss'],
+                    "runtime_s": time.time() - wall_start_time,
+                })
                 if rnd % 10 == 0:
                     valid_acc.append(ret_dict['acc'])
                     losses.append(ret_dict['loss'])

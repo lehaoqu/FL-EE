@@ -59,6 +59,16 @@ class Client(BaseClient):
     def run(self):
         self.train()
 
+    def get_embedding(self,):
+        self.model.eval()
+        embedding_outputs = []
+        for epoch in range(self.epoch):
+            for idx, data in enumerate(self.loader_train):
+                batch, label = self.adapt_batch(data)
+                batch['rt_embedding'] = True
+                embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
+        return embedding_outputs
+        
 
 class Server(BaseServer):
     

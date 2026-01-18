@@ -1,5 +1,5 @@
 import streamlit as st
-from modules import home, generate, evaluate, settings, dataset_generate, model_download
+from modules import home, generate, evaluate, settings, dataset_generate, model_download, structure
 
 st.set_page_config(page_title="FL-EE GUI", layout="wide")
 
@@ -122,6 +122,7 @@ st.markdown(COMPACT_CSS, unsafe_allow_html=True)
 # 页面字典
 PAGES = {
     "首页": home,
+    "项目结构": structure,
     "模型下载": model_download,
     "数据集生成": dataset_generate,
     "训练与监控": generate,

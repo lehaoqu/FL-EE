@@ -254,13 +254,13 @@ def show():
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "searchr1")
         if conda_env != "searchr1":
-            # st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
+            st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
             pass
         else:
             st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
         if st.button("运行 main.py", type="primary", use_container_width=True):
-            # st.info(f"使用 Conda 环境 '{conda_env}' 开始执行 main.py…")
+            st.info(f"使用 Conda 环境 '{conda_env}' 开始执行 main.py…")
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             
             # Get direct python path from conda environment
@@ -268,8 +268,8 @@ def show():
             if python_path:
                 # Replace python3 with the full conda python path
                 direct_cmd = cmd.replace("python3", python_path)
-                # st.info(f"Python 解释器：`{python_path}`")
-                # st.info(f"执行命令：`{direct_cmd}`")
+                st.info(f"Python 解释器：`{python_path}`")
+                st.info(f"执行命令：`{direct_cmd}`")
                 
                 try:
                     # Execute command with real-time output
@@ -293,7 +293,7 @@ def show():
                     st.session_state["train_process_running"] = True
                     
                     # Display process ID
-                    # st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
+                    st.info(f"🔧 **进程号 (PID): {process.pid}** - 如需手动停止可执行：`kill {process.pid}`")
                     
                     stdout_lines = []
                     max_lines = 100  # Limit output lines to prevent overflow
@@ -344,7 +344,7 @@ def show():
                     st.error(f"执行命令时出错：{e}")
             else:
                 st.error(f"❌ 未找到 Conda 环境 '{conda_env}' 的 Python 可执行文件")
-                # st.info("请确认该环境存在，并在“设置”页重新配置。")
+                st.info("请确认该环境存在，并在“设置”页重新配置。")
 
     # --- Part 3: Weights & Biases Integration ---
     st.divider()
@@ -411,7 +411,7 @@ def show():
 
     # 如果已登录，显示项目选择下拉框
     if st.session_state.get('wandb_logged_in', False):
-        # st.info(f"✅ 已登录 W&B，实体：**{st.session_state.get('wandb_entity')}**")
+        st.info(f"✅ 已登录 W&B，实体：**{st.session_state.get('wandb_entity')}**")
         pass
         
         # 添加实时刷新控制
@@ -487,7 +487,7 @@ def show():
                                 df_runs = pd.DataFrame(run_data)
                                 
                                 # 显示运行列表表格
-                                st.dataframe(df_runs, use_container_width=True)
+                                # st.dataframe(df_runs, use_container_width=True)
                                 
                                 # 按 Metric 分别绘图，展示所有 runs 的历史曲线
                                 st.subheader("训练曲线（按指标）")
@@ -499,6 +499,16 @@ def show():
                                 for run in runs:
                                     try:
                                         history = run.history(samples=500)
+                                        # Some W&B backends omit internal fields unless explicitly requested.
+                                        # Best-effort: re-fetch including internal runtime/step columns.
+                                        if (not history.empty) and ("_runtime" not in history.columns):
+                                            try:
+                                                keys = list(dict.fromkeys(list(history.columns) + ["_runtime", "_timestamp", "_step"]))
+                                                history_with_internal = run.history(samples=500, keys=keys)
+                                                if not history_with_internal.empty:
+                                                    history = history_with_internal
+                                            except Exception:
+                                                pass
                                         if not history.empty:
                                             runs_history[run.name] = history
                                             # 收集该 run 中的所有指标列
@@ -507,7 +517,7 @@ def show():
                                         st.warning(f"无法获取运行 {run.name} 的历史：{e}")
                                 
                                 # 移除非 metric 的列 (Step, Epoch 等)
-                                metric_cols = [col for col in all_metrics if col not in ['Step', '_step', 'epoch', '_timestamp']]
+                                metric_cols = [col for col in all_metrics if col not in ['Step', '_step', 'epoch', '_timestamp', '_runtime']]
                                 
                                 if metric_cols and runs_history:
                                     # 为每个 metric 创建一张图
@@ -523,30 +533,37 @@ def show():
                                         with metric_cols_layout[col_idx]:
                                             st.write(f"**{metric}**")
                                             
-                                            # 收集该 metric 的所有 runs 数据
-                                            metric_chart_data = {}
                                             has_data = False
-                                            
+
+                                            # 准备数据：将多条线的数据转换为 long format
+                                            chart_data_list = []
                                             for run_name, history in runs_history.items():
-                                                if metric in history.columns:
-                                                    # 提取该 run 该 metric 的数据
-                                                    metric_data = history[[metric]].dropna()
-                                                    if not metric_data.empty:
-                                                        metric_chart_data[run_name] = metric_data[metric].values
-                                                        has_data = True
-                                            
-                                            if has_data:
-                                                # 创建多条线的图表
-                                                # 准备数据：将多条线的数据转换为 long format
-                                                chart_data_list = []
-                                                for run_name, values in metric_chart_data.items():
-                                                    for step, value in enumerate(values):
+                                                if metric not in history.columns:
+                                                    continue
+                                                if "_step" in history.columns:
+                                                    metric_df = history[["_step", metric]].dropna()
+                                                    if metric_df.empty:
+                                                        continue
+                                                    for _, row in metric_df.iterrows():
+                                                        chart_data_list.append({
+                                                            'Step': float(row["_step"]),
+                                                            'Value': row[metric],
+                                                            'Run': run_name
+                                                        })
+                                                    has_data = True
+                                                else:
+                                                    metric_series = history[metric].dropna()
+                                                    if metric_series.empty:
+                                                        continue
+                                                    for step, value in enumerate(metric_series.values):
                                                         chart_data_list.append({
                                                             'Step': step,
                                                             'Value': value,
                                                             'Run': run_name
                                                         })
-                                                
+                                                    has_data = True
+
+                                            if has_data:
                                                 if chart_data_list:
                                                     chart_df = pd.DataFrame(chart_data_list)
                                                     
@@ -563,13 +580,13 @@ def show():
                                                     
                                                     st.altair_chart(chart, use_container_width=True)
                                             else:
-                                                # st.info(f"该指标暂无数据：{metric}")
+                                                st.info(f"该指标暂无数据：{metric}")
                                                 pass
                                 else:
-                                    # st.info("这些运行中没有可用的训练历史。")
+                                    st.info("这些运行中没有可用的训练历史。")
                                     pass
                             else:
-                                # st.info("该项目下尚无运行记录。")
+                                st.info("该项目下尚无运行记录。")
                                 pass
                         
                         # --- Tab 2: 网页嵌入视图 (Iframe) ---

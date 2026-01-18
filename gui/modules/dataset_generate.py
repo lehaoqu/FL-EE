@@ -169,20 +169,21 @@ def show():
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "searchr1")
         if conda_env != "searchr1":
-            st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
+            # st.info(f"🐍 使用全局 Conda 环境：**{conda_env}**")
+            pass
         else:
             st.caption("💡 可在“设置”页统一配置 Conda 环境")
         
         if st.button("生成数据集", type="primary", use_container_width=True):
-            st.info(f"使用 Conda 环境 '{conda_env}' 开始生成数据集…")
+            # st.info(f"使用 Conda 环境 '{conda_env}' 开始生成数据集…")
             
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
             if python_path:
                 # Replace python with the full conda python path
                 direct_cmd = command_preview.replace("python", python_path)
-                st.info(f"Python 解释器：`{python_path}`")
-                st.info(f"执行命令：`{direct_cmd}`")
+                # st.info(f"Python 解释器：`{python_path}`")
+                # st.info(f"执行命令：`{direct_cmd}`")
                 
                 # Create placeholder for real-time output
                 output_placeholder = st.empty()

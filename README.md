@@ -10,6 +10,11 @@ The asynchronous simulation is based on a prior queue.
 
 We also provide simulation of synchronous federated learning like FedAvg.
 
+## Project Structure
+
+- Key directories overview: see `docs/PROJECT_STRUCTURE.md`
+- If you use the Streamlit GUI (`gui/front.py`), you can open the **项目结构** page to browse the key folders interactively.
+
 
 ## Getting Started
 
