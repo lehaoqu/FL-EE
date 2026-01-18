@@ -344,3 +344,193 @@ def kd_loss_func(pred, teacher, T=1.0):
     softmax = nn.Softmax(dim=1)
     _kld = kld_loss(log_softmax(pred/T), softmax(teacher/T)) * T * T
     return _kld
+
+
+def area_under_fitted_curve(y_list, x_list, *, fit: str = 'spline', s: float = 0.0, k: int = 3,
+                            bounds=None) -> float:
+    """计算拟合曲线下的面积（AUC）。
+
+    参数:
+        y_list: 纵坐标列表（长度与 x_list 相同）。
+        x_list: 横坐标列表（长度与 y_list 相同）。
+        fit: 拟合方式，默认 'spline'（三次样条）；也可传 'trapz' 直接对原始点做梯形积分。
+        s: UnivariateSpline 的平滑系数（s=0 表示插值拟合；s>0 会更平滑）。
+        k: 样条阶数（默认 3；需满足 1 <= k <= 5 且点数 > k）。
+        bounds: 积分区间 (xmin, xmax)。为 None 时使用 (min(x), max(x)).
+
+    返回:
+        拟合曲线在指定区间内的面积（float）。
+    """
+    import numpy as np
+
+    x = np.asarray(x_list, dtype=float)
+    y = np.asarray(y_list, dtype=float)
+
+    if x.shape != y.shape:
+        raise ValueError(f"x_list 与 y_list 长度必须一致，得到 {len(x)} vs {len(y)}")
+    if x.size < 2:
+        raise ValueError("至少需要 2 个点来计算面积")
+    if not (np.isfinite(x).all() and np.isfinite(y).all()):
+        raise ValueError("x_list / y_list 里包含 NaN 或 Inf")
+
+    order = np.argsort(x)
+    x = x[order]
+    y = y[order]
+
+    # 去重：UnivariateSpline 需要严格递增的 x
+    unique_x, inverse = np.unique(x, return_inverse=True)
+    if unique_x.size != x.size:
+        y_accum = np.zeros_like(unique_x, dtype=float)
+        counts = np.zeros_like(unique_x, dtype=float)
+        np.add.at(y_accum, inverse, y)
+        np.add.at(counts, inverse, 1.0)
+        x = unique_x
+        y = y_accum / np.maximum(counts, 1.0)
+
+    if bounds is None:
+        a = float(x[0])
+        b = float(x[-1])
+    else:
+        a = float(bounds[0])
+        b = float(bounds[1])
+        if a > b:
+            a, b = b, a
+
+    if fit == 'trapz':
+        mask = (x >= a) & (x <= b)
+        xx = x[mask]
+        yy = y[mask]
+        if xx.size < 2:
+            raise ValueError("bounds 区间内点数不足，无法进行积分")
+        return float(np.trapz(yy, xx)), float(np.trapz(yy, xx)/(b - a))
+
+    if fit != 'spline':
+        raise ValueError("fit 仅支持 'spline' 或 'trapz'")
+
+    # spline 拟合 + 解析积分（失败则回退到 trapz）
+    try:
+        from scipy.interpolate import UnivariateSpline
+
+        kk = int(k)
+        if not (1 <= kk <= 5):
+            raise ValueError("k 需满足 1 <= k <= 5")
+        if x.size <= kk:
+            kk = max(1, min(kk, int(x.size - 1)))
+
+        spl = UnivariateSpline(x, y, k=kk, s=float(s))
+        print(b-a)
+        return float(spl.integral(a, b)), float(spl.integral(a, b)/(b - a))
+    except Exception:
+        grid = np.linspace(a, b, num=max(200, int(x.size * 10)))
+        yy = np.interp(grid, x, y)
+        return float(np.trapz(yy, grid)), float(np.trapz(yy, grid)/(b - a))
+
+
+def fuse_curves_take_max(slim_x, slim_y, *, ref_ratio: float = 1.0, grid: str = 'ref', num=None):
+    """将多条曲线融合为一条“最大值包络”曲线。
+
+    约定:
+        - slim_x / slim_y 为 dict: ratio -> x_list/y_list
+        - bounds 使用 ratio=1.0（默认 ref_ratio）那条曲线的 x 范围
+
+    融合方式:
+        - 以 ref_ratio 曲线的 x 作为默认网格（grid='ref'）
+        - 其它曲线通过线性插值对齐到同一 x 网格
+        - y 取各曲线的逐点最大值
+
+    参数:
+        slim_x: dict[ratio, list[float]]
+        slim_y: dict[ratio, list[float]]
+        ref_ratio: 用于确定 bounds/默认网格的 ratio（通常为 1.0）
+        grid: 'ref' 使用 ref 曲线的 x 点；'linspace' 使用均匀网格
+        num: 当 grid='linspace' 时，网格点数；为 None 时使用 len(ref_x)
+
+    返回:
+        (x_fused, y_fused): 两个 list[float]
+    """
+    import numpy as np
+
+    if not isinstance(slim_x, dict) or not isinstance(slim_y, dict):
+        raise TypeError("slim_x / slim_y 需要是 dict: ratio -> list")
+
+    def _pick_key(dct, target_ratio: float):
+        if target_ratio in dct:
+            return target_ratio
+        if str(target_ratio) in dct:
+            return str(target_ratio)
+        if int(target_ratio) in dct:
+            return int(target_ratio)
+        candidates = []
+        for k in dct.keys():
+            try:
+                candidates.append((abs(float(k) - float(target_ratio)), k))
+            except Exception:
+                continue
+        if not candidates:
+            raise KeyError(f"未找到 ref_ratio={target_ratio} 对应的曲线")
+        candidates.sort(key=lambda t: t[0])
+        return candidates[0][1]
+
+    def _prepare_xy(x_list, y_list):
+        x_arr = np.asarray(x_list, dtype=float)
+        y_arr = np.asarray(y_list, dtype=float)
+        if x_arr.shape != y_arr.shape:
+            raise ValueError("某条曲线的 x/y 长度不一致")
+        if x_arr.size < 2:
+            return None
+        if not (np.isfinite(x_arr).all() and np.isfinite(y_arr).all()):
+            return None
+
+        order = np.argsort(x_arr)
+        x_arr = x_arr[order]
+        y_arr = y_arr[order]
+
+        unique_x, inverse = np.unique(x_arr, return_inverse=True)
+        if unique_x.size != x_arr.size:
+            y_accum = np.zeros_like(unique_x, dtype=float)
+            counts = np.zeros_like(unique_x, dtype=float)
+            np.add.at(y_accum, inverse, y_arr)
+            np.add.at(counts, inverse, 1.0)
+            x_arr = unique_x
+            y_arr = y_accum / np.maximum(counts, 1.0)
+        return x_arr, y_arr
+
+    ref_key = _pick_key(slim_x, ref_ratio)
+    if ref_key not in slim_y:
+        raise KeyError(f"ref_ratio={ref_ratio} 在 slim_y 中不存在")
+
+    ref_xy = _prepare_xy(slim_x[ref_key], slim_y[ref_key])
+    if ref_xy is None:
+        raise ValueError("ref_ratio 曲线点数不足或包含非法值")
+    ref_x, ref_y = ref_xy
+
+    a = float(ref_x[0])
+    b = float(ref_x[-1])
+    if a > b:
+        a, b = b, a
+
+    if grid == 'ref':
+        x_grid = ref_x
+    elif grid == 'linspace':
+        n = int(num) if num is not None else int(ref_x.size)
+        n = max(2, n)
+        x_grid = np.linspace(a, b, num=n)
+    else:
+        raise ValueError("grid 仅支持 'ref' 或 'linspace'")
+
+    ys = []
+    for ratio_key in slim_x.keys():
+        if ratio_key not in slim_y:
+            continue
+        xy = _prepare_xy(slim_x[ratio_key], slim_y[ratio_key])
+        if xy is None:
+            continue
+        x_i, y_i = xy
+        y_interp = np.interp(x_grid, x_i, y_i, left=np.nan, right=np.nan)
+        ys.append(y_interp)
+
+    if not ys:
+        raise ValueError("没有可用的曲线用于融合")
+
+    y_fused = np.nanmax(np.stack(ys, axis=0), axis=0)
+    return x_grid.astype(float).tolist(), y_fused.astype(float).tolist()

@@ -54,6 +54,12 @@ MODEL_CONFIGS = {
         "description": "数据高效的图像 Transformer（Small 版），patch 大小 16",
         "type": "vision"
     },
+    "DeiT-Base": {
+        "model_name": "facebook/deit-base-patch16-224",
+        "model_key": "deit-base",
+        "description": "数据高效的图像 Transformer（Base 版），patch 大小 16",
+        "type": "vision"
+    },
 }
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,7 +91,7 @@ def show():
     
     with col2:
         st.write("**视觉模型**")
-        for key in ["DeiT-Tiny", "DeiT-Small"]:
+        for key in ["DeiT-Tiny", "DeiT-Small", "DeiT-Base"]:
             config = MODEL_CONFIGS[key]
             if st.checkbox(
                 f"{key}",

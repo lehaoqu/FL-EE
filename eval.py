@@ -33,7 +33,7 @@ class Eval():
         self.test_dataset, self.test_dataloader = load_dataset_loader(args=args, file_name='test', shuffle=False)
         self.eval_output_path = f'./{args.suffix}/eval.txt'
         self.eval_output = open(self.eval_output_path, 'w')
-        self.eval_json = f'./{args.suffix}/'
+        self.eval_dir = f'./{args.suffix}/'
         self.img_dir = args.img_dir
 
     def _log(self, message: str):
@@ -63,12 +63,16 @@ class Eval():
         # print('slim', self.model.config.slimmable)
         if self.model.config.slimmable:
             # print('current width ratio:', slimmable_module.CURRENT_WIDTH_RATIO)
-            if os.path.exists(self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'):
+            if os.path.exists(self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'):
                 return
+            else:
+                self.eval_json_path = self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
         else:
             # print('not slimmable')
-            if os.path.exists(self.eval_json+self.model_path+'_eval.json'):
+            if os.path.exists(self.eval_dir+self.model_path+'_eval.json'):
                 return
+            else:
+                self.eval_json_path = self.eval_dir+self.model_path+'_eval.json'
 
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
@@ -150,12 +154,17 @@ class Eval():
             # self._log('{} {} {}'.format(p, exp_flops.item(), acc_test))
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
-        if self.model.config.slimmable:
-            file_path = self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
-        else:
-            file_path = self.eval_json+self.model_path+'_eval.json'
-        with open(file_path, 'w') as f:
-            json.dump({'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
+        # if self.model.config.slimmable:
+        #     self.file_path = self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
+        # else:
+        #     self.file_path = self.eval_json+self.model_path+'_eval.json'
+        with open(self.eval_json_path, 'w') as f:
+            y = acc_test_np
+            x = exp_flops_np
+            from utils.train_utils import area_under_fitted_curve
+            area, acc = area_under_fitted_curve(y, x)
+            self._log(f'Budgeted AUC: {area}, AVG ACC: {acc}')
+            json.dump({'budgeted_acc': acc, 'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
             
     def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)

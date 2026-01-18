@@ -6,7 +6,7 @@ total_num=100
 md=vit
 bs=32
 lr=0.05
-cp=models/facebook/deit-small-patch16-224
+cp=models/facebook/deit-base-patch16-224
 
 # noniids=(1000 1 0.1)
 noniids=(1000)

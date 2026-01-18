@@ -19,6 +19,7 @@ from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from eval import *
+from utils.train_utils import fuse_curves_take_max, area_under_fitted_curve
 
 
 if __name__ == '__main__':
@@ -37,6 +38,8 @@ if __name__ == '__main__':
             full_model = load_model_eval(args, model_path+'.pth', config_path=model_path+'.json')
             slim_ratios = full_model.config.slim_ratios if full_model.config.slimmable else [1.0]
             print(slim_ratios)
+            slim_x_list = {}
+            slim_y_list = {}
             # eval loop for each slim ratio
             for ratio in slim_ratios:
                 # print(f"Evaluating at slim ratio: {ratio}")
@@ -47,3 +50,18 @@ if __name__ == '__main__':
                     eval._log(f'Setting width ratio to {ratio}')
                     set_width_ratio(ratio, full_model)
                     eval.eval(model_path+'.pth', model_path+'.json', model=full_model)
+
+                    eval_path = eval.eval_json_path
+                    dct = json.loads(open(eval_path, 'r').read())
+                    x = dct['flops']
+                    y = dct['test']
+                    slim_x_list[ratio] = x
+                    slim_y_list[ratio] = y
+            
+            fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
+            area, acc = area_under_fitted_curve(fy, fx)
+            print(f"AUC: {area}, Budgeted Acc: {acc}")
+            ratio_1_eval_path = eval.eval_dir+eval.model_path+f'_slim_1.0_eval.json'
+            ratio_1_dct = json.loads(open(ratio_1_eval_path, 'r').read())
+            json.dumps({'budgeted_acc': acc, **{k: v for k, v in ratio_1_dct.items()}}, open(ratio_1_eval_path, 'w'))
+            

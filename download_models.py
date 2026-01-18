@@ -24,6 +24,7 @@ MODELS = {
     "Vision Models": {
         "deit-tiny": "facebook/deit-tiny-patch16-224",
         "deit-small": "facebook/deit-small-patch16-224",
+        "deit-base": "facebook/deit-base-patch16-224",
     }
 }
 
@@ -103,7 +104,7 @@ def main():
     parser.add_argument(
         '--models',
         nargs='+',
-        choices=['bert-12-128', 'bert-12-256', 'deit-tiny', 'deit-small', 'all'],
+        choices=['bert-12-128', 'bert-12-256', 'deit-tiny', 'deit-small', 'deit-base', 'all'],
         default=['all'],
         help='Models to download (default: all)'
     )

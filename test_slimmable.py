@@ -7,6 +7,7 @@ from utils.modelload.modelloader import load_model
 from utils.modelload.slimmable import set_width_ratio, convert_to_slimmable, custom_ops_dict, set_model_config
 import numpy as np
 import random
+import json
 
 from thop import profile
 
@@ -280,6 +281,39 @@ class Test:
         #         from utils.train_utils import get_flops
         #         flops[(depth, ratio)] = get_flops(model, stop_exit=depth)
         # print(flops)
+    
+    def test_area(self):
+        origin_eval_path = '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_eval.json'
+        dct = json.loads(open(origin_eval_path, 'r').read())
+        x = dct['flops']
+        y = dct['test']
+        from utils.train_utils import area_under_fitted_curve
+        area, acc = area_under_fitted_curve(y, x)
+        print(f"area: {area}, acc: {acc}")
+    
+    def test_slim_area(self):
+        ratio_paths = {
+            1.0: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9]_slim_1.0_eval.json',
+            0.95: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9]_slim_0.9_eval.json',
+        }
+
+        # ratio_paths = {
+        #     1.0: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.95-0.9]_slim_1.0_eval.json',
+        #     0.95: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.95-0.9]_slim_0.95_eval.json',
+        #     0.9: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.95-0.9]_slim_0.9_eval.json',
+        # }
+        slim_x_list = {}
+        slim_y_list = {}
+        for ratio, path in ratio_paths.items():
+            dct = json.loads(open(path, 'r').read())
+            slim_x_list[ratio] = dct['flops']
+            slim_y_list[ratio] = dct['test']
+
+        from utils.train_utils import fuse_curves_take_max, area_under_fitted_curve
+        fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
+        area, acc = area_under_fitted_curve(fy, fx)
+        print(f"slimmable area: {area}, acc: {acc}")
+
 
 t = Test()
 # t.test_slimmable_conv2d()
@@ -287,4 +321,7 @@ t = Test()
 # t.test_slimmable_layernorm()
 # t.test_slimmable_vit()
 # t.test_slimmable_load()
-t.test_slimmbale_flops()
+# t.test_slimmbale_flops()
+
+t.test_area()
+t.test_slim_area()
