@@ -42,6 +42,7 @@ class Client(BaseClient):
                     slim_ratios = getattr(self.args, 'slim_ratios', [1.0])
                     if 1.0 not in slim_ratios:
                         slim_ratios = list(slim_ratios) + [1.0]
+                    ce_slim_ratios = slim_ratios if self.args.slim_ce else [1.0]
 
                     ce_loss = torch.zeros(1).to(self.device)
                     depth_kd_loss = torch.zeros(1).to(self.device)
@@ -54,7 +55,7 @@ class Client(BaseClient):
                             self.policy.train_meta(self.model, batch, label, self.optim)
 
                         exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
-                        ce_loss += sum(exits_ce_loss) / len(slim_ratios)
+                        ce_loss += sum(exits_ce_loss) / len(ce_slim_ratios) if slim_ratio in ce_slim_ratios else 0.0
                         ratio_exits_logits[slim_ratio] = exits_logits
 
                         # Original DepthFL KD across exits (within the same width)
@@ -73,18 +74,19 @@ class Client(BaseClient):
                     # Slimmable KD across widths: distill smaller widths from width=1.0 at each exit
                     t_exits_logits = ratio_exits_logits.get(1.0)
                     slim_kd_loss = torch.zeros(1).to(self.device)
-                    denom = max(1, (len(slim_ratios) - 1))
-                    if t_exits_logits is not None:
-                        for slim_ratio in slim_ratios:
-                            if slim_ratio == 1.0:
-                                continue
-                            for exit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
-                                teacher_logits = t_exits_logits[exit_idx].detach()
-                                slim_kd_loss += kd_loss_func(
-                                    student_logits,
-                                    teacher_logits,
-                                    T=getattr(self.args, 'T_slim', 1.0),
-                                ) / denom
+                    if self.args.slim_kd:
+                        denom = max(1, (len(slim_ratios) - 1))
+                        if t_exits_logits is not None:
+                            for slim_ratio in slim_ratios:
+                                if slim_ratio == 1.0:
+                                    continue
+                                for exit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
+                                    teacher_logits = t_exits_logits[exit_idx].detach()
+                                    slim_kd_loss += kd_loss_func(
+                                        student_logits,
+                                        teacher_logits,
+                                        T=getattr(self.args, 'T_slim', 1.0),
+                                    ) / denom
 
                     loss = ce_loss + depth_kd_loss + slim_kd_loss
                     loss.backward()

@@ -115,6 +115,7 @@ class Client(BaseClient):
                     ce_loss = torch.zeros(1).to(self.device)
                     ratio_exits_logits = {}
 
+                    ce_slim_ratios = self.args.slim_ratios if self.args.slim_ce else [1.0]
                     for slim_ratio in self.args.slim_ratios:
                         set_width_ratio(slim_ratio, self.model)
 
@@ -122,17 +123,18 @@ class Client(BaseClient):
                             self.policy.train_meta(self.model, batch, label, self.optim)
 
                         exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
-                        ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
+                        ce_loss += sum(exits_ce_loss) / len(ce_slim_ratios) if slim_ratio in ce_slim_ratios else 0.0
                         ratio_exits_logits[slim_ratio] = exits_logits
 
                     t_exits_logits = ratio_exits_logits[1.0]
                     kd_loss = torch.zeros(1).to(self.device)
-                    for slim_ratio in self.args.slim_ratios:
-                        if slim_ratio == 1.0:
-                            continue
-                        for logit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
-                            teacher_logits = t_exits_logits[logit_idx].detach()
-                            kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios) - 1)
+                    if self.args.slim_kd:
+                        for slim_ratio in self.args.slim_ratios:
+                            if slim_ratio == 1.0:
+                                continue
+                            for logit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
+                                teacher_logits = t_exits_logits[logit_idx].detach()
+                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios) - 1)
 
                     if epoch == self.epoch-1:
                         for index in range(label.shape[0]):

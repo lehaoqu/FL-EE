@@ -13,6 +13,7 @@ from dataset.svhn_dataset import SVHNClassificationDataset
 from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from utils.dataprocess import DataProcessor
+from utils.modelload.slimmable import set_width_ratio
 from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors, kd_loss_func
 
 from utils.modelload.model import BaseModule
@@ -130,27 +131,26 @@ class BaseClient:
                     ce_loss = torch.zeros(1).to(self.device)
                     ratio_exits_logits = {}
                     ratio_exits_ce_loss = {}
+                    
+                    ce_slim_ratios = self.args.slim_ratios if self.args.slim_ce else [1.0]
                     for slim_ratio in self.args.slim_ratios:
-                        # print(f'Client {self.id} Slim {slim_ratio} Training...')
-                        from utils.modelload.slimmable import set_width_ratio
                         set_width_ratio(slim_ratio, self.model)
                         if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                             self.policy.train_meta(self.model, batch, label, self.optim)
 
                         exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
-                        ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
-                        ratio_exits_ce_loss[slim_ratio] = exits_ce_loss
+                        ce_loss += sum(exits_ce_loss) / len(ce_slim_ratios) if slim_ratio in ce_slim_ratios else 0.0
                         ratio_exits_logits[slim_ratio] = exits_logits
-                        # print(f'Client {self.id} Slim {slim_ratio} is ok')
 
                     t_exits_logits = ratio_exits_logits[1.0]
                     kd_loss = torch.zeros(1).to(self.device)
-                    for slim_ratio in self.args.slim_ratios:
-                        if slim_ratio == 1.0:
-                            continue
-                        for idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
-                            teacher_logits = t_exits_logits[idx].detach()
-                            kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios)-1)
+                    if self.args.slim_kd:
+                        for slim_ratio in self.args.slim_ratios:
+                            if slim_ratio == 1.0:
+                                continue
+                            for idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
+                                teacher_logits = t_exits_logits[idx].detach()
+                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios)-1)
 
                     loss = ce_loss + kd_loss
                     loss.backward()

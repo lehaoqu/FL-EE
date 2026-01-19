@@ -43,7 +43,7 @@ def _get_conda_python_path(env_name):
 
 
 def _scan_exps_suffixes():
-    """Recursively scan fron t directory for available result suffixes"""
+    """Recursively scan a results root directory for available experiment suffixes."""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     exps_dir = os.path.join(project_root, "front-exps")
     
@@ -71,6 +71,49 @@ def _project_root() -> str:
 
 def _front_exps_dir() -> str:
     return os.path.join(_project_root(), "front-exps")
+
+
+def _resolve_results_root(results_root: str) -> Tuple[str, str]:
+    """Resolve results root directory.
+
+    Returns:
+        (abs_path, rel_path_from_project_root)
+
+    Notes:
+        - If results_root is absolute, it must be under project root so downstream
+          eval scripts (cwd=project root) can use a relative --suffix.
+    """
+    project_root = _project_root()
+    results_root = (results_root or "").strip()
+    if not results_root:
+        results_root = "front-exps"
+
+    if os.path.isabs(results_root):
+        abs_path = os.path.normpath(results_root)
+        project_root_norm = os.path.normpath(project_root)
+        if os.path.commonpath([abs_path, project_root_norm]) != project_root_norm:
+            raise ValueError("结果根目录必须位于项目目录下（或使用相对路径）")
+        rel_path = os.path.relpath(abs_path, project_root_norm)
+        return abs_path, rel_path
+
+    rel_path = results_root.strip("/\\")
+    abs_path = os.path.join(project_root, rel_path)
+    return abs_path, rel_path
+
+
+def _scan_exps_suffixes_under(results_root_abs: str) -> List[str]:
+    """Recursively scan results_root_abs for subdirectories containing model .pth files."""
+    suffixes: List[str] = []
+    if not os.path.exists(results_root_abs):
+        return suffixes
+
+    for root, _dirs, files in os.walk(results_root_abs):
+        rel_path = os.path.relpath(root, results_root_abs)
+        if rel_path != '.':
+            has_models = any(f.endswith('.pth') for f in files)
+            if has_models:
+                suffixes.append(rel_path)
+    return sorted(suffixes)
 
 
 def _infer_ft_from_rel_dir(rel_dir: str) -> str:
@@ -123,7 +166,7 @@ def _is_eval_target_pth(filename: str) -> bool:
 
 
 def _scan_eval_complete_items() -> List[EvalRunItem]:
-    """Recursively collect all *_eval.json under front-exps (no all-pth requirement)."""
+    """Recursively collect all *_eval.json under a results root (default: front-exps)."""
     exps_dir = _front_exps_dir()
     if not os.path.exists(exps_dir):
         return []
@@ -211,7 +254,7 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         style = (getattr(db, "STYLE", {}) if db else {}).get(item.policy, "-")
         name = (getattr(db, "NAMES", {}) if db else {}).get(item.policy, item.policy)
         extra = f", {item.slim}" if item.slim else ""
-        label = f"{name} ({item.dataset}, {item.mode}, {item.ft}{extra})".strip()
+        label = f"{name} ({item.dataset}, {item.mode}, {item.ft}{extra}|{item.rel_dir.split('/')[0]})".strip()
 
         ax.plot(
             x,
@@ -257,39 +300,74 @@ def _fig_to_bytes(fig, fmt: str, dpi: int = 300) -> bytes:
 def show():
     """显示 Evaluate 页面"""
     st.header("评估")
-    st.write("对 front-exps 目录下已训练模型运行评估")
+    st.write("对指定结果目录下已训练模型运行评估")
+
+    project_root = _project_root()
+
+    def _with_results_prefix(path: str, results_root_rel: str) -> str:
+        """Ensure suffix is under results_root_rel for downstream eval script."""
+        results_root_rel = (results_root_rel or "").strip("/\\")
+        path = (path or "").strip("/\\")
+        if not results_root_rel:
+            return path
+        prefix = results_root_rel + os.sep
+        if path == results_root_rel or path.startswith(prefix):
+            return path
+        return os.path.join(results_root_rel, path)
     
-    def _with_front_prefix(path: str) -> str:
-        """Ensure suffix is under front-exps for downstream eval script."""
-        return path if path.startswith("front-exps/") else f"front-exps/{path}"
+    # Persist chosen results root in session so plotting can reuse it.
+    st.session_state.setdefault("results_root", "front-exps")
     
     # --- Configuration ---
     with st.expander("评估配置", expanded=True):
+        st.subheader("结果目录")
+        st.caption("可选择或手动输入结果根目录（相对项目根目录，默认 front-exps）。")
+
+        preset_root = st.selectbox(
+            "结果根目录（快捷选择）",
+            options=["front-exps", "EXPS", "EXPS2", "自定义"],
+            index=0,
+            help="选择结果目录根路径；也可以选“自定义”后手动输入。",
+        )
+        results_root_input = st.text_input(
+            "结果根目录（可手动输入）",
+            value=st.session_state.get("results_root", "front-exps"),
+            help="示例：front-exps 或 exps 或 EXPS；也可填绝对路径（必须在项目目录内）。",
+        )
+        if preset_root != "自定义":
+            results_root_input = preset_root
+
+        try:
+            results_root_abs, results_root_rel = _resolve_results_root(results_root_input)
+        except Exception as e:
+            st.error(f"结果目录无效：{e}")
+            return
+        st.session_state["results_root"] = results_root_rel
+
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("模型与数据设置")
             
             # Scan available suffixes
-            available_suffixes = _scan_exps_suffixes()
+            available_suffixes = _scan_exps_suffixes_under(results_root_abs)
             
             if available_suffixes:
-                st.caption(f"📁 在 front-exps 中发现 {len(available_suffixes)} 个已训练实验")
+                st.caption(f"📁 在 {results_root_rel} 中发现 {len(available_suffixes)} 个已训练实验")
                 suffix = st.selectbox(
                     "实验后缀",
                     available_suffixes,
-                    help="从 front-exps 目录自动检测"
+                    help="从结果根目录自动检测（相对该目录的子路径）"
                 )
             else:
-                st.warning("⚠️ 在 front-exps/ 中未发现已训练模型。")
+                st.warning(f"⚠️ 在 {results_root_rel}/ 中未发现已训练模型。")
                 suffix = st.text_input(
                     "实验后缀（手动输入）",
-                    value="front-exps/test/cifar100/vit_base",
-                    help="手动指定实验后缀（应以 front-exps/ 开头）"
+                    value="test/cifar100/vit_base",
+                    help="手动指定实验后缀（相对结果根目录的子路径，例如 test/cifar100/vit_base）"
                 )
             
             # Scan available datasets from dataset directory
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             dataset_dir = os.path.join(project_root, "dataset")
             available_datasets = []
             
@@ -338,7 +416,7 @@ def show():
         
         st.divider()
         st.write("**生成的命令：**")
-        suffix_prefixed = _with_front_prefix(suffix)
+        suffix_prefixed = _with_results_prefix(suffix, results_root_rel)
         cmd = (
             f"python -u eval.py {algorithm} {boosted} --suffix {suffix_prefixed} --device {device} "
             f"--dataset {dataset} --model {model} --valid_ratio {valid_ratio} --if_mode {if_mode} --ft {fine_tuning}"
@@ -356,7 +434,7 @@ def show():
         
         if st.button("运行评估", type="primary", use_container_width=True):
             st.info(f"使用 Conda 环境 '{conda_env}' 开始执行评估…")
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            project_root = _project_root()
             
             # Get direct python path from conda environment
             python_path = _get_conda_python_path(conda_env)
@@ -481,10 +559,58 @@ def show():
     with st.expander("绘制不同预算的准确率曲线图", expanded=True):
         st.write("选择任意可用的 *_eval.json（数据集 + 模型 + 策略 + 微调）并绘制预算曲线。")
 
-        eval_items = _scan_eval_complete_items()
+        # Use chosen results root for plotting as well.
+        try:
+            results_root_abs, results_root_rel = _resolve_results_root(st.session_state.get("results_root", "front-exps"))
+        except Exception:
+            results_root_abs, results_root_rel = _resolve_results_root("front-exps")
+
+        eval_items = []
+        if os.path.exists(results_root_abs):
+            # Inline scan to avoid changing EvalRunItem schema.
+            for root, _dirs, files in os.walk(results_root_abs):
+                rel_dir = os.path.relpath(root, results_root_abs)
+                ft = _infer_ft_from_rel_dir(rel_dir)
+                for fname in files:
+                    if not fname.endswith("_eval.json"):
+                        continue
+                    stem = fname[:-10]
+                    policy, dataset, model, mode = _parse_stem(stem)
+                    slim = ""
+                    if "slim" in stem:
+                        slim = stem.split("slim", 1)[1].strip("_")
+
+                    label_parts = [rel_dir, policy]
+                    if slim:
+                        label_parts.append(f"slim:{slim}")
+                    label = " | ".join(p for p in label_parts if p)
+
+                    eval_items.append(
+                        EvalRunItem(
+                            label=label,
+                            eval_json_path=os.path.join(root, fname),
+                            rel_dir=rel_dir,
+                            policy=policy,
+                            dataset=dataset,
+                            model=model,
+                            ft=ft,
+                            mode=mode,
+                            slim=slim,
+                        )
+                    )
+
+            seen = set()
+            uniq_items = []
+            for it in sorted(eval_items, key=lambda x: x.label):
+                key = (it.label, it.eval_json_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                uniq_items.append(it)
+            eval_items = uniq_items
         if not eval_items:
-            st.warning("⚠️ 未在 front-exps/ 下找到任何 *_eval.json 文件。")
-            st.caption("扫描 front-exps/ 下的所有子目录，自动收集 *_eval.json（无需整目录齐全）。")
+            st.warning(f"⚠️ 未在 {results_root_rel}/ 下找到任何 *_eval.json 文件。")
+            st.caption("扫描结果根目录下的所有子目录，自动收集 *_eval.json（无需整目录齐全）。")
             return
 
         label_to_item: Dict[str, EvalRunItem] = {it.label: it for it in eval_items}
@@ -492,7 +618,7 @@ def show():
             "已发现的评估结果",
             options=list(label_to_item.keys()),
             default=[],
-            help="从 front-exps/ 递归收集到的 *_eval.json 中选择要绘制的曲线。",
+            help="从结果根目录递归收集到的 *_eval.json 中选择要绘制的曲线。",
         )
         selected_items = [label_to_item[lbl] for lbl in selected_labels]
 

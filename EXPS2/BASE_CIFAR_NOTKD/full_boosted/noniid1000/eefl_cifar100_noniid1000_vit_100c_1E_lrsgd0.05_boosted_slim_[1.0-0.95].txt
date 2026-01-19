@@ -1,0 +1,96 @@
+alg: eefl
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2/BASE_CIFAR_NOTKD/full_boosted/noniid1000
+device: 3
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [1.0, 0.95]
+slim_ce: True
+slim_kd: False
+T: 3
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[1.0-0.95]
+output: <_io.TextIOWrapper name='./EXPS2/BASE_CIFAR_NOTKD/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.95].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 5.49, exits:['0.96', '1.37', '5.23', '14.40'] loss: 13.19
+  slim[1.0]: exits:['0.96', '1.37', '5.23', '14.40']
+  slim[0.95]: exits:['0.96', '1.18', '1.97', '6.49']
+alg: eefl
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2/BASE_CIFAR_NOTKD/full_boosted/noniid1000
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [1.0, 0.95]
+slim_ce: True
+slim_kd: False
+T: 3
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[1.0-0.95]
+output: <_io.TextIOWrapper name='./EXPS2/BASE_CIFAR_NOTKD/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.95].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 5.49, exits:['0.96', '1.37', '5.23', '14.40'] loss: 13.19
+  slim[1.0]: exits:['0.96', '1.37', '5.23', '14.40']
+  slim[0.95]: exits:['0.96', '1.18', '1.97', '6.49']
+========== Round 10 ==========
+server, accuracy: 36.08, exits:['15.39', '32.16', '45.82', '50.93'] loss: 8.52
+  slim[1.0]: exits:['15.39', '32.16', '45.82', '50.93']
+  slim[0.95]: exits:['14.24', '29.11', '40.49', '43.23']
+========== Round 20 ==========
+server, accuracy: 45.92, exits:['24.80', '43.74', '56.20', '58.93'] loss: 6.70
+  slim[1.0]: exits:['24.80', '43.74', '56.20', '58.93']
+  slim[0.95]: exits:['23.21', '40.92', '51.00', '52.43']
+========== Round 10 ==========
+server, accuracy: 36.08, exits:['15.39', '32.16', '45.82', '50.93'] loss: 8.52
+  slim[1.0]: exits:['15.39', '32.16', '45.82', '50.93']
+  slim[0.95]: exits:['14.24', '29.11', '40.49', '43.23']

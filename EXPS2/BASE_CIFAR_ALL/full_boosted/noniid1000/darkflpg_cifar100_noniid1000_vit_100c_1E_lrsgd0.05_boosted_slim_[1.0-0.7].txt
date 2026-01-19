@@ -1,0 +1,110 @@
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [1.0, 0.7]
+slim_ce: True
+slim_kd: True
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[1.0-0.7]
+output: <_io.TextIOWrapper name='./EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.7].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 5.08, exits:['1.07', '1.03', '4.14', '14.10'] loss: 13.22
+  slim[1.0]: exits:['1.07', '1.03', '4.14', '14.10']
+  slim[0.7]: exits:['1.57', '1.03', '1.93', '1.19']
+========== Round 10 ==========
+server, accuracy: 30.87, exits:['11.11', '23.37', '40.99', '48.00'] loss: 9.23
+  slim[1.0]: exits:['11.11', '23.37', '40.99', '48.00']
+  slim[0.7]: exits:['8.58', '9.67', '11.00', '10.80']
+========== Round 20 ==========
+server, accuracy: 38.55, exits:['18.98', '35.86', '48.11', '51.25'] loss: 7.90
+  slim[1.0]: exits:['18.98', '35.86', '48.11', '51.25']
+  slim[0.7]: exits:['15.04', '20.55', '23.92', '22.92']
+========== Round 30 ==========
+server, accuracy: 45.15, exits:['25.29', '43.29', '53.96', '58.07'] loss: 7.00
+  slim[1.0]: exits:['25.29', '43.29', '53.96', '58.07']
+  slim[0.7]: exits:['21.81', '31.10', '34.03', '32.96']
+========== Round 40 ==========
+server, accuracy: 48.99, exits:['29.34', '48.34', '58.35', '59.94'] loss: 5.57
+  slim[1.0]: exits:['29.34', '48.34', '58.35', '59.94']
+  slim[0.7]: exits:['24.73', '38.00', '41.47', '39.40']
+========== Round 50 ==========
+server, accuracy: 50.68, exits:['33.29', '50.91', '58.86', '59.67'] loss: 5.62
+  slim[1.0]: exits:['33.29', '50.91', '58.86', '59.67']
+  slim[0.7]: exits:['29.13', '42.52', '45.42', '42.84']
+========== Round 60 ==========
+server, accuracy: 54.24, exits:['36.22', '54.51', '62.63', '63.61'] loss: 5.49
+  slim[1.0]: exits:['36.22', '54.51', '62.63', '63.61']
+  slim[0.7]: exits:['32.16', '46.38', '50.24', '49.58']
+========== Round 70 ==========
+server, accuracy: 55.12, exits:['37.87', '55.88', '63.20', '63.54'] loss: 4.68
+  slim[1.0]: exits:['37.87', '55.88', '63.20', '63.54']
+  slim[0.7]: exits:['34.46', '48.60', '51.62', '50.30']
+========== Round 80 ==========
+server, accuracy: 56.21, exits:['39.37', '56.85', '64.18', '64.46'] loss: 4.21
+  slim[1.0]: exits:['39.37', '56.85', '64.18', '64.46']
+  slim[0.7]: exits:['36.72', '50.59', '54.79', '52.83']
+========== Round 90 ==========
+server, accuracy: 58.02, exits:['41.23', '59.00', '65.96', '65.89'] loss: 4.53
+  slim[1.0]: exits:['41.23', '59.00', '65.96', '65.89']
+  slim[0.7]: exits:['38.16', '53.16', '57.05', '55.97']

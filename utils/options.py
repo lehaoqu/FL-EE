@@ -52,6 +52,8 @@ def args_parser():
     # ===== Slimmable Setting =====
     parser.add_argument('--slimmable', action='store_true', help='whether use slimmable model')
     parser.add_argument('--slim_ratios', type=float, nargs='+', default=[1.0, 0.75, 0.5, 0.25], help='the width ratios for slimmable model')
+    parser.add_argument('--slim_ce', action='store_true', help='whether use ce loss for slimmable model')
+    parser.add_argument('--slim_kd', action='store_true', help='whether use kd loss for slimmable model')
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]

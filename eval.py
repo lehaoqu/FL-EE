@@ -7,6 +7,8 @@ from PIL import Image
 import numpy as np
 import argparse
 import json
+import tempfile
+import random
 
 from tqdm import tqdm
 from transformers import BertTokenizer
@@ -36,13 +38,29 @@ class Eval():
         self.eval_dir = f'./{args.suffix}/'
         self.img_dir = args.img_dir
 
+
     def _log(self, message: str):
         """Write to eval file and echo to terminal."""
         msg = message if message.endswith('\n') else message + '\n'
         self.eval_output.write(msg)
         self.eval_output.flush()
         print(message, flush=True)
-  
+
+
+    def _atomic_json_dump(self, path: str, data) -> None:
+        """Atomically write JSON to avoid empty/corrupt files on interruption."""
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(prefix=".tmp_", suffix=".json", dir=os.path.dirname(path))
+        try:
+            with os.fdopen(tmp_fd, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp_path, path)
+        finally:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
         
         
     def eval(self, model_path, config_path, model=None):
@@ -63,16 +81,28 @@ class Eval():
         # print('slim', self.model.config.slimmable)
         if self.model.config.slimmable:
             # print('current width ratio:', slimmable_module.CURRENT_WIDTH_RATIO)
-            if os.path.exists(self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'):
-                return
-            else:
-                self.eval_json_path = self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
+            self.eval_json_path = self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
         else:
-            # print('not slimmable')
-            if os.path.exists(self.eval_dir+self.model_path+'_eval.json'):
-                return
+            self.eval_json_path = self.eval_dir+self.model_path+'_eval.json'
+
+        if os.path.exists(self.eval_json_path):
+            try:
+                with open(self.eval_json_path, 'r') as f:
+                    raw = f.read().strip()
+                if not raw:
+                    raise ValueError("empty eval json")
+                dct = json.loads(raw)
+            except Exception as e:
+                self._log(f"[WARN] Skip broken eval json: {self.eval_json_path} ({e}); will re-evaluate.")
             else:
-                self.eval_json_path = self.eval_dir+self.model_path+'_eval.json'
+                if 'budgeted_acc' not in dct:
+                    x = dct.get('flops', [])
+                    y = dct.get('test', [])
+                    from utils.train_utils import area_under_fitted_curve
+                    _area, acc = area_under_fitted_curve(y, x)
+                    dct['budgeted_acc'] = acc
+                    self._atomic_json_dump(self.eval_json_path, dct)
+                return
 
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
@@ -146,11 +176,11 @@ class Eval():
             acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
             acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
             acc_test_list += (str(acc_test)+'\n')
-            exp_flops_list += (str(exp_flops.cpu().item())+'\n')
-            acc_test_np.append(acc_test)
-            acc_val_np.append(acc_val)
-            exp_flops_np.append(exp_flops.cpu().item())
-            self._log('p: {:d}, valid acc: {:.3f}, test acc: {:.3f}, test flops: {:.2f}'.format(p, acc_val, acc_test, exp_flops))
+            exp_flops_list += (str(exp_flops)+'\n')
+            acc_test_np.append(float(acc_test))
+            # acc_val_np.append(acc_val)
+            exp_flops_np.append(float(exp_flops))
+            self._log('p: {:d}, test acc: {:.3f}, test flops: {:.2f}'.format(p, float(acc_test), float(exp_flops)))
             # self._log('{} {} {}'.format(p, exp_flops.item(), acc_test))
         # self.eval_output.write(acc_test_list)
         # self.eval_output.write(exp_flops_list)
@@ -158,13 +188,12 @@ class Eval():
         #     self.file_path = self.eval_json+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
         # else:
         #     self.file_path = self.eval_json+self.model_path+'_eval.json'
-        with open(self.eval_json_path, 'w') as f:
-            y = acc_test_np
-            x = exp_flops_np
-            from utils.train_utils import area_under_fitted_curve
-            area, acc = area_under_fitted_curve(y, x)
-            self._log(f'Budgeted AUC: {area}, AVG ACC: {acc}')
-            json.dump({'budgeted_acc': acc, 'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np}, f)
+        y = acc_test_np
+        x = exp_flops_np
+        from utils.train_utils import area_under_fitted_curve
+        area, acc = area_under_fitted_curve(y, x)
+        self._log(f'Budgeted AUC: {area}, AVG ACC: {acc}')
+        self._atomic_json_dump(self.eval_json_path, {'budgeted_acc': acc, 'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np})
             
     def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)
@@ -327,71 +356,78 @@ class Tester(object):
             n: Samples
             c: Classes
         """
-        n_exits, n_sample, n_class = preds.size()
-        max_preds, argmax_preds = preds.max(dim=2, keepdim=False)
-        _, sorted_idx = max_preds.sort(dim=1, descending=True)
-        filtered = torch.zeros(n_sample)
-        T = torch.tensor([1e8 for _ in range(n_exits)]).to(self.device)
-        
-        for k in range(n_exits - 1):
-            crt, count = 0.0, 0
-            out_n = math.floor(n_sample * p[k])
-            for i in range(n_sample):
-                ori_idx = sorted_idx[k][i]
-                if filtered[ori_idx] == 0:
-                    count += 1
-                    filtered[ori_idx] = 1
-                    if count == out_n:
-                        T[k] = max_preds[k][ori_idx]
-                        break
-        
-        T[n_exits-1] = -1e8
-        
-        # crt_rec 在各个出口的准确率，exp 从各个出口出来的sample数量
-        crt_rec, exp = torch.zeros(n_exits), torch.zeros(n_exits)
-        crt, expected_flops = 0, 0
-        for i in range(n_sample):
-            glod_label = targets[i]
-            for k in range(n_exits):
-                if max_preds[k][i].item() >= T[k]:
-                    if (int(glod_label.item())) == int(argmax_preds[k][i].item()):
-                        crt += 1
-                        crt_rec[k] += 1
-                    exp[k] += 1
-                    break
-        
-        for k in range(n_exits):
-            _t = 1.0 * exp[k] / n_sample
-            expected_flops += _t * flops[k]
+        n_exits, n_sample, _n_class = preds.size()
+        max_preds, _argmax_preds = preds.max(dim=2, keepdim=False)
+        sorted_idx = max_preds.argsort(dim=1, descending=True)
 
-        return crt * 100 / n_sample, expected_flops, T
+        filtered = torch.zeros(n_sample, device=max_preds.device, dtype=torch.bool)
+        T = torch.full((n_exits,), 1e8, device=max_preds.device, dtype=max_preds.dtype)
+
+        # Only loop over exits; selection within each exit is vectorized.
+        for k in range(n_exits - 1):
+            try:
+                pk = float(p[k].item()) if torch.is_tensor(p) else float(p[k])
+            except Exception:
+                pk = float(p[k])
+            out_n = int(math.floor(n_sample * pk))
+            if out_n <= 0:
+                continue
+
+            idx_sorted = sorted_idx[k]  # (n_sample,)
+            unused_mask = ~filtered[idx_sorted]
+            unused_cnt = int(unused_mask.sum().item())
+            if unused_cnt <= 0:
+                continue
+
+            # If out_n >= remaining, mark all remaining as filtered and keep T[k]=1e8
+            # to match the original behavior.
+            if out_n >= unused_cnt:
+                selected = idx_sorted[unused_mask]
+                filtered[selected] = True
+                continue
+
+            selected = idx_sorted[unused_mask][:out_n]
+            filtered[selected] = True
+            T[k] = max_preds[k, selected[-1]]
+
+        T[n_exits - 1] = -1e8
+
+        acc, expected_flops = self.dynamic_eval_with_threshold(preds, targets, flops, T)
+        return acc, expected_flops, T
         
     def dynamic_eval_with_threshold(self, preds, targets, flops, T):
         n_exits, n_sample, _ = preds.size()
         max_preds, argmax_preds = preds.max(dim=2, keepdim=False)
-        
-        # crt_rec 在各个出口的正确个数，exp 从各个出口出来的sample数量
-        crt_rec, exp = torch.zeros(n_exits), torch.zeros(n_exits)
-        crt, expected_flops = 0, 0
-        for i in range(n_sample):
-            glod_label = targets[i]
-            for k in range(n_exits):
-                if max_preds[k][i].item() >= T[k]:
-                    if (int(glod_label.item())) == int(argmax_preds[k][i].item()):
-                        crt += 1
-                        crt_rec[k] += 1
-                    exp[k] += 1
-                    break
-        
-        for k in range(n_exits):
-            _t = 1.0 * exp[k] / n_sample
-            expected_flops += _t * flops[k]
-        
-        return crt * 100 / n_sample, expected_flops
+
+        T = T.to(device=max_preds.device, dtype=max_preds.dtype)
+        # mask[k, i] indicates sample i can exit at k
+        mask = max_preds >= T.view(-1, 1)
+        # Ensure every sample exits somewhere (safety net for extreme logits)
+        mask[-1, :] = True
+
+        exit_idx = mask.to(torch.float32).argmax(dim=0)  # (n_sample,)
+        sample_idx = torch.arange(n_sample, device=max_preds.device)
+
+        pred_label = argmax_preds[exit_idx, sample_idx]
+        correct = pred_label.eq(targets).to(torch.float32)
+
+        exp = torch.bincount(exit_idx, minlength=n_exits).to(torch.float32)
+
+        flops_t = torch.as_tensor(flops, device=max_preds.device, dtype=torch.float32)
+        expected_flops = (exp / float(n_sample) * flops_t).sum()
+
+        acc = correct.mean() * 100.0
+        return float(acc.detach().cpu().item()), float(expected_flops.detach().cpu().item())
         
     
 if __name__ == '__main__':
     args = args_parser()
+    seed = args.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     eval_dir = args.suffix
     args.img_dir = eval_dir + "/img"
     eval = Eval(args=args)
