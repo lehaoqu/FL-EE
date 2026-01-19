@@ -221,13 +221,80 @@ class Test:
             optim_slim.step()
 
 
+    def test_slimmable_vit_reefl(self):
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.config_path = './models/facebook/deit-tiny-patch16-224'
+        args.policy = 'boosted'
+        args.alg = 'reefl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'full'
+        args.slimmable = False
+
+        ratios = [1.0, 0.75, 0.5, 0.25]
+        depth = 12
+
+        dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
+
+        model = load_model(args, model_depth=depth, is_scalefl=False, exits=(2,5,8,11)).to(0)
+        origin_model = copy.deepcopy(model)
+        # print(origin_model)
+        original_exits_logits = model(**dummy)
+        # 转换为slimmable
+        slim_model = convert_to_slimmable(model, ratios=ratios).to(0)
+        
+        # print(slim_model)
+        # for name, para in origin_model.named_parameters():
+        #     print(name, para.shape)
+        # exit(0)
+        # print(model)
+        # 记录原始的 hidden size 和 intermediate size
+        set_model_config(slim_model.config)
+
+        set_width_ratio(1.0, slim_model)
+        slim_exits_logits = slim_model(**dummy)
+
+        for slim_logit, original_logit in zip(slim_exits_logits, original_exits_logits):
+            # print(f"==={slim_logit.shape}==")
+            # print(slim_logit)
+            # print(original_logit)
+            # print(torch.allclose(slim_logit, original_logit, atol=1e-20))
+            assert torch.allclose(slim_logit, original_logit, atol=1e-20), f"slimmable vit output does not match original output at ratio 1.0"
+        print("slimmable vit output matches original output at ratio 1.0")
+
+        # backward test
+        optim_origin = self.adma_optim(origin_model)
+        optim_slim = self.adma_optim(slim_model)
+        for epoch in range(10):
+            optim_origin.zero_grad()
+            optim_slim.zero_grad()
+
+            origin_out = origin_model(**dummy)
+            slim_out = slim_model(**dummy)
+
+            origin_loss = sum([out.sum() for out in origin_out]).sum()
+            origin_loss.backward()
+            
+            slim_loss = sum([out.sum() for out in slim_out]).sum()
+            slim_loss.backward()
+
+            print('loss:', origin_loss.item(), slim_loss.item())
+            assert torch.allclose(origin_loss, slim_loss, atol=1e-6), f"slimmable vit loss does not match original loss at ratio 1.0"
+            print("slimmable vit loss matches original loss at ratio 1.0 in epoch", epoch)
+            optim_origin.step()
+            optim_slim.step()
+
+
     def test_slimmable_load(self):
         class A: pass
         args = A()
         args.model = 'vit'
         args.dataset = 'cifar100'
         args.policy = 'boosted'
-        args.alg = 'depthfl'
+        args.alg = 'reefl'
         args.blocks = (2,5,8,11)
         args.load_path = ''
         args.ft = 'full'
@@ -320,8 +387,10 @@ t = Test()
 # t.test_slimmable_linear()
 # t.test_slimmable_layernorm()
 # t.test_slimmable_vit()
+t.test_slimmable_vit_reefl()
+
 # t.test_slimmable_load()
 # t.test_slimmbale_flops()
 
-t.test_area()
-t.test_slim_area()
+# t.test_area()
+# t.test_slim_area()

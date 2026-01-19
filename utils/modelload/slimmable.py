@@ -4,6 +4,7 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.vit.modeling_vit import ViTSelfAttention, ViTEmbeddings, ViTConfig
+from utils.modelload.model import Ree
 
 # 全局变量控制当前宽度比例，默认为 1.0 (大模型)
 CURRENT_WIDTH_RATIO = 1.0
@@ -275,12 +276,31 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
         embeddings = self.dropout(embeddings)
 
         return embeddings
-
+    
 
     def slimmable_transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         new_x_shape = x.size()[:-1] + (x.size()[-1]//self.attention_head_size, self.attention_head_size)
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
+
+
+    def slimmable_ree_forward(self, features, **kwargs):
+        # features are cls_tokens
+        b, n, _ = features.shape
+        last_cls_token = features[:, -1]
+        
+        client_token = self.client_token.expand(b, -1, -1)
+        client_token = client_token[:, :, :get_aligned_dim(client_token.shape[-1], CURRENT_WIDTH_RATIO)]
+        x = torch.cat((client_token, features), dim=1)
+
+        x += self.pos_embedding[:, :(n + 1), :get_aligned_dim(self.pos_embedding.shape[-1], CURRENT_WIDTH_RATIO)]
+
+        x = self.dropout(x)
+
+        m = self.transformer(x)
+
+        return m
+
 
     # 应用 Monkey Patch
     for module in model.modules():
@@ -291,4 +311,6 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
         if isinstance(module, ViTEmbeddings):
             # 替换 Embeddings 的 forward
             module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
+        if isinstance(module, Ree):
+            module.forward = slimmable_ree_forward.__get__(module, Ree)
     return model
