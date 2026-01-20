@@ -348,7 +348,8 @@ class Test:
         #         from utils.train_utils import get_flops
         #         flops[(depth, ratio)] = get_flops(model, stop_exit=depth)
         # print(flops)
-    
+
+
     def test_area(self):
         origin_eval_path = '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_eval.json'
         dct = json.loads(open(origin_eval_path, 'r').read())
@@ -357,7 +358,8 @@ class Test:
         from utils.train_utils import area_under_fitted_curve
         area, acc = area_under_fitted_curve(y, x)
         print(f"area: {area}, acc: {acc}")
-    
+
+
     def test_slim_area(self):
         ratio_paths = {
             1.0: '/home/qvlehao/FL-EE/front-exps/BASE_CIFAR_R/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9]_slim_1.0_eval.json',
@@ -387,7 +389,7 @@ t = Test()
 # t.test_slimmable_linear()
 # t.test_slimmable_layernorm()
 # t.test_slimmable_vit()
-t.test_slimmable_vit_reefl()
+# t.test_slimmable_vit_reefl()
 
 # t.test_slimmable_load()
 # t.test_slimmbale_flops()

@@ -77,6 +77,12 @@ class Eval():
             self.model = load_model_eval(self.args, model_path, config_path)
         else:
             self.model = model
+        
+        self.args.policy = self.model.config.policy
+        self.n_exits = len(self.model.config.exits)
+        self.args.n_exits = self.n_exits
+        self.model.to(self.device)
+        self.tester = Tester(self.model, self.args)
 
         # print('slim', self.model.config.slimmable)
         if self.model.config.slimmable:
@@ -270,7 +276,7 @@ class Eval():
             
             
 class Tester(object):
-    def __init__(self, model, args):
+    def __init__(self, model, args, *, measure_flops: bool = True):
         self.args = args
         self.device = self.args.device
         self.model = model
@@ -281,28 +287,14 @@ class Tester(object):
         args.policy = self.model.config.policy
         policy_module = importlib.import_module(f'trainer.policy.{args.policy}')
         self.policy = policy_module.Policy(args)
-        # Measure FLOPs for the model (full forward). If `thop` is available,
-        # compute FLOPs and set `self.flops` (same value per exit). Otherwise
-        # fall back to a simple incremental placeholder.
-
-        from thop import profile
-
-        # 定义一个专用的 Module 包装器（放在类内或外均可，这里建议放外面或作为内部类）
-        class _ExitWrapper(nn.Module):
-            def __init__(self, model, dummy_input, stop_exit):
-                super().__init__()
-                self.model = model
-                self.dummy_input = dummy_input
-                self.stop_exit = stop_exit
-
-            def forward(self, _=None):
-                return self.model(**self.dummy_input, stop_exit=self.stop_exit)
-
-        # —————— 你的原有逻辑开始 ——————
-        self.flops = []
-        for exit_idx in range(self.n_exits):
-            exit_flops = get_flops(args, self.model, stop_exit=exit_idx)
-            self.flops.append(exit_flops)
+        # FLOPs measurement can be expensive; allow disabling for analysis.
+        if measure_flops:
+            self.flops = []
+            for exit_idx in range(self.n_exits):
+                exit_flops = get_flops(args, self.model, stop_exit=exit_idx)
+                self.flops.append(exit_flops)
+        else:
+            self.flops = [float(i + 1) for i in range(self.n_exits)]
         # print(self.flops)
         # print('============')
     
@@ -349,7 +341,7 @@ class Tester(object):
         all_sample_targets = torch.cat(all_sample_targets, dim=0)
         return ts_preds, all_sample_targets, all_sample_exits_logits
     
-    def dynamic_eval_find_threshold(self, preds, targets, p, flops):
+    def dynamic_eval_find_threshold(self, preds, targets, p, flops, return_exit_indices: bool = False):
         """
             preds: m * n * c
             m: Stages
@@ -392,10 +384,16 @@ class Tester(object):
 
         T[n_exits - 1] = -1e8
 
+        if return_exit_indices:
+            acc, expected_flops, exit_sample_indices = self.dynamic_eval_with_threshold(
+                preds, targets, flops, T, return_exit_indices=True
+            )
+            return acc, expected_flops, T, exit_sample_indices
+
         acc, expected_flops = self.dynamic_eval_with_threshold(preds, targets, flops, T)
         return acc, expected_flops, T
         
-    def dynamic_eval_with_threshold(self, preds, targets, flops, T):
+    def dynamic_eval_with_threshold(self, preds, targets, flops, T, return_exit_indices: bool = False):
         n_exits, n_sample, _ = preds.size()
         max_preds, argmax_preds = preds.max(dim=2, keepdim=False)
 
@@ -417,7 +415,17 @@ class Tester(object):
         expected_flops = (exp / float(n_sample) * flops_t).sum()
 
         acc = correct.mean() * 100.0
-        return float(acc.detach().cpu().item()), float(expected_flops.detach().cpu().item())
+        acc_f = float(acc.detach().cpu().item())
+        exp_f = float(expected_flops.detach().cpu().item())
+
+        if return_exit_indices:
+            exit_idx_cpu = exit_idx.detach().cpu()
+            exit_sample_indices = [
+                (exit_idx_cpu == k).nonzero(as_tuple=False).view(-1).tolist() for k in range(n_exits)
+            ]
+            return acc_f, exp_f, exit_sample_indices
+
+        return acc_f, exp_f
         
     
 if __name__ == '__main__':

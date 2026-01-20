@@ -418,7 +418,6 @@ def area_under_fitted_curve(y_list, x_list, *, fit: str = 'spline', s: float = 0
             kk = max(1, min(kk, int(x.size - 1)))
 
         spl = UnivariateSpline(x, y, k=kk, s=float(s))
-        print(b-a)
         return float(spl.integral(a, b)), float(spl.integral(a, b)/(b - a))
     except Exception:
         grid = np.linspace(a, b, num=max(200, int(x.size * 10)))
