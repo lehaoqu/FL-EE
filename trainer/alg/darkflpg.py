@@ -128,13 +128,14 @@ class Client(BaseClient):
 
                     t_exits_logits = ratio_exits_logits[1.0]
                     kd_loss = torch.zeros(1).to(self.device)
+                    kd_exits_weights = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else [1.0 for _ in range(self.exits_num)]
                     if self.args.slim_kd:
                         for slim_ratio in self.args.slim_ratios:
                             if slim_ratio == 1.0:
                                 continue
                             for logit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
                                 teacher_logits = t_exits_logits[logit_idx].detach()
-                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) / (len(self.args.slim_ratios) - 1)
+                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) * kd_exits_weights[logit_idx] / (len(self.args.slim_ratios) - 1)
 
                     if epoch == self.epoch-1:
                         for index in range(label.shape[0]):

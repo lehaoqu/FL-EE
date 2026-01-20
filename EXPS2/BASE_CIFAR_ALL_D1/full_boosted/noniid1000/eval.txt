@@ -1,0 +1,91 @@
+==================eval model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9]==================
+Setting width ratio to 1.0
+logits calc compeleted
+Exits FLOPs: [582838272.0, 1107873792.0, 1632909312.0, 2157944832.0]
+p: 1, test acc: 52.060, test flops: 583468288.00
+p: 2, test acc: 52.050, test flops: 583415744.00
+p: 3, test acc: 52.050, test flops: 583573312.00
+p: 4, test acc: 52.090, test flops: 584780864.00
+p: 5, test acc: 52.190, test flops: 585883456.00
+p: 6, test acc: 52.270, test flops: 587616064.00
+p: 7, test acc: 52.340, test flops: 590661248.00
+p: 8, test acc: 52.630, test flops: 597171712.00
+p: 9, test acc: 52.970, test flops: 606674816.00
+p: 10, test acc: 53.460, test flops: 620220800.00
+p: 11, test acc: 54.240, test flops: 638754560.00
+p: 12, test acc: 55.230, test flops: 664113728.00
+p: 13, test acc: 56.260, test flops: 695248384.00
+p: 14, test acc: 57.750, test flops: 745704320.00
+p: 15, test acc: 59.310, test flops: 807343424.00
+p: 16, test acc: 61.130, test flops: 890404032.00
+p: 17, test acc: 63.550, test flops: 994098560.00
+p: 18, test acc: 65.340, test flops: 1107453696.00
+p: 19, test acc: 67.150, test flops: 1239237632.00
+p: 20, test acc: 68.200, test flops: 1376534400.00
+p: 21, test acc: 69.060, test flops: 1502227968.00
+p: 22, test acc: 69.480, test flops: 1611225344.00
+p: 23, test acc: 69.510, test flops: 1707779328.00
+p: 24, test acc: 69.530, test flops: 1787322240.00
+p: 25, test acc: 69.580, test flops: 1855944320.00
+p: 26, test acc: 69.570, test flops: 1901832448.00
+p: 27, test acc: 69.470, test flops: 1948770688.00
+p: 28, test acc: 69.510, test flops: 1983947904.00
+p: 29, test acc: 69.460, test flops: 2009149696.00
+p: 30, test acc: 69.450, test flops: 2030256128.00
+p: 31, test acc: 69.420, test flops: 2047739904.00
+p: 32, test acc: 69.410, test flops: 2063595904.00
+p: 33, test acc: 69.410, test flops: 2076459264.00
+p: 34, test acc: 69.360, test flops: 2086907520.00
+p: 35, test acc: 69.360, test flops: 2094993152.00
+p: 36, test acc: 69.360, test flops: 2102238464.00
+p: 37, test acc: 69.370, test flops: 2108434048.00
+p: 38, test acc: 69.360, test flops: 2113684352.00
+p: 39, test acc: 69.360, test flops: 2119144576.00
+Budgeted AUC: 100846059144.65053, AVG ACC: 65.66657930965414
+Anytime:
+[52.05, 64.45, 70.13, 69.37], avg:64.0
+Setting width ratio to 0.9
+logits calc compeleted
+Exits FLOPs: [470581056.0, 889681536.0, 1308782016.0, 1727882496.0]
+p: 1, test acc: 52.350, test flops: 470832480.00
+p: 2, test acc: 52.360, test flops: 471084000.00
+p: 3, test acc: 52.370, test flops: 470874432.00
+p: 4, test acc: 52.400, test flops: 471670688.00
+p: 5, test acc: 52.490, test flops: 473263296.00
+p: 6, test acc: 52.610, test flops: 475191136.00
+p: 7, test acc: 52.800, test flops: 478166752.00
+p: 8, test acc: 53.080, test flops: 483405536.00
+p: 9, test acc: 53.450, test flops: 491410336.00
+p: 10, test acc: 53.900, test flops: 501510656.00
+p: 11, test acc: 54.670, test flops: 516011520.00
+p: 12, test acc: 55.420, test flops: 534829120.00
+p: 13, test acc: 56.580, test flops: 562615488.00
+p: 14, test acc: 58.270, test flops: 600124992.00
+p: 15, test acc: 59.700, test flops: 650710400.00
+p: 16, test acc: 61.640, test flops: 716006272.00
+p: 17, test acc: 63.920, test flops: 801880000.00
+p: 18, test acc: 65.750, test flops: 893621056.00
+p: 19, test acc: 66.940, test flops: 997558016.00
+p: 20, test acc: 68.280, test flops: 1104470528.00
+p: 21, test acc: 68.980, test flops: 1206311936.00
+p: 22, test acc: 69.420, test flops: 1293904000.00
+p: 23, test acc: 69.490, test flops: 1367749504.00
+p: 24, test acc: 69.570, test flops: 1433632128.00
+p: 25, test acc: 69.580, test flops: 1485558528.00
+p: 26, test acc: 69.610, test flops: 1528935552.00
+p: 27, test acc: 69.530, test flops: 1562295808.00
+p: 28, test acc: 69.580, test flops: 1587986688.00
+p: 29, test acc: 69.560, test flops: 1610157312.00
+p: 30, test acc: 69.530, test flops: 1626208768.00
+p: 31, test acc: 69.550, test flops: 1639661824.00
+p: 32, test acc: 69.560, test flops: 1651690112.00
+p: 33, test acc: 69.570, test flops: 1661790336.00
+p: 34, test acc: 69.590, test flops: 1670842880.00
+p: 35, test acc: 69.570, test flops: 1677758080.00
+p: 36, test acc: 69.570, test flops: 1683793024.00
+p: 37, test acc: 69.570, test flops: 1688948096.00
+p: 38, test acc: 69.580, test flops: 1692426496.00
+p: 39, test acc: 69.560, test flops: 1696827136.00
+Budgeted AUC: 80667250688.59099, AVG ACC: 65.79739176986347
+Anytime:
+[52.34, 65.55, 70.44, 69.57], avg:64.475

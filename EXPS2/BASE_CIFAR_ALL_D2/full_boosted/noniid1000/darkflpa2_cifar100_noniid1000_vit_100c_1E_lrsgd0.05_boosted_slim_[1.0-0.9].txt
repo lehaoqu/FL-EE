@@ -1,0 +1,84 @@
+alg: darkflpa2
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2/BASE_CIFAR_ALL_D2/full_boosted/noniid1000
+device: 2
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [1.0, 0.9]
+slim_ce: True
+slim_kd: True
+slim_kd_weights: [0.6, 1.0, 1.4, 1.0]
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 1
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: False
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+wd: 0.001
+increase: True
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[1.0-0.9]
+output: <_io.TextIOWrapper name='./EXPS2/BASE_CIFAR_ALL_D2/full_boosted/noniid1000/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 3.51, exits:['1.19', '1.06', '4.04', '7.77'] loss: 13.25
+  slim[1.0]: exits:['1.19', '1.06', '4.04', '7.77']
+  slim[0.9]: exits:['1.47', '1.54', '1.69', '1.69']
+========== Round 10 ==========
+server, accuracy: 32.79, exits:['11.86', '28.70', '42.75', '47.87'] loss: 8.52
+  slim[1.0]: exits:['11.86', '28.70', '42.75', '47.87']
+  slim[0.9]: exits:['11.77', '24.23', '34.31', '36.98']
+========== Round 20 ==========
+server, accuracy: 43.65, exits:['22.14', '41.95', '52.95', '57.54'] loss: 6.80
+  slim[1.0]: exits:['22.14', '41.95', '52.95', '57.54']
+  slim[0.9]: exits:['21.12', '38.79', '47.90', '50.24']
