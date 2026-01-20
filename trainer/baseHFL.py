@@ -3,7 +3,8 @@ import torch.nn as nn
 import time
 import random
 import importlib
-import copy
+import copy, math
+import torch.nn.functional as F
 
 from typing import *
 
@@ -14,7 +15,7 @@ from dataset.imagenet_dataset import TinyImageNetClassificationDataset
 from dataset.speechcmd_dataset import SPEEDCMDSClassificationDataset
 from utils.dataprocess import DataProcessor
 from utils.modelload.slimmable import set_width_ratio
-from utils.train_utils import crop_tensor_dimensions, aggregate_scale_tensors, kd_loss_func
+from utils.train_utils import calc_target_probs, crop_tensor_dimensions, aggregate_scale_tensors, kd_loss_func
 
 from utils.modelload.model import BaseModule
 from utils.train_utils import AdamW
@@ -64,6 +65,8 @@ class BaseClient:
         self.metric = {
             'acc': DataProcessor(),
             'loss': DataProcessor(),
+            'kd_weights': DataProcessor(),
+            'kd_sims': DataProcessor(),
         }
 
         self.training_time = None
@@ -172,6 +175,92 @@ class BaseClient:
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
    
+
+    def calc_slim_full_jaccard_weights(self):
+        """Compute per-exit weights from 1-Jaccard similarity between slim and full exits on valid set."""
+        from utils.modelload.slimmable import set_width_ratio
+
+        slim_ratios = self.args.slim_ratios if self.args.slimmable else [1.0]
+        if 1.0 not in slim_ratios:
+            slim_ratios = list(slim_ratios) + [1.0]
+
+        full_ratio = 1.0 if 1.0 in slim_ratios else max(slim_ratios)
+        # 默认p是20，每个出口分配的样本比例为1:1:1:1
+        p = 20
+        target_probs = calc_target_probs(self.exits_num)[p - 1]
+
+        self.model.to(self.device)
+        was_training = self.model.training
+        self.model.eval()
+
+        def _collect_logits(ratio):
+            set_width_ratio(ratio, self.model)
+            exits_logits_all = [[] for _ in range(self.exits_num)]
+            with torch.no_grad():
+                for data in self.loader_train:
+                    batch, _ = self.adapt_batch(data)
+                    exits_logits = self.policy(self.model(**batch))
+                    for i, exit_logits in enumerate(exits_logits):
+                        exits_logits_all[i].append(exit_logits.detach())
+            return [torch.cat(chunks, dim=0) for chunks in exits_logits_all]
+
+        def _exit_indices(exits_logits):
+            used_index = set()
+            selected_index_list = []
+            for j in range(self.exits_num):
+                confidence = F.softmax(exits_logits[j], dim=1)
+                max_preds, _ = confidence.max(dim=1, keepdim=False)
+                sorted_idx = torch.argsort(max_preds, descending=True).tolist()
+                n_target = len(sorted_idx)
+
+                if j == 0:
+                    selected_index = sorted_idx[: math.floor(n_target * target_probs[j])]
+                elif j < self.exits_num - 1:
+                    unused_index = [x for x in sorted_idx if x not in used_index]
+                    selected_index = unused_index[: math.floor(n_target * target_probs[j])]
+                else:
+                    selected_index = [x for x in sorted_idx if x not in used_index]
+
+                used_index.update(selected_index)
+                selected_index_list.append(selected_index)
+            return selected_index_list
+
+        exit_indices_by_ratio = {}
+        for ratio in slim_ratios:
+            exits_logits = _collect_logits(ratio)
+            exit_indices_by_ratio[ratio] = _exit_indices(exits_logits)
+
+        full_indices = exit_indices_by_ratio[full_ratio]
+        slim_ratios_only = [r for r in slim_ratios if r != full_ratio]
+
+        weights_by_ratio = {str(r): [0.0 for _ in range(self.exits_num)] for r in slim_ratios_only}
+        sims_by_ratio = {str(r): [0.0 for _ in range(self.exits_num)] for r in slim_ratios_only}
+        for r in slim_ratios_only:
+            sims = []
+            for exit_idx in range(self.exits_num):
+                a = set(full_indices[exit_idx])
+                b = set(exit_indices_by_ratio[r][exit_idx])
+                if not a and not b:
+                    sim = 1.0
+                else:
+                    sim = len(a & b) / max(1, len(a | b))
+                sims.append(1.0 - sim)
+
+            sum_w = sum(sims)
+            if sum_w <= 0:
+                normed = [1.0 for _ in sims]
+            else:
+                normed = [w / sum_w * self.exits_num for w in sims]
+
+
+            weights_by_ratio[str(r)] = normed
+            sims_by_ratio[str(r)] = [1.0 - s for s in sims]
+
+        set_width_ratio(1.0, self.model)
+        if was_training:
+            self.model.train()
+        return weights_by_ratio, sims_by_ratio
+       
    
     def clearGPU(self):
         del self.model
@@ -319,7 +408,9 @@ class BaseServer:
             'acc': DataProcessor(),
             'loss': DataProcessor(),
             'acc_exits': [],
-            'acc_exit_slim': []
+            'acc_exit_slim': [],
+            'kd_weights': [],
+            'kd_sims': [],
         }
         
         # == ratio of each classes for each eq ==  
@@ -532,6 +623,8 @@ class BaseServer:
             c_metric = client.metric
             if client in self.sampled_clients:
                 self.metric['loss'].append(c_metric['loss'].last())
+                self.metric['kd_weights'].append(c_metric['kd_weights'].last())
+                self.metric['kd_sims'].append(c_metric['kd_sims'].last())
 
         return self.analyse_metric()
 
@@ -555,16 +648,52 @@ class BaseServer:
                     avg_exits.append(sum(vals) / len(vals))
                 acc_exit_slim.append(avg_exits)
 
+        slims_weights = {}
+        slim_ratios = self.args.slim_ratios if self.args.slimmable else [1.0]
+        slim_ratios = [r for r in slim_ratios if r != 1.0]
+
+        # if self.metric['kd_weights'] and self.args.slimmable:
+        #     # average over rounds for each exit
+        #     for slim_ratio in slim_ratios:
+        #         slim_weights = []
+        #         for exit_idx in range(self.max_exit):
+        #             tmp = []
+        #             for idx in range(len(self.metric['kd_weights'])):
+        #                 if exit_idx >= len(self.metric['kd_weights'][idx][str(slim_ratio)]):
+        #                     continue
+        #                 tmp.append(self.metric['kd_weights'][idx][str(slim_ratio)][exit_idx])
+        #             slim_weights.append(sum(tmp) / len(tmp))
+        #         slims_weights[slim_ratio] = slim_weights
+
+        slims_sims = {}
+        if self.metric['kd_sims'] and self.args.slimmable:
+            # average over rounds for each exit
+            for slim_ratio in slim_ratios:
+                slim_sims = []
+                for exit_idx in range(self.max_exit):
+                    tmp = []
+                    for idx in range(len(self.metric['kd_sims'])):
+                        if exit_idx >= len(self.metric['kd_sims'][idx][str(slim_ratio)]):
+                            continue
+                        tmp.append(self.metric['kd_sims'][idx][str(slim_ratio)][exit_idx])
+                    slim_sims.append(sum(tmp) / len(tmp))
+                slims_sims[slim_ratio] = slim_sims
+
+
         self.metric['acc'].clear()
         self.metric['loss'].clear()
         self.metric['acc_exits'].clear()
         self.metric['acc_exit_slim'].clear()
+        self.metric['kd_weights'].clear()
+        self.metric['kd_sims'].clear()
 
         return {'loss': loss,
                 'acc': acc,
                 'std': std,
                 'acc_exits': acc_exits,
-                'acc_exit_slim': acc_exit_slim}
+                'acc_exit_slim': acc_exit_slim,
+                'kd_weights': slims_weights,
+                'kd_sims': slims_sims}
         
     def save_model(self, model_save_path, generator_save_path):
         self.global_model.save_model(model_save_path)

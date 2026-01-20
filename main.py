@@ -163,6 +163,11 @@ class FedSim:
                 acc_exit_slim = ret_dict.get('acc_exit_slim', [])
                 if acc_exit_slim and self.args.slimmable:
                     # acc_exit_slim: list over slim_ratios -> list over exits
+                    for slim_ratio in ret_dict['kd_sims']:
+                        # weights_fmt = [f"{weight:.2f}" for weight in ret_dict['kd_weights'][slim_ratio]]
+                        # self.output.write(f"  slim[{slim_ratio}]: kd_weights:{weights_fmt}\n")
+                        sims_fmt = [f"{sim:.2f}" for sim in ret_dict['kd_sims'][slim_ratio]]
+                        self.output.write(f"  slim[{slim_ratio}]: kd_sims:{sims_fmt}\n")
                     for ratio_idx, exits_vals in enumerate(acc_exit_slim):
                         exits_fmt = [f"{num:.2f}" for num in exits_vals]
                         self.output.write(f"  slim[{self.args.slim_ratios[ratio_idx]}]: exits:{exits_fmt}\n")

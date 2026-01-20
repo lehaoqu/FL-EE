@@ -103,6 +103,12 @@ class Client(BaseClient):
         # === train ===
         self.model.to(self.device)
         batch_loss = []
+        kd_exits_weights_by_ratio, kd_exits_sims_by_ratio = self.calc_slim_full_jaccard_weights()
+        # print(f'Client {self.id} Round {self.client_crt_rnd} kd_exits_weights_by_ratio: {kd_exits_weights_by_ratio}')
+        
+        if not self.args.slim_kd_dyn_weights:
+            kd_exits_weights_by_ratio = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else {str(ratio): [1.0 for _ in range(self.exits_num)] for ratio in self.args.slim_ratios if ratio != 1.0}
+        
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
@@ -128,14 +134,14 @@ class Client(BaseClient):
 
                     t_exits_logits = ratio_exits_logits[1.0]
                     kd_loss = torch.zeros(1).to(self.device)
-                    kd_exits_weights = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else [1.0 for _ in range(self.exits_num)]
+
                     if self.args.slim_kd:
                         for slim_ratio in self.args.slim_ratios:
                             if slim_ratio == 1.0:
                                 continue
                             for logit_idx, student_logits in enumerate(ratio_exits_logits[slim_ratio]):
                                 teacher_logits = t_exits_logits[logit_idx].detach()
-                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) * kd_exits_weights[logit_idx] / (len(self.args.slim_ratios) - 1)
+                                kd_loss += kd_loss_func(student_logits, teacher_logits, T=self.args.T_slim) * kd_exits_weights_by_ratio[str(slim_ratio)][logit_idx] / (len(self.args.slim_ratios) - 1)
 
                     if epoch == self.epoch-1:
                         for index in range(label.shape[0]):
@@ -179,6 +185,8 @@ class Client(BaseClient):
                     
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
+        # self.metric['kd_weights'].append(kd_exits_weights_by_ratio)
+        self.metric['kd_sims'].append(kd_exits_sims_by_ratio)
         self.client_crt_rnd += 1
     
     
@@ -190,8 +198,7 @@ class Client(BaseClient):
                 batch, label = self.adapt_batch(data)
                 batch['rt_embedding'] = True
                 embedding_outputs.append(torch.mean(self.model(**batch).detach(), dim=0, keepdim=True))
-        return embedding_outputs
-        
+        return embedding_outputs 
 
     def run(self):
         self.train()
