@@ -20,6 +20,7 @@ class EvalRunItem:
     ft: str
     mode: str
     slim: str = ""
+    exits: str = ""
 
 
 def _get_conda_python_path(env_name):
@@ -165,58 +166,6 @@ def _is_eval_target_pth(filename: str) -> bool:
     return True
 
 
-def _scan_eval_complete_items() -> List[EvalRunItem]:
-    """Recursively collect all *_eval.json under a results root (default: front-exps)."""
-    exps_dir = _front_exps_dir()
-    if not os.path.exists(exps_dir):
-        return []
-
-    items: List[EvalRunItem] = []
-
-    for root, _dirs, files in os.walk(exps_dir):
-        rel_dir = os.path.relpath(root, exps_dir)
-        ft = _infer_ft_from_rel_dir(rel_dir)
-
-        for fname in files:
-            if not fname.endswith("_eval.json"):
-                continue
-            stem = fname[:-10]  # strip _eval.json
-            policy, dataset, model, mode = _parse_stem(stem)
-            slim = ""
-            if "slim" in stem:
-                slim = stem.split("slim", 1)[1].strip("_")
-
-            label_parts = [rel_dir, policy]
-            if slim:
-                label_parts.append(f"slim:{slim}")
-            label = " | ".join(p for p in label_parts if p)
-
-            items.append(
-                EvalRunItem(
-                    label=label,
-                    eval_json_path=os.path.join(root, fname),
-                    rel_dir=rel_dir,
-                    policy=policy,
-                    dataset=dataset,
-                    model=model,
-                    ft=ft,
-                    mode=mode,
-                    slim=slim,
-                )
-            )
-
-    # Deduplicate exact same label/path pairs if any
-    seen = set()
-    uniq_items = []
-    for it in sorted(items, key=lambda x: x.label):
-        key = (it.label, it.eval_json_path)
-        if key in seen:
-            continue
-        seen.add(key)
-        uniq_items.append(it)
-    return uniq_items
-
-
 def _plot_budget_curves(selected: List[EvalRunItem]):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -253,7 +202,7 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         marker = (getattr(db, "MARKER", {}) if db else {}).get(item.policy, "o")
         style = (getattr(db, "STYLE", {}) if db else {}).get(item.policy, "-")
         name = (getattr(db, "NAMES", {}) if db else {}).get(item.policy, item.policy)
-        extra = f", {item.slim}" if item.slim else ""
+        extra = f", {item.slim}, {item.exits}" if item.slim or item.exits else ""
         label = f"{name} ({item.dataset}, {item.mode}, {item.ft}{extra}|{item.rel_dir.split('/')[0]})".strip()
 
         ax.plot(
@@ -577,12 +526,17 @@ def show():
                     stem = fname[:-10]
                     policy, dataset, model, mode = _parse_stem(stem)
                     slim = ""
+                    exits = ""
                     if "slim" in stem:
                         slim = stem.split("slim", 1)[1].strip("_")
+                    if "exits" in stem:
+                        exits = stem.split("exits", 1)[1].strip("_")
 
                     label_parts = [rel_dir, policy]
                     if slim:
                         label_parts.append(f"slim:{slim}")
+                    if exits:
+                        label_parts.append(f"exits:{exits}")
                     label = " | ".join(p for p in label_parts if p)
 
                     eval_items.append(
@@ -596,6 +550,7 @@ def show():
                             ft=ft,
                             mode=mode,
                             slim=slim,
+                            exits=exits,
                         )
                     )
 

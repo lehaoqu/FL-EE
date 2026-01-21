@@ -143,7 +143,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
 
     return model
 
-def load_model_eval(args, model_path, config_path=None):
+def load_model_eval(args, model_path, config_path=None, model_depth=None):
     model_arg = args.model
     dataset_arg = args.dataset
     # Check if dataset starts with any GLUE task name
@@ -173,6 +173,8 @@ def load_model_eval(args, model_path, config_path=None):
 
         num_labels = 100 if CIFAR100 in dataset_arg else 10 if SVHN in dataset_arg else 200 if IMAGENET in dataset_arg else 35 if SPEECHCMDS in dataset_arg else 2
         exit_config = based_model.ExitConfig(base_conf, num_labels=num_labels, exits=exits, policy=policy, alg=alg, blocks=blocks, slimmable=slimmable, slim_ratios=slim_ratios)
+        exit_config.num_hidden_layers = model_depth if model_depth is not None else exit_config.num_hidden_layers
+        exit_config.exits = exit_config.exits[:model_depth//3] if model_depth is not None else exit_config.exits
 
         if args.ft == 'full':
             model = based_model.ExitModel(config=exit_config)

@@ -84,32 +84,6 @@ class Eval():
         self.model.to(self.device)
         self.tester = Tester(self.model, self.args)
 
-        # print('slim', self.model.config.slimmable)
-        if self.model.config.slimmable:
-            # print('current width ratio:', slimmable_module.CURRENT_WIDTH_RATIO)
-            self.eval_json_path = self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_eval.json'
-        else:
-            self.eval_json_path = self.eval_dir+self.model_path+'_eval.json'
-
-        if os.path.exists(self.eval_json_path):
-            try:
-                with open(self.eval_json_path, 'r') as f:
-                    raw = f.read().strip()
-                if not raw:
-                    raise ValueError("empty eval json")
-                dct = json.loads(raw)
-            except Exception as e:
-                self._log(f"[WARN] Skip broken eval json: {self.eval_json_path} ({e}); will re-evaluate.")
-            else:
-                if 'budgeted_acc' not in dct:
-                    x = dct.get('flops', [])
-                    y = dct.get('test', [])
-                    from utils.train_utils import area_under_fitted_curve
-                    _area, acc = area_under_fitted_curve(y, x)
-                    dct['budgeted_acc'] = acc
-                    self._atomic_json_dump(self.eval_json_path, dct)
-                return
-
         # parser = argparse.ArgumentParser()
         # policy_module = importlib.import_module(f'trainer.policy.{self.model.config.policy}')
         # policy_parser = parser.add_subparsers(dest='policy_parser')
@@ -143,13 +117,45 @@ class Eval():
             # self.sort(self.valid_all_sample_cos_exits, self.valid_dataset)
             
 
-        if self.args.if_mode == 'anytime':
-            self.anytime()
-        elif self.args.if_mode == 'budgeted':
-            self.budgeted()
-        else:
-            self.budgeted()
-            self.anytime()
+        all_exits = self.model.config.exits
+        for idx in range(len(all_exits)):
+            self._log(f'Evaluating with exits: {all_exits[:idx+1]}')
+            cur_exits = all_exits[:idx+1]
+            self.model.config.exits = cur_exits
+            self.n_exits = len(self.model.config.exits)
+            self.args.n_exits = self.n_exits
+
+            if self.model.config.slimmable:
+                # print('current width ratio:', slimmable_module.CURRENT_WIDTH_RATIO)
+                self.eval_json_path = self.eval_dir+self.model_path+f'_slim_{slimmable_module.CURRENT_WIDTH_RATIO}_exits_{self.model.config.exits}_eval.json'
+            else:
+                self.eval_json_path = self.eval_dir+self.model_path+f'_exits_{self.model.config.exits}_eval.json'
+
+            if os.path.exists(self.eval_json_path):
+                try:
+                    with open(self.eval_json_path, 'r') as f:
+                        raw = f.read().strip()
+                    if not raw:
+                        raise ValueError("empty eval json")
+                    dct = json.loads(raw)
+                except Exception as e:
+                    self._log(f"[WARN] Skip broken eval json: {self.eval_json_path} ({e}); will re-evaluate.")
+                else:
+                    if 'budgeted_acc' not in dct:
+                        x = dct.get('flops', [])
+                        y = dct.get('test', [])
+                        from utils.train_utils import area_under_fitted_curve
+                        _area, acc = area_under_fitted_curve(y, x)
+                        dct['budgeted_acc'] = acc
+                        self._atomic_json_dump(self.eval_json_path, dct)
+                    continue
+            if self.args.if_mode == 'anytime':
+                self.anytime()
+            elif self.args.if_mode == 'budgeted':
+                self.budgeted()
+            else:
+                self.budgeted()
+                self.anytime()
         
     
     def anytime(self,):
@@ -166,7 +172,8 @@ class Eval():
         rnd = 40
         # TODO flops need to be measured
         # use measured FLOPs from tester when available
-        flops = getattr(self.tester, 'flops', [i+1 for i in range(self.n_exits)])
+        # flops = getattr(self.tester, 'flops', [i+1 for i in range(self.n_exits)])
+        flops = self.tester.flops[:self.n_exits]
         self._log('Exits FLOPs: {}'.format(flops))
         acc_test_list = ''
         exp_flops_list = ''
@@ -179,8 +186,8 @@ class Eval():
             probs = torch.exp(torch.log(_p) * torch.tensor([(i+1)*4 for i in range(self.n_exits)]).to(self.device))
             probs /= probs.sum()
             
-            acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds, self.valid_targets, probs, flops)
-            acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds, self.test_targets, flops, T)
+            acc_val, _, T = self.tester.dynamic_eval_find_threshold(self.valid_exits_preds[:self.n_exits], self.valid_targets, probs, flops)
+            acc_test, exp_flops = self.tester.dynamic_eval_with_threshold(self.test_exits_preds[:self.n_exits], self.test_targets, flops, T)
             acc_test_list += (str(acc_test)+'\n')
             exp_flops_list += (str(exp_flops)+'\n')
             acc_test_np.append(float(acc_test))
@@ -413,6 +420,7 @@ class Tester(object):
         exp = torch.bincount(exit_idx, minlength=n_exits).to(torch.float32)
 
         flops_t = torch.as_tensor(flops, device=max_preds.device, dtype=torch.float32)
+        # print(exp.size(), flops_t.size())
         expected_flops = (exp / float(n_sample) * flops_t).sum()
 
         acc = correct.mean() * 100.0
@@ -447,6 +455,6 @@ if __name__ == '__main__':
     # print(model_paths)
     for model_path in model_paths:
         if  args.policy in model_path and 'G_' not in model_path and 'loss' not in model_path and 'acc' not in model_path and 'distance' not in model_path and 'budget' not in model_path:
-            print(model_path)
+            # print(model_path)
             eval._log((f'eval model:{os.path.basename(model_path)}').center(80, '='))
             eval.eval(model_path+'.pth', model_path+'.json')

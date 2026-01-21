@@ -370,6 +370,9 @@ def area_under_fitted_curve(y_list, x_list, *, fit: str = 'spline', s: float = 0
         raise ValueError(f"x_list 与 y_list 长度必须一致，得到 {len(x)} vs {len(y)}")
     if x.size < 2:
         raise ValueError("至少需要 2 个点来计算面积")
+    if np.allclose(x, x[0]):
+        y0 = float(y[0])
+        return y0, y0
     if not (np.isfinite(x).all() and np.isfinite(y).all()):
         raise ValueError("x_list / y_list 里包含 NaN 或 Inf")
 

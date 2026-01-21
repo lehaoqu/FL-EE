@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers.models.vit.modeling_vit import ViTSelfAttention, ViTEmbeddings, ViTPreTrainedModel
+from eval import Eval
 from utils.modelload.modelloader import load_model
 from utils.modelload.slimmable import set_width_ratio, convert_to_slimmable, custom_ops_dict, set_model_config
 import numpy as np
@@ -382,6 +383,43 @@ class Test:
         fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
         area, acc = area_under_fitted_curve(fy, fx)
         print(f"slimmable area: {area}, acc: {acc}")
+
+    def test_slim_dynamic_compute(self):
+        '''
+        Docstring for test_slim_dynamic_compute
+        比较slim训练的模型和原始浅层模型的效果。
+        如：0.9的slim和只有3个出口的原始模型
+        :param self: Description
+        '''
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100_noniid1000'
+        args.policy = 'boosted'
+        args.alg = 'depthfl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'full'
+        args.device = 0
+        from utils.modelload.modelloader import load_model_eval
+        slim_config_path = 'EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
+        slim_model_path = 'EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
+        origin_config_path = 'EXPS/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+        origin_model_path = 'EXPS/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
+
+        slim_model = load_model_eval(args, model_path=slim_model_path, config_path=slim_config_path)
+        origin_model = load_model_eval(args, model_path=origin_model_path, config_path=origin_config_path, model_depth=9)
+        set_width_ratio(0.9, slim_model)
+
+        eval = Eval(args=args)
+        eval.eval(slim_model_path, slim_config_path, model=slim_model)
+
+        
+        eval = Eval(args=args)
+        eval.eval(origin_model_path, origin_config_path, model=origin_model)
+
+
+
 
 
 t = Test()
