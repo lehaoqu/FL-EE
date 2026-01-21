@@ -325,6 +325,7 @@ class Tester(object):
             all_sample_targets.append(y)
             with torch.no_grad():
                 exits_logits = self.policy(self.model(**batch))
+                assert len(exits_logits) == self.n_exits, f"Expected {self.n_exits} exits, got {len(exits_logits)}"
                 for i, exit_logits in enumerate(exits_logits):
                     # _t = self.softmax(exit_logits)
                     # all_sample_exits_logits[i].append(_t)

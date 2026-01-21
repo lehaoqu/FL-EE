@@ -32,7 +32,9 @@ class BaseClient:
         self.id = id
         self.args = args
         self.dataset_train, self.loader_train = load_dataset_loader(args=args, file_name='train', id=id)
+        self.dataset_train_not_shuffle, self.loader_train_not_shuffle = load_dataset_loader(args=args, file_name='train', id=id, shuffle=False)
         self.dataset_valid, self.loader_valid = load_dataset_loader(args=args, file_name='valid', id=id)
+        self.dataset_valid_not_shuffle, self.loader_valid_not_shuffle = load_dataset_loader(args=args, file_name='valid', id=id, shuffle=False)
         self.device = args.device
         self.exits = exits
         self.server = None
@@ -47,6 +49,7 @@ class BaseClient:
         self.model = model
         self.model_arch = copy.deepcopy(model)
         self.exits_num = len(self.exits)
+        # print(f"Client {self.id} initialized with eq_depth {self.eq_depth} and exits_num {self.exits_num}")
         
         self.loss_func = nn.CrossEntropyLoss()
         if args.optim == 'adam':
@@ -179,56 +182,36 @@ class BaseClient:
     def calc_slim_full_jaccard_weights(self):
         """Compute per-exit weights from 1-Jaccard similarity between slim and full exits on valid set."""
         from utils.modelload.slimmable import set_width_ratio
+        from eval import Tester
 
         slim_ratios = self.args.slim_ratios if self.args.slimmable else [1.0]
         if 1.0 not in slim_ratios:
             slim_ratios = list(slim_ratios) + [1.0]
 
         full_ratio = 1.0 if 1.0 in slim_ratios else max(slim_ratios)
-        # 默认p是20，每个出口分配的样本比例为1:1:1:1
-        p = 20
-        target_probs = calc_target_probs(self.exits_num)[p - 1]
+        rnd = 40
+        p_int = 20
 
         self.model.to(self.device)
         was_training = self.model.training
         self.model.eval()
 
-        def _collect_logits(ratio):
-            set_width_ratio(ratio, self.model)
-            exits_logits_all = [[] for _ in range(self.exits_num)]
-            with torch.no_grad():
-                for data in self.loader_train:
-                    batch, _ = self.adapt_batch(data)
-                    exits_logits = self.policy(self.model(**batch))
-                    for i, exit_logits in enumerate(exits_logits):
-                        exits_logits_all[i].append(exit_logits.detach())
-            return [torch.cat(chunks, dim=0) for chunks in exits_logits_all]
-
-        def _exit_indices(exits_logits):
-            used_index = set()
-            selected_index_list = []
-            for j in range(self.exits_num):
-                confidence = F.softmax(exits_logits[j], dim=1)
-                max_preds, _ = confidence.max(dim=1, keepdim=False)
-                sorted_idx = torch.argsort(max_preds, descending=True).tolist()
-                n_target = len(sorted_idx)
-
-                if j == 0:
-                    selected_index = sorted_idx[: math.floor(n_target * target_probs[j])]
-                elif j < self.exits_num - 1:
-                    unused_index = [x for x in sorted_idx if x not in used_index]
-                    selected_index = unused_index[: math.floor(n_target * target_probs[j])]
-                else:
-                    selected_index = [x for x in sorted_idx if x not in used_index]
-
-                used_index.update(selected_index)
-                selected_index_list.append(selected_index)
-            return selected_index_list
+        self.args.n_exits = self.exits_num
+        tester = Tester(self.model, self.args, measure_flops=False)
+        _p = torch.tensor([p_int * (1.0 / (rnd / 2))], dtype=torch.float32).to(tester.device)
+        probs = torch.exp(torch.log(_p) * torch.tensor([(i + 1) * 4 for i in range(tester.n_exits)]).to(tester.device))
+        probs /= probs.sum()
 
         exit_indices_by_ratio = {}
+        # valid_loader = self.server.valid_dataloader if self.server is not None else self.loader_valid
         for ratio in slim_ratios:
-            exits_logits = _collect_logits(ratio)
-            exit_indices_by_ratio[ratio] = _exit_indices(exits_logits)
+            set_width_ratio(ratio, self.model)
+            valid_preds, valid_targets, _ = tester.calc_logtis(self.loader_train_not_shuffle)
+            flops_placeholder = [float(i + 1) for i in range(tester.n_exits)]
+            _acc_val, _exp_val, _T, exit_sample_indices = tester.dynamic_eval_find_threshold(
+                valid_preds, valid_targets, probs, flops_placeholder, return_exit_indices=True
+            )
+            exit_indices_by_ratio[ratio] = exit_sample_indices
 
         full_indices = exit_indices_by_ratio[full_ratio]
         slim_ratios_only = [r for r in slim_ratios if r != full_ratio]
@@ -255,6 +238,8 @@ class BaseClient:
 
             weights_by_ratio[str(r)] = normed
             sims_by_ratio[str(r)] = [1.0 - s for s in sims]
+        # if self.exits_num == 4:
+        #     print(f"Client {self.id} slim-full jaccard weights: {weights_by_ratio}, sims: {sims_by_ratio}")
 
         set_width_ratio(1.0, self.model)
         if was_training:
@@ -667,13 +652,14 @@ class BaseServer:
 
         slims_sims = {}
         if self.metric['kd_sims'] and self.args.slimmable:
+            # print('Validation KD sims:', self.metric['kd_sims'])
             # average over rounds for each exit
             for slim_ratio in slim_ratios:
                 slim_sims = []
                 for exit_idx in range(self.max_exit):
                     tmp = []
                     for idx in range(len(self.metric['kd_sims'])):
-                        if exit_idx >= len(self.metric['kd_sims'][idx][str(slim_ratio)]):
+                        if len(self.metric['kd_sims'][idx][str(slim_ratio)]) < self.max_exit:
                             continue
                         tmp.append(self.metric['kd_sims'][idx][str(slim_ratio)][exit_idx])
                     slim_sims.append(sum(tmp) / len(tmp))
