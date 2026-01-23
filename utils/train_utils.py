@@ -333,8 +333,45 @@ def get_flops(args, model, stop_exit=3):
     # thop 需要一个 dummy input tensor（即使不用）
     dummy_tensor_for_thop = torch.zeros(1, 1).to(args.device)
 
+    # 清理上一次 profile 留下的 buffer，避免重复注册报错
+    for m in wrapped_model.modules():
+        if hasattr(m, "_buffers"):
+            m._buffers.pop("total_ops", None)
+            m._buffers.pop("total_params", None)
+        if hasattr(m, "_parameters"):
+            m._parameters.pop("total_ops", None)
+            m._parameters.pop("total_params", None)
+        if hasattr(m, "total_ops"):
+            try:
+                delattr(m, "total_ops")
+            except Exception:
+                pass
+        if hasattr(m, "total_params"):
+            try:
+                delattr(m, "total_params")
+            except Exception:
+                pass
+
     # ✅ 现在传入的是 nn.Module，不会报错
-    macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False, custom_ops=custom_ops_dict)
+    # 处理共享模块导致的重复 register_buffer 报错
+    _orig_register_buffer = torch.nn.Module.register_buffer
+
+    def _safe_register_buffer(self, name, tensor, persistent=True):
+        if hasattr(self, name):
+            try:
+                buf = getattr(self, name)
+                if torch.is_tensor(buf):
+                    buf.zero_()
+            except Exception:
+                pass
+            return
+        return _orig_register_buffer(self, name, tensor, persistent=persistent)
+
+    torch.nn.Module.register_buffer = _safe_register_buffer
+    try:
+        macs, _ = profile(wrapped_model, inputs=(dummy_tensor_for_thop,), verbose=False, custom_ops=custom_ops_dict)
+    finally:
+        torch.nn.Module.register_buffer = _orig_register_buffer
     return float(macs * 2)
 
 

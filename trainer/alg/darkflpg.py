@@ -107,7 +107,7 @@ class Client(BaseClient):
         # print(f'Client {self.id} Round {self.client_crt_rnd} kd_exits_weights_by_ratio: {kd_exits_weights_by_ratio}')
         
         if not self.args.slim_kd_dyn_weights:
-            kd_exits_weights_by_ratio = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else {str(ratio): [1.0 for _ in range(self.exits_num)] for ratio in self.args.slim_ratios if ratio != 1.0}
+            kd_exits_weights_by_ratio = {str(ratio): self.args.slim_kd_weights for ratio in self.args.slim_ratios if ratio != 1.0}
         
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):

@@ -211,8 +211,10 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             # 替换 Linear
             new_layer = SlimmableLinear(module.in_features, module.out_features, bias=module.bias is not None)
             new_layer.weight.data = module.weight.data
+            new_layer.weight.requires_grad = module.weight.requires_grad
             if module.bias is not None:
                 new_layer.bias.data = module.bias.data
+                new_layer.bias.requires_grad = module.bias.requires_grad
             setattr(model, name, new_layer)
         
         elif isinstance(module, nn.LayerNorm):
@@ -225,6 +227,8 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             # 将大模型(1.0)的权重复制给对应的层，小模型(0.5)的权重随机初始化
             new_layer.norm_dict['1p0'].weight.data = module.weight.data
             new_layer.norm_dict['1p0'].bias.data = module.bias.data
+            new_layer.norm_dict['1p0'].weight.requires_grad = module.weight.requires_grad
+            new_layer.norm_dict['1p0'].bias.requires_grad = module.bias.requires_grad
             
             # (可选) 如果你想用切片初始化小模型的LN作为起点也可以，但之后它们会独立更新
             # 小模型的初始化策略很重要，通常直接随机或复制切片均可
@@ -233,6 +237,8 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
                     dim = get_aligned_dim(original_dim, r)
                     new_layer.norm_dict[str(r).replace('.', 'p')].weight.data = module.weight.data[:dim].clone()
                     new_layer.norm_dict[str(r).replace('.', 'p')].bias.data = module.bias.data[:dim].clone()
+                    new_layer.norm_dict[str(r).replace('.', 'p')].weight.requires_grad = module.weight.requires_grad
+                    new_layer.norm_dict[str(r).replace('.', 'p')].bias.requires_grad = module.bias.requires_grad
 
             setattr(model, name, new_layer)
             
@@ -242,8 +248,10 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
                                         kernel_size=module.kernel_size, stride=module.stride, 
                                         padding=module.padding)
             new_layer.weight.data = module.weight.data
+            new_layer.weight.requires_grad = module.weight.requires_grad
             if module.bias is not None:
                 new_layer.bias.data = module.bias.data
+                new_layer.bias.requires_grad = module.bias.requires_grad
             setattr(model, name, new_layer)
             
         else:

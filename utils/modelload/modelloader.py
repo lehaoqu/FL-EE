@@ -114,12 +114,6 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
     if args.load_path != '':
         existing_model = torch.load(args.load_path, weights_only=True)
         model.load_state_dict(existing_model, strict=False)
-    
-    if args.slimmable:
-        model = convert_to_slimmable(model, args.slim_ratios)
-        set_model_config(model.config)
-        model.config.slimmable = True
-        model.config.slim_ratios = args.slim_ratios
 
     if args.ft == 'classifier':
         for n, p in model.named_parameters():
@@ -136,6 +130,11 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
             else:
                 if 'accumulator' in n or 'classifier' in n:
                     p.requires_grad = True
+    if args.slimmable:
+        model = convert_to_slimmable(model, args.slim_ratios)
+        set_model_config(model.config)
+        model.config.slimmable = True
+        model.config.slim_ratios = args.slim_ratios
                             
     # for n, p in model.named_parameters():
     #     print(n, p.requires_grad)
@@ -186,11 +185,12 @@ def load_model_eval(args, model_path, config_path=None, model_depth=None):
         elif args.ft == 'lora':
             model = based_model.ExitModel(config=exit_config)
             pre_model = based_model.Model.from_pretrained(pretrained_model_name_or_path=args.config_path)
-            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
             
             model.load_state_dict(pre_model.state_dict(), strict=False)
             peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
             model = get_peft_model(model, peft_config)
+            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
+            
             state_dict = torch.load(model_path, weights_only=True)
             new_dict = {}
             for n, p in state_dict.items():

@@ -56,6 +56,7 @@ def args_parser():
     parser.add_argument('--slim_kd', action='store_true', help='whether use kd loss for slimmable model')
     parser.add_argument('--slim_kd_dyn_weights', action='store_true', help='whether use dynamic kd weights cross exits with various depth for slimmable model')
     parser.add_argument('--slim_kd_weights', type=float, nargs='+', default=[1.0, 1.0, 1.0, 1.0], help='the kd weights for slimmable model cross various depths')
+    parser.add_argument('--slim_sim_last_type', type=str, default='ind', help='the similarity calculation type for last exit: ind | cum')
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]

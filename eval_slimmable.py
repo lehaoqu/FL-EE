@@ -238,7 +238,7 @@ if __name__ == '__main__':
             fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
             area, acc = area_under_fitted_curve(fy, fx)
             print(f"AUC: {area}, ALL SLIM Budgeted Acc: {acc}")
-            ratio_1_eval_path = eval.eval_dir+eval.model_path+f'_slim_1.0_eval.json'
+            ratio_1_eval_path = eval.eval_dir+eval.model_path+f'_slim_1.0_exits_[2, 5, 8, 11]_eval.json'
             with open(ratio_1_eval_path, 'r') as f:
                 ratio_1_dct = json.load(f)
             merged = {'all_slim_budgeted_acc': acc, **{k: v for k, v in ratio_1_dct.items()}}

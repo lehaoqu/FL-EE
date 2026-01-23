@@ -222,6 +222,111 @@ class Test:
             optim_slim.step()
 
 
+
+    def test_slimmable_vit_lora(self):
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.config_path = './models/facebook/deit-tiny-patch16-224'
+        args.policy = 'boosted'
+        args.alg = 'depthfl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'lora'
+        args.slimmable = False
+
+        ratios = [1.0, 0.75, 0.5, 0.25]
+        depth = 12
+
+        dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
+
+        model = load_model(args, model_depth=depth, is_scalefl=False, exits=(2,5,8,11)).to(0)
+        origin_model = copy.deepcopy(model)
+        # print(origin_model)
+        original_exits_logits = model(**dummy)
+        # 转换为slimmable
+        slim_model = convert_to_slimmable(model, ratios=ratios).to(0)
+
+        set_model_config(slim_model.config)
+
+        set_width_ratio(1.0, slim_model)
+        slim_exits_logits = slim_model(**dummy)
+
+        for slim_logit, original_logit in zip(slim_exits_logits, original_exits_logits):
+            # print(f"==={slim_logit.shape}==")
+            # print(slim_logit)
+            # print(original_logit)
+            # print(torch.allclose(slim_logit, original_logit, atol=1e-20))
+            assert torch.allclose(slim_logit, original_logit, atol=1e-20), f"slimmable vit output does not match original output at ratio 1.0"
+        print("slimmable vit output matches original output at ratio 1.0")
+
+        # backward test
+        optim_origin = self.adma_optim(origin_model)
+        optim_slim = self.adma_optim(slim_model)
+        for epoch in range(10):
+            optim_origin.zero_grad()
+            optim_slim.zero_grad()
+
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            origin_out = origin_model(**dummy)
+            # print(len(origin_out), origin_out[0].shape)
+            # print(origin_model)
+            # print('======')
+            # print(slim_model)
+            # print(dict(origin_model.named_parameters())['base_model.model.vit.encoder.layer.2.classifier.modules_to_save.default.weight'].requires_grad)
+            # exit(0)
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            slim_out = slim_model(**dummy)
+
+            origin_loss = sum([out.sum() for out in origin_out]).sum()
+            origin_loss.backward()
+            
+            slim_loss = sum([out.sum() for out in slim_out]).sum()
+            slim_loss.backward()
+
+
+            print('loss:', origin_loss.item(), slim_loss.item())
+            assert torch.allclose(origin_loss, slim_loss, atol=1e-6), f"slimmable vit loss does not match original loss at ratio 1.0"
+            print("slimmable vit loss matches original loss at ratio 1.0 in epoch", epoch)
+            
+            for n, p in slim_model.named_parameters():
+                if n not in dict(origin_model.named_parameters()):
+                    continue
+                p_origin = dict(origin_model.named_parameters())[n]
+                if not torch.allclose(p, p_origin, atol=1e-6):
+                    print(f"Parameter {n} does not match between slim and origin model.")
+                if p.requires_grad:
+                    if 'original_module' in n: continue
+                    if p_origin.requires_grad is False:
+                        print(f"Gradient of parameter {n} is None in origin model but not in slim model.")
+                        continue
+                    grad_origin = p_origin.grad
+                    if p.grad == None: print(f"slim {n} grad is None")
+                    if p_origin.grad == None: print(f"origin {n} grad is None")
+                    if not torch.allclose(p.grad, grad_origin, atol=1e-6):
+                        print(f"Gradient of parameter {n} does not match between slim and origin model.")
+                        print(p.grad)
+                        print(grad_origin)
+
+
+            optim_origin.step()
+            optim_slim.step()
+
+            # for n, p in slim_model.named_parameters():
+            #     if n not in dict(origin_model.named_parameters()):
+            #         continue
+            #     p_origin = dict(origin_model.named_parameters())[n]
+            #     if not torch.allclose(p, p_origin, atol=1e-6):
+            #         print(f"After step, Parameter {n} does not match between slim and origin model.")
+            
+            # exit(0)
+
+
     def test_slimmable_vit_reefl(self):
         class A: pass
         args = A()
@@ -303,6 +408,27 @@ class Test:
         from utils.modelload.modelloader import load_model_eval
         config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].json'
         model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].pth'
+        model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        # set_width_ratio(0.25, model)
+        print(model)
+
+
+    def test_slimmable_load_lora(self):
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.policy = 'boosted'
+        args.alg = 'eefl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'lora'
+        args.config_path = '/home/qvlehao/FL-EE/models/facebook/deit-tiny-patch16-224'
+        
+        from utils.modelload.modelloader import load_model_eval
+        config_path = 'EXPS2/BASE_CIFAR_ALL_DY/lora_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0].json'
+        model_path = 'EXPS2/BASE_CIFAR_ALL_DY/lora_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0].pth'
+
         model = load_model_eval(args, model_path=model_path, config_path=config_path)
         # set_width_ratio(0.25, model)
         print(model)
@@ -434,3 +560,6 @@ t = Test()
 
 # t.test_area()
 # t.test_slim_area()
+
+# t.test_slimmable_vit_lora()
+# t.test_slimmable_load_lora()

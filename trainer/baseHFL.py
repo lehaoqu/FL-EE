@@ -229,6 +229,12 @@ class BaseClient:
                     sim = len(a & b) / max(1, len(a | b))
                 sims.append(1.0 - sim)
 
+            origin_sims = copy.deepcopy(sims)
+            ######
+            if self.args.slim_sim_last_type == 'cum':
+                sims[-1] = sum(sims[:-1])
+            ######
+
             sum_w = sum(sims)
             if sum_w <= 0:
                 normed = [1.0 for _ in sims]
@@ -237,7 +243,7 @@ class BaseClient:
 
 
             weights_by_ratio[str(r)] = normed
-            sims_by_ratio[str(r)] = [1.0 - s for s in sims]
+            sims_by_ratio[str(r)] = [1.0 - s for s in origin_sims]
         # if self.exits_num == 4:
         #     print(f"Client {self.id} slim-full jaccard weights: {weights_by_ratio}, sims: {sims_by_ratio}")
 
