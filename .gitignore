@@ -21,3 +21,5 @@ img/
 __pycache__/
 wandb/
 front-exps/
+EXPS2_V100/
+dataset/dataset/
