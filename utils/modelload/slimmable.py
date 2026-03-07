@@ -196,7 +196,7 @@ custom_ops_dict = {
 }
 
 
-def convert_to_slimmable(model, ratios=[1.0, 0.5]):
+def convert_to_slimmable(model, ratios=[1.0, 0.5], block_wise=False):
     """
     递归将 HuggingFace ViT 模型转换为 Slimmable 版本
     """
@@ -283,7 +283,7 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
             
         else:
             # 递归处理子模块
-            convert_to_slimmable(module, ratios)
+            convert_to_slimmable(module, ratios, block_wise=block_wise)
 
     # 2. 特殊处理 Position Embeddings (如果它是 Parameter 而不是 Layer)
     # HF ViT 通常有一个 self.embeddings.position_embeddings

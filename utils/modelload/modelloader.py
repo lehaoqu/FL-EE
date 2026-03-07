@@ -131,7 +131,7 @@ def load_model(args, model_depth=None, is_scalefl=False, exits=None):
                 if 'accumulator' in n or 'classifier' in n:
                     p.requires_grad = True
     if args.slimmable:
-        model = convert_to_slimmable(model, args.slim_ratios)
+        model = convert_to_slimmable(model, args.slim_ratios, block_wise=args.slim_block_wise)
         set_model_config(model.config)
         model.config.slimmable = True
         model.config.slim_ratios = args.slim_ratios
@@ -177,7 +177,7 @@ def load_model_eval(args, model_path, config_path=None, model_depth=None):
 
         if args.ft == 'full':
             model = based_model.ExitModel(config=exit_config)
-            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
+            convert_to_slimmable(model, exit_config.slim_ratios, block_wise=args.slim_block_wise) if exit_config.slimmable else None
             
             state_dict = torch.load(model_path, weights_only=True)
             model.load_state_dict(state_dict)
@@ -189,7 +189,7 @@ def load_model_eval(args, model_path, config_path=None, model_depth=None):
             model.load_state_dict(pre_model.state_dict(), strict=False)
             peft_config = LoraConfig(task_type=TaskType.SEQ_CLS, r=32, lora_alpha=64, lora_dropout=0.01, target_modules=['query', 'value'])
             model = get_peft_model(model, peft_config)
-            convert_to_slimmable(model, exit_config.slim_ratios) if exit_config.slimmable else None
+            convert_to_slimmable(model, exit_config.slim_ratios, block_wise=args.slim_block_wise) if exit_config.slimmable else None
             
             state_dict = torch.load(model_path, weights_only=True)
             new_dict = {}

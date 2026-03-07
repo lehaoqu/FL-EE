@@ -1,0 +1,137 @@
+alg: eefl
+policy: base
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: test_o/full_base/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: False
+slim_ratios: [1.0, 0.75, 0.5, 0.25]
+slim_ce: False
+slim_kd: False
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: False
+T: 3
+T_slim: 3.0
+slim_str: 
+output: <_io.TextIOWrapper name='./test_o/full_base/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_base.txt' mode='a' encoding='UTF-8'>
+alg: eefl
+policy: base
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: test_o/full_base/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: False
+slim_ratios: [1.0, 0.75, 0.5, 0.25]
+slim_ce: False
+slim_kd: False
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: False
+T: 3
+T_slim: 3.0
+slim_str: 
+output: <_io.TextIOWrapper name='./test_o/full_base/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_base.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 0.95, exits:['0.95', '1.03', '0.82', '1.02'] loss: 5.00
+========== Round 10 ==========
+server, accuracy: 1.32, exits:['1.75', '0.74', '0.99', '1.79'] loss: 4.80
+========== Round 20 ==========
+server, accuracy: 1.71, exits:['3.74', '1.01', '1.07', '1.04'] loss: 4.48
+alg: eefl
+policy: base
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: test_o/full_base/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: False
+slim_ratios: [1.0, 0.75, 0.5, 0.25]
+slim_ce: False
+slim_kd: False
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: False
+T: 3
+T_slim: 3.0
+slim_str: 
+output: <_io.TextIOWrapper name='./test_o/full_base/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_base.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 0.98, exits:['0.76', '1.12', '1.12', '0.95'] loss: 13.49
+========== Round 10 ==========
+server, accuracy: 3.08, exits:['3.33', '3.27', '3.22', '2.51'] loss: 12.50
+========== Round 20 ==========
+server, accuracy: 4.82, exits:['4.85', '4.76', '5.03', '4.63'] loss: 10.90
+========== Round 30 ==========
+server, accuracy: 7.66, exits:['8.24', '7.87', '7.87', '6.68'] loss: 11.81
