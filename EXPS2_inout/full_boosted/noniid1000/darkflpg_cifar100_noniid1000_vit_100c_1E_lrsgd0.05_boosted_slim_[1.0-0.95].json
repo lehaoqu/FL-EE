@@ -285,11 +285,12 @@
     ],
     "classifier_dropout": 0.0,
     "base_model": null,
-    "alg": "eefl",
+    "alg": "darkflpg",
     "policy": "boosted",
-    "slimmable": false,
+    "slimmable": true,
     "slim_ratios": [
-        1.0
+        1.0,
+        0.95
     ],
     "model_type": "vit"
 }

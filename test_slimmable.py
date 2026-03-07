@@ -1,4 +1,6 @@
 import copy
+import importlib
+from multiprocessing import dummy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -33,6 +35,17 @@ class Test:
         torch.backends.cudnn.benchmark = False
         self.dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
         self.ratios = [1.0, 0.75, 0.5, 0.25]
+        class A: pass
+        args = A()
+        args.model = 'vit'
+        args.dataset = 'cifar100'
+        args.policy = 'boosted'
+        args.alg = 'depthfl'
+        args.blocks = (2,5,8,11)
+        args.load_path = ''
+        args.ft = 'full'
+        args.device = 0
+        self.args = args
 
 
     def adma_optim(self, model):
@@ -157,6 +170,40 @@ class Test:
             optim_slim.step()
 
 
+    def test_slimmable_layerexit(self):
+
+
+        from utils.train_utils import get_flops
+        from utils.modelload.vit import ViTExitLayer, ExitConfig, ExitModel
+        config_path = './models/facebook/deit-tiny-patch16-224'
+        based_model = importlib.import_module(f'utils.modelload.vit')
+        pre_model = based_model.Model.from_pretrained(pretrained_model_name_or_path=config_path)
+        eq_config = copy.deepcopy(pre_model.config)
+        num_labels = 100
+        exits = (2,5,8,11)
+        policy = 'base'
+        alg = 'depthfl'
+        blocks = (2,5,8,11)
+        eq_exit_config = ExitConfig(eq_config, num_labels=num_labels, exits=exits, policy=policy, alg=alg, blocks=blocks) 
+
+        origin_layer = ViTExitLayer(config=eq_exit_config, index=2).to(0)
+        slim_layer = copy.deepcopy(origin_layer)
+        convert_to_slimmable(slim_layer, ratios=self.ratios).to(0)
+
+        # print(slim_layer)
+        # exit(0)
+        set_model_config(slim_layer.config)
+        set_width_ratio(0.75, slim_layer)
+        
+        # slim_flops = get_flops(self.args, slim_layer, input_feature=True)
+        origin_flops = get_flops(self.args, origin_layer, input_feature=True)
+        
+        for ratio in self.ratios:
+            set_width_ratio(ratio, slim_layer)
+            slim_flops = get_flops(self.args, slim_layer, input_feature=True)
+            print(f"At ratio {ratio}, Slimmable layer FLOPs: {slim_flops}, div by origin FLOPs: {slim_flops/origin_flops:.4f}")
+       
+
     def test_slimmable_vit(self):
         class A: pass
         args = A()
@@ -177,7 +224,6 @@ class Test:
 
         model = load_model(args, model_depth=depth, is_scalefl=False, exits=(2,5,8,11)).to(0)
         origin_model = copy.deepcopy(model)
-        # print(origin_model)
         original_exits_logits = model(**dummy)
         # 转换为slimmable
         slim_model = convert_to_slimmable(model, ratios=ratios).to(0)
@@ -530,11 +576,12 @@ class Test:
         from utils.modelload.modelloader import load_model_eval
         slim_config_path = 'EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].json'
         slim_model_path = 'EXPS2/BASE_CIFAR_ALL/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.9].pth'
-        origin_config_path = 'EXPS/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
-        origin_model_path = 'EXPS/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
+        origin_config_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+        origin_model_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
 
-        slim_model = load_model_eval(args, model_path=slim_model_path, config_path=slim_config_path)
+        slim_model = load_model_eval(args, model_path=slim_model_path, config_path=slim_config_path)        
         origin_model = load_model_eval(args, model_path=origin_model_path, config_path=origin_config_path, model_depth=9)
+
         set_width_ratio(0.9, slim_model)
 
         eval = Eval(args=args)
@@ -561,5 +608,8 @@ t = Test()
 # t.test_area()
 # t.test_slim_area()
 
+# t.test_slimmable_layerexit()
+t.test_slimmable_vit()
 # t.test_slimmable_vit_lora()
 # t.test_slimmable_load_lora()
+# t.test_slim_dynamic_compute()

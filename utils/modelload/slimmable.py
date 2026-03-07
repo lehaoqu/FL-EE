@@ -59,6 +59,13 @@ def set_width_ratio(ratio, model):
     
 
 class SlimmableLinear(nn.Linear):
+
+    def __init__(self, in_features, out_features, bias = True, device=None, dtype=None, fix_in_dim=False, fix_out_dim=False):
+        super().__init__(in_features, out_features, bias, device, dtype)
+        self.fix_in_dim = fix_in_dim
+        self.fix_out_dim = fix_out_dim
+
+
     def forward(self, input):
         # 获取当前权重的最大维度
         in_features = self.in_features
@@ -69,15 +76,21 @@ class SlimmableLinear(nn.Linear):
         # in_dim = input.shape[-1]
         # out_dim = int(out_features * CURRENT_WIDTH_RATIO)
 
-        if in_features == HIDEEN_SIZE or in_features == INTERMEDIATE_SIZE:
-            in_dim = int(in_features * CURRENT_WIDTH_RATIO // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
-        else:
+        if self.fix_in_dim:
             in_dim = in_features
-        if out_features == HIDEEN_SIZE or out_features == INTERMEDIATE_SIZE:
-            out_dim = int(out_features * CURRENT_WIDTH_RATIO // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
         else:
+            if in_features == HIDEEN_SIZE or in_features == INTERMEDIATE_SIZE:
+                in_dim = int(in_features * CURRENT_WIDTH_RATIO // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
+            else:
+                in_dim = in_features
+        if self.fix_out_dim:
             out_dim = out_features
-        
+        else:
+            if out_features == HIDEEN_SIZE or out_features == INTERMEDIATE_SIZE:
+                out_dim = int(out_features * CURRENT_WIDTH_RATIO // NUM_ATTENTION_HEADS * NUM_ATTENTION_HEADS)
+            else:
+                out_dim = out_features
+
         # print(f'SlimmableLinear: in_dim={in_dim}, out_dim={out_dim}')
         # 权重切片：取前 out_dim 行，前 in_dim 列
         weight = self.weight[:out_dim, :in_dim]
@@ -207,52 +220,66 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
 
     # 1. 替换基础层
     for name, module in model.named_children():
-        if isinstance(module, nn.Linear):
-            # 替换 Linear
-            new_layer = SlimmableLinear(module.in_features, module.out_features, bias=module.bias is not None)
-            new_layer.weight.data = module.weight.data
-            new_layer.weight.requires_grad = module.weight.requires_grad
-            if module.bias is not None:
-                new_layer.bias.data = module.bias.data
-                new_layer.bias.requires_grad = module.bias.requires_grad
-            setattr(model, name, new_layer)
-        
-        elif isinstance(module, nn.LayerNorm):
-            # 获取原有的维度
-            original_dim = module.normalized_shape[0] if isinstance(module.normalized_shape, tuple) else module.normalized_shape
-            
-            # 初始化 Switchable LayerNorm
-            new_layer = SwitchableLayerNorm(original_dim, eps=module.eps, ratios=ratios)
-            
-            # 将大模型(1.0)的权重复制给对应的层，小模型(0.5)的权重随机初始化
-            new_layer.norm_dict['1p0'].weight.data = module.weight.data
-            new_layer.norm_dict['1p0'].bias.data = module.bias.data
-            new_layer.norm_dict['1p0'].weight.requires_grad = module.weight.requires_grad
-            new_layer.norm_dict['1p0'].bias.requires_grad = module.bias.requires_grad
-            
-            # (可选) 如果你想用切片初始化小模型的LN作为起点也可以，但之后它们会独立更新
-            # 小模型的初始化策略很重要，通常直接随机或复制切片均可
-            for r in ratios:
-                if r != 1.0:
-                    dim = get_aligned_dim(original_dim, r)
-                    new_layer.norm_dict[str(r).replace('.', 'p')].weight.data = module.weight.data[:dim].clone()
-                    new_layer.norm_dict[str(r).replace('.', 'p')].bias.data = module.bias.data[:dim].clone()
-                    new_layer.norm_dict[str(r).replace('.', 'p')].weight.requires_grad = module.weight.requires_grad
-                    new_layer.norm_dict[str(r).replace('.', 'p')].bias.requires_grad = module.bias.requires_grad
+        # 获取当前模块名，用于过滤
+        class_name = model.__class__.__name__
 
-            setattr(model, name, new_layer)
+        if isinstance(module, nn.Linear):
+            fix = {
+                'ViTIntermediate': {'fix_in_dim': True, 'fix_out_dim': False},  # intermediate 的输入是 hidden_size，输出是 intermediate_size，保持输出维度不变
+                'ViTOutput': {'fix_in_dim': False, 'fix_out_dim': True},  # output 的输入是 intermediate_size，输出是 hidden_size，保持输入维度不变
+                'ViTSelfAttention': {'fix_in_dim': True, 'fix_out_dim': False},  # self-attention 的输入是 hidden_size，输出是 hidden_size，保持输出维度不变
+                'ViTSelfOutput': {'fix_in_dim': False, 'fix_out_dim': True},  # self-attention output 的输入是 hidden_size，输出是 hidden_size，保持输入维度不变
+            }
+            # 只有当父模块是 ViTIntermediate 或 ViTOutput 时，才替换为 SlimmableLinear
+            if class_name in ['ViTIntermediate', 'ViTOutput', 'ViTSelfAttention', 'ViTSelfOutput']:
+
+                new_layer = SlimmableLinear(module.in_features, module.out_features, bias=module.bias is not None, **fix[class_name])
+                new_layer.weight.data = module.weight.data
+                new_layer.weight.requires_grad = module.weight.requires_grad
+                if module.bias is not None:
+                    new_layer.bias.data = module.bias.data
+                    new_layer.bias.requires_grad = module.bias.requires_grad
+                setattr(model, name, new_layer)
+            else:
+                # 其他模块的 Linear 保持不变，不进行替换
+                pass
+        
+        # elif isinstance(module, nn.LayerNorm):
+        #     # 获取原有的维度
+        #     original_dim = module.normalized_shape[0] if isinstance(module.normalized_shape, tuple) else module.normalized_shape
             
-        elif isinstance(module, nn.Conv2d):
-            # 替换 Patch Embeddings 里的 Conv2d
-            new_layer = SlimmableConv2d(module.in_channels, module.out_channels, 
-                                        kernel_size=module.kernel_size, stride=module.stride, 
-                                        padding=module.padding)
-            new_layer.weight.data = module.weight.data
-            new_layer.weight.requires_grad = module.weight.requires_grad
-            if module.bias is not None:
-                new_layer.bias.data = module.bias.data
-                new_layer.bias.requires_grad = module.bias.requires_grad
-            setattr(model, name, new_layer)
+        #     # 初始化 Switchable LayerNorm
+        #     new_layer = SwitchableLayerNorm(original_dim, eps=module.eps, ratios=ratios)
+            
+        #     # 将大模型(1.0)的权重复制给对应的层，小模型(0.5)的权重随机初始化
+        #     new_layer.norm_dict['1p0'].weight.data = module.weight.data
+        #     new_layer.norm_dict['1p0'].bias.data = module.bias.data
+        #     new_layer.norm_dict['1p0'].weight.requires_grad = module.weight.requires_grad
+        #     new_layer.norm_dict['1p0'].bias.requires_grad = module.bias.requires_grad
+            
+        #     # (可选) 如果你想用切片初始化小模型的LN作为起点也可以，但之后它们会独立更新
+        #     # 小模型的初始化策略很重要，通常直接随机或复制切片均可
+        #     for r in ratios:
+        #         if r != 1.0:
+        #             dim = get_aligned_dim(original_dim, r)
+        #             new_layer.norm_dict[str(r).replace('.', 'p')].weight.data = module.weight.data[:dim].clone()
+        #             new_layer.norm_dict[str(r).replace('.', 'p')].bias.data = module.bias.data[:dim].clone()
+        #             new_layer.norm_dict[str(r).replace('.', 'p')].weight.requires_grad = module.weight.requires_grad
+        #             new_layer.norm_dict[str(r).replace('.', 'p')].bias.requires_grad = module.bias.requires_grad
+
+        #     setattr(model, name, new_layer)
+            
+        # elif isinstance(module, nn.Conv2d):
+        #     # 替换 Patch Embeddings 里的 Conv2d
+        #     new_layer = SlimmableConv2d(module.in_channels, module.out_channels, 
+        #                                 kernel_size=module.kernel_size, stride=module.stride, 
+        #                                 padding=module.padding)
+        #     new_layer.weight.data = module.weight.data
+        #     new_layer.weight.requires_grad = module.weight.requires_grad
+        #     if module.bias is not None:
+        #         new_layer.bias.data = module.bias.data
+        #         new_layer.bias.requires_grad = module.bias.requires_grad
+        #     setattr(model, name, new_layer)
             
         else:
             # 递归处理子模块
@@ -310,15 +337,15 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5]):
         return m
 
 
-    # 应用 Monkey Patch
-    for module in model.modules():
-        if isinstance(module, ViTSelfAttention):
-            # 替换 Attention 的 reshape 逻辑
-            module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
-            # module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
-        if isinstance(module, ViTEmbeddings):
-            # 替换 Embeddings 的 forward
-            module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
-        if isinstance(module, Ree):
-            module.forward = slimmable_ree_forward.__get__(module, Ree)
+    # # 应用 Monkey Patch
+    # for module in model.modules():
+    #     if isinstance(module, ViTSelfAttention):
+    #         # 替换 Attention 的 reshape 逻辑
+    #         module.transpose_for_scores = slimmable_transpose_for_scores.__get__(module, ViTSelfAttention)
+    #         # module.forward = slimmable_vit_self_attention_forward.__get__(module, ViTSelfAttention)
+    #     if isinstance(module, ViTEmbeddings):
+    #         # 替换 Embeddings 的 forward
+    #         module.forward = slimmable_embeddings_forward.__get__(module, ViTEmbeddings)
+    #     if isinstance(module, Ree):
+    #         module.forward = slimmable_ree_forward.__get__(module, Ree)
     return model

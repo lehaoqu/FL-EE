@@ -303,7 +303,7 @@ def difficulty_measure(exits_logits, label=None, metric='loss', rt_exits_diff=Fa
     else: return diff_pred
 
 
-def get_flops(args, model, stop_exit=3):
+def get_flops(args, model, stop_exit=3, input_feature=False):
     from utils.modelload.slimmable import convert_to_slimmable, custom_ops_dict, set_width_ratio
     from thop import profile
     # 定义一个专用的 Module 包装器（放在类内或外均可，这里建议放外面或作为内部类）
@@ -315,17 +315,23 @@ def get_flops(args, model, stop_exit=3):
             self.stop_exit = stop_exit
 
         def forward(self, _=None):
-            return self.model(**self.dummy_input, stop_exit=self.stop_exit)
+            if input_feature:
+                return self.model(**self.dummy_input)
+            else:
+                return self.model(**self.dummy_input, stop_exit=self.stop_exit)
 
-    if 'cifar' in args.dataset or 'imagenet' in args.dataset:
-        dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
-    elif 'glue' in args.dataset or 'bert' in args.dataset:
-        dummy_input = {
-            'input_ids': torch.zeros(1, 128, dtype=torch.long).to(args.device),
-            'attention_mask': torch.ones(1, 128, dtype=torch.long).to(args.device)
-        }
+    if input_feature:
+        dummy_input = {'hidden_states': torch.zeros(1, 197, 192).to(args.device)}
     else:
-        dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
+        if 'cifar' in args.dataset or 'imagenet' in args.dataset:
+            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
+        elif 'glue' in args.dataset or 'bert' in args.dataset:
+            dummy_input = {
+                'input_ids': torch.zeros(1, 128, dtype=torch.long).to(args.device),
+                'attention_mask': torch.ones(1, 128, dtype=torch.long).to(args.device)
+            }
+        else:
+            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
 
     # ✅ 使用 _ExitWrapper 包装（是 nn.Module！）
     wrapped_model = _ExitWrapper(model, dummy_input, stop_exit=stop_exit).to(args.device)
