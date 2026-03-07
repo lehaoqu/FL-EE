@@ -16,8 +16,8 @@ class Policy():
         self.loss_func = nn.CrossEntropyLoss()
         self.reweight = [self.args.ensemble_weight] * self.exits_num
     
-    def train(self, model, batch, label, ws=None) -> torch.tensor:
-        exits_logits = model(**batch)
+    def train(self, model, batch, label, ws=None, rt_feature=False) -> torch.tensor:
+        exits_logits, exits_features = model(**batch, rt_feature=True)
         
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
         
@@ -34,6 +34,8 @@ class Policy():
             pred_final = pred_ensembel + logits
             ensembel_exits_logits.append(pred_final)
             exits_loss += (self.loss_func(pred_final, label) * ws[i],)
+        if rt_feature:
+            return exits_loss, ensembel_exits_logits, exits_features
         return exits_loss, ensembel_exits_logits
         
 

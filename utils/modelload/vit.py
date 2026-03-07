@@ -160,12 +160,27 @@ class ViTExitEncoder(nn.Module):
         self,
         hidden_states: torch.Tensor,
         head_mask: Optional[torch.Tensor] = None,
+        input_block: Optional[int] = None,
         stop_exit: Optional[int] = None,
         frozen: Optional[bool] = False,
     ) -> Union[tuple, BaseModelOutput, torch.Tensor]:
         
         exits_logits = ()
         exits_feature = ()
+        if input_block is not None:
+            layer_index_input = 0 if input_block == 0 else self.config.exits[input_block - 1] + 1
+            for i in range(layer_index_input, self.config.num_hidden_layers):
+                layer_module = self.layer[i]
+                layer_head_mask = head_mask[i] if head_mask is not None else None
+                layer_outputs = layer_module(hidden_states, layer_head_mask)
+                hidden_states, exit_logits = layer_outputs[0], layer_outputs[1]
+                if layer_module.exit:
+                    exits_logits += (exit_logits,)
+                    exits_feature += (hidden_states[:, 0, :], )
+                    hidden_states = hidden_states.detach() if frozen is True else hidden_states
+                if stop_exit is not None and i == self.config.exits[stop_exit]: break
+            return exits_logits, exits_feature
+
         for i, layer_module in enumerate(self.layer):
             layer_head_mask = head_mask[i] if head_mask is not None else None
             layer_outputs = layer_module(hidden_states, layer_head_mask)
@@ -274,6 +289,7 @@ class ViTExitModel(ViTPreTrainedModel):
         head_mask: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
         is_latent: Optional[bool] = False,
+        input_block: Optional[int] = None,
         stop_exit:Optional[int] = None,
         frozen:Optional[bool] = None,
         rt_embedding:Optional[bool] = False
@@ -297,10 +313,12 @@ class ViTExitModel(ViTPreTrainedModel):
         if rt_embedding:
             return hidden_states
         
+        # 这里应该可以指定具体流经encoder的哪个block
         exits_logits, exits_feature = self.encoder(
             hidden_states,
             head_mask=head_mask,
             stop_exit=stop_exit,
+            input_block=input_block,
             frozen=frozen
         )
             
@@ -324,6 +342,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         self.vit = ViTExitModel(config, add_pooling_layer=False)
         self.post_init()
 
+    # 添加一个方法，输入特征，以及块的index，输出块经过beta的特征。
     def forward(
         self,
         pixel_values: Optional[torch.Tensor] = None,
@@ -331,6 +350,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         labels: Optional[torch.Tensor] = None,
         interpolate_pos_encoding: Optional[bool] = None,
         is_latent: Optional[bool] = False,
+        input_block: Optional[int] = None,
         stop_exit:Optional[int] = None,
         rt_embedding:Optional[bool]=False,
         rt_feature:Optional[bool]=False,
@@ -350,10 +370,12 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
             stop_exit=stop_exit,
             is_latent=is_latent,
             rt_embedding=rt_embedding,
-            frozen=frozen
+            frozen=frozen,
+            input_block=input_block,
         )
         if rt_embedding: return outputs
         if rt_feature: return outputs
+        if input_block is not None: return outputs
         return outputs[0]
 
         # sequence_output = outputs[0]

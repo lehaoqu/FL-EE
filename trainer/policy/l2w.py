@@ -123,8 +123,8 @@ class Policy():
         return probs_list
     
     
-    def train(self, model, batch, label, ws=None) -> torch.tensor:
-        exits_logits = model(**batch)
+    def train(self, model, batch, label, ws=None, rt_feature=False) -> torch.tensor:
+        exits_logits, exits_features = model(**batch, rt_feature=True)
         assert self.exits_num == len(exits_logits), f'expected {self.exits_num}, but {len(exits_logits)}'
 
         ws = [1 for i in range(self.exits_num)] if ws is None else ws
@@ -148,9 +148,11 @@ class Policy():
         exits_loss = ()
         for i, exit_loss in enumerate(losses_tuple) :
             exits_loss += (exit_loss * ws[i],)
+        if rt_feature:
+            return exits_loss, exits_logits, exits_features
         return exits_loss, exits_logits
-    
-    
+
+
     def train_meta(self, model, batch, label, optimizer):
         batch_1, batch_2 = {},{}
         for key in batch.keys():
