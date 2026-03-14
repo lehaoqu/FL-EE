@@ -141,12 +141,17 @@ class Eval():
                 except Exception as e:
                     self._log(f"[WARN] Skip broken eval json: {self.eval_json_path} ({e}); will re-evaluate.")
                 else:
-                    if 'budgeted_acc' not in dct:
+                    if 'budgeted_acc' not in dct or 'budgeted_auc' not in dct:
                         x = dct.get('flops', [])
                         y = dct.get('test', [])
                         from utils.train_utils import area_under_fitted_curve
                         _area, acc = area_under_fitted_curve(y, x)
                         dct['budgeted_acc'] = acc
+                        dct['budgeted_auc'] = _area
+                        minx = min(x) if x else None
+                        maxx = max(x) if x else None
+                        dct['min_flops'] = minx
+                        dct['max_flops'] = maxx
                         self._atomic_json_dump(self.eval_json_path, dct)
                     continue
             if self.args.if_mode == 'anytime':
@@ -206,7 +211,9 @@ class Eval():
         from utils.train_utils import area_under_fitted_curve
         area, acc = area_under_fitted_curve(y, x)
         self._log(f'Budgeted AUC: {area}, AVG ACC: {acc}')
-        self._atomic_json_dump(self.eval_json_path, {'budgeted_acc': acc, 'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np})
+        minx = min(x) if x else None
+        maxx = max(x) if x else None
+        self._atomic_json_dump(self.eval_json_path, {'budgeted_auc': area, 'min_flops': minx, 'max_flops': maxx, 'budgeted_acc': acc, 'test':acc_test_np, 'val':acc_val_np, 'flops':exp_flops_np})
             
     def cos_similiarity(self, all_sample_exits_logits):
         sample_num = all_sample_exits_logits[0].size(0)

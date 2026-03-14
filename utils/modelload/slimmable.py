@@ -222,6 +222,16 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5], block_wise=False):
     for name, module in model.named_children():
         # 获取当前模块名，用于过滤
         class_name = model.__class__.__name__
+        if 'lora_B' in name:
+            origin_layer = module['default']
+            new_layer = SlimmableLinear(origin_layer.in_features, origin_layer.out_features, bias=origin_layer.bias is not None, fix_in_dim=True, fix_out_dim=False)
+            new_layer.weight.data = module['default'].weight.data
+            new_layer.weight.requires_grad = module['default'].weight.requires_grad
+            if origin_layer.bias is not None:
+                new_layer.bias.data = origin_layer.bias.data
+                new_layer.bias.requires_grad = origin_layer.bias.requires_grad
+            setattr(module, 'default', new_layer)
+            continue
 
         if isinstance(module, nn.Linear):
             fix = {
@@ -229,7 +239,20 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5], block_wise=False):
                 'ViTOutput': {'fix_in_dim': False, 'fix_out_dim': True},  # output 的输入是 intermediate_size，输出是 hidden_size，保持输入维度不变
                 'ViTSelfAttention': {'fix_in_dim': True, 'fix_out_dim': False},  # self-attention 的输入是 hidden_size，输出是 hidden_size，保持输出维度不变
                 'ViTSelfOutput': {'fix_in_dim': False, 'fix_out_dim': True},  # self-attention output 的输入是 hidden_size，输出是 hidden_size，保持输入维度不变
+                # 'lora.Linear': {'fix_in_dim': True, 'fix_out_dim': False},  # LoRA 的线性层保持输入维度不变
+                # 'lora_B': {'fix_in_dim': True, 'fix_out_dim': False},  # LoRA 的 B 矩阵保持输入维度不变，输出维度根据 slim_ratio 切片
             }
+            if 'base_layer' in name:
+                new_layer = SlimmableLinear(module.in_features, module.out_features, bias=module.bias is not None, fix_in_dim=True, fix_out_dim=False)
+                new_layer.weight.data = module.weight.data
+                new_layer.weight.requires_grad = module.weight.requires_grad
+                if module.bias is not None:
+                    new_layer.bias.data = module.bias.data
+                    new_layer.bias.requires_grad = module.bias.requires_grad
+                setattr(model, name, new_layer)
+                continue
+
+
             # 只有当父模块是 ViTIntermediate 或 ViTOutput 时，才替换为 SlimmableLinear
             if class_name in ['ViTIntermediate', 'ViTOutput', 'ViTSelfAttention', 'ViTSelfOutput']:
 
@@ -240,6 +263,7 @@ def convert_to_slimmable(model, ratios=[1.0, 0.5], block_wise=False):
                     new_layer.bias.data = module.bias.data
                     new_layer.bias.requires_grad = module.bias.requires_grad
                 setattr(model, name, new_layer)
+
             else:
                 # 其他模块的 Linear 保持不变，不进行替换
                 pass

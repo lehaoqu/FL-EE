@@ -225,6 +225,7 @@ class ViTExitEncoderRee(nn.Module):
         output_attentions: bool = False,
         stop_exit: Optional[int] = None,
         frozen: Optional[bool] = False,
+        input_block: Optional[int] = None,
     ):
         
         cls_tokens = []

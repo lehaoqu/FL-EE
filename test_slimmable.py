@@ -288,11 +288,16 @@ class Test:
         dummy = {'pixel_values': torch.randn(1, 3, 224, 224).to(0)}
 
         model = load_model(args, model_depth=depth, is_scalefl=False, exits=(2,5,8,11)).to(0)
+
         origin_model = copy.deepcopy(model)
         # print(origin_model)
         original_exits_logits = model(**dummy)
         # 转换为slimmable
         slim_model = convert_to_slimmable(model, ratios=ratios).to(0)
+        # print(slim_model)
+        # for n, p in slim_model.named_parameters():
+        #     print(n, p.shape, p.requires_grad)
+        # exit(0)
 
         set_model_config(slim_model.config)
 
@@ -609,7 +614,7 @@ t = Test()
 # t.test_slim_area()
 
 # t.test_slimmable_layerexit()
-t.test_slimmable_vit()
-# t.test_slimmable_vit_lora()
+# t.test_slimmable_vit()
+t.test_slimmable_vit_lora()
 # t.test_slimmable_load_lora()
 # t.test_slim_dynamic_compute()

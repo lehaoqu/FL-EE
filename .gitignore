@@ -17,7 +17,6 @@ dataset/rte*/
 cifar*/
 models/
 *.pth
-img/
 __pycache__/
 wandb/
 front-exps/

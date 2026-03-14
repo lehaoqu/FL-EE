@@ -5,7 +5,7 @@ total_num=100
 
 md=vit
 bs=32
-lr=0.05
+lr=$5
 
 # noniids=(1000 1 0.1)
 noniids=(1000)

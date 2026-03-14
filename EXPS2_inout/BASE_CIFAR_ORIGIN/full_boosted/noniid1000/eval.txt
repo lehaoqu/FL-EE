@@ -1,0 +1,25 @@
+=====eval model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted======
+logits calc compeleted
+Evaluating with exits: [2]
+Evaluating with exits: [2, 5]
+Evaluating with exits: [2, 5, 8]
+Evaluating with exits: [2, 5, 8, 11]
+=======eval model:eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted========
+logits calc compeleted
+Evaluating with exits: [2]
+Evaluating with exits: [2, 5]
+Evaluating with exits: [2, 5, 8]
+Evaluating with exits: [2, 5, 8, 11]
+======eval model:depthfl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted======
+logits calc compeleted
+Evaluating with exits: [2]
+Evaluating with exits: [2, 5]
+Evaluating with exits: [2, 5, 8]
+Evaluating with exits: [2, 5, 8, 11]
+=====eval model:darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted=====
+logits calc compeleted
+Evaluating with exits: [2]
+Evaluating with exits: [2, 5]
+Evaluating with exits: [2, 5, 8]
+Evaluating with exits: [2, 5, 8, 11]
+======eval model:reefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.005_boosted=======

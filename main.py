@@ -216,9 +216,9 @@ class FedSim:
 if __name__ == '__main__':
     args = args_parser()
     args.slim_str = f'_slim_{str(args.slim_ratios).replace(" ","").replace(",","-")}' if args.slimmable else ''
-    projext_name = f"ResearchPoint_Exit_{args.dataset}" if not args.slimmable else f"ResearchPoint_Slimmable_{args.dataset}"
-    wdb = wandb.init(mode="disabled")
-    # wdb = wandb.init(project=projext_name, name=f"{args.alg}-{args.policy}-{args.ft}{args.slim_str}")
+    projext_name = f"ResearchPoint_Exit_{args.dataset}" if not args.slimmable else f"ResearchPoint_Slim_{args.dataset}" if not args.slim_block_wise else f"ResearchPoint_Slim_Block_{args.dataset}"
+    # wdb = wandb.init(mode="disabled")
+    wdb = wandb.init(project=projext_name, name=f"{args.alg}-{args.policy}-{args.ft}{args.slim_str}")
 
     seed = args.seed
     torch.manual_seed(seed)

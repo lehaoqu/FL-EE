@@ -63,10 +63,12 @@ class Client(BaseClient):
         # === train ===
         self.model.to(self.device)
         batch_loss = []
-        kd_exits_weights_by_ratio, kd_exits_sims_by_ratio = self.calc_slim_full_jaccard_weights()
-        
-        if not self.args.slim_kd_dyn_weights:
-            kd_exits_weights_by_ratio = {str(ratio): self.args.slim_kd_weights for ratio in self.args.slim_ratios if ratio != 1.0}
+
+        if self.args.slimmable:
+            kd_exits_weights_by_ratio, kd_exits_sims_by_ratio = self.calc_slim_full_jaccard_weights()
+
+            if not self.args.slim_kd_dyn_weights:
+                kd_exits_weights_by_ratio = {str(ratio): self.args.slim_kd_weights for ratio in self.args.slim_ratios if ratio != 1.0}
         
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
@@ -122,7 +124,7 @@ class Client(BaseClient):
         # === record loss ===
         self.metric['loss'].append(sum(batch_loss) / len(batch_loss))
         # self.metric['kd_weights'].append(kd_exits_weights_by_ratio)
-        self.metric['kd_sims'].append(kd_exits_sims_by_ratio)
+        self.metric['kd_sims'].append(kd_exits_sims_by_ratio) if self.args.slimmable else None
     
 
     def get_embedding(self,):

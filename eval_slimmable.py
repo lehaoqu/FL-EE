@@ -190,6 +190,7 @@ if __name__ == '__main__':
             exit_indices_by_ratio = {}
             probs = None
             # eval loop for each slim ratio
+            
             for ratio in slim_ratios:
                 # print(f"Evaluating at slim ratio: {ratio}")
                 if full_model.config.slimmable:
@@ -235,15 +236,56 @@ if __name__ == '__main__':
                     }
                     # print(exit_indices_by_ratio[str(ratio)]['exit_counts'])
             
-            fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
-            area, acc = area_under_fitted_curve(fy, fx)
-            print(f"AUC: {area}, ALL SLIM Budgeted Acc: {acc}")
-            ratio_1_eval_path = eval.eval_dir+eval.model_path+f'_slim_1.0_exits_[2, 5, 8, 11]_eval.json'
-            with open(ratio_1_eval_path, 'r') as f:
-                ratio_1_dct = json.load(f)
-            merged = {'all_slim_budgeted_acc': acc, **{k: v for k, v in ratio_1_dct.items()}}
-            with open(ratio_1_eval_path, 'w') as f:
-                json.dump(merged, f)
+            for exit_index in range(1, len(full_model.config.exits)):
+                print(f"Calculating AUC for exit {exit_index} across slim ratios...")
+                exit_slim_flops_list = {}
+                exit_slim_acc_list = {}
+                for ratio in slim_ratios:
+                    eval_exit_path = eval.eval_dir + eval.model_path + f'_slim_{ratio}_exits_{full_model.config.exits[:exit_index+1]}_eval.json'
+                    with open(eval_exit_path, 'r') as f:
+                        dct = json.load(f)
+                    exit_slim_flops_list[ratio] = dct['flops']
+                    exit_slim_acc_list[ratio] = dct['test']
+                # print(f"Exit {exit_index} slim flops list: {exit_slim_flops_list}")
+                # print(f"Exit {exit_index} slim acc list: {exit_slim_acc_list}")
+                fx, fy = fuse_curves_take_max(exit_slim_flops_list, exit_slim_acc_list, ref_ratio=1.0)
+                area, acc = area_under_fitted_curve(fy, fx)
+                minx = min(min(x) for x in exit_slim_flops_list.values())
+                maxx = max(max(x) for x in exit_slim_flops_list.values())
+                print(f"Exit {exit_index}: min_flops:{minx}, max_flops: {maxx}, AUC: {area}, ALL SLIM Budgeted Acc: {acc}")
+                ratio_1_exit_eval_path = eval.eval_dir + eval.model_path + f'_slim_1.0_exits_{full_model.config.exits[:exit_index+1]}_eval.json'
+                print(ratio_1_exit_eval_path)
+                with open(ratio_1_exit_eval_path, 'r') as f:
+                    ratio_1_exit_dct = json.load(f)
+                merged_exit = {
+                    'all_slim_budgeted_auc': area,
+                    'min_flops': minx,
+                    'max_flops': maxx,
+                    'd': maxx - minx,
+                    'all_slim_budgeted_acc': acc,
+                    **{k: v for k, v in ratio_1_exit_dct.items() if k not in ['all_slim_budgeted_auc', 'all_slim_budgeted_acc', 'min_flops', 'max_flops']}
+                }
+                print(merged_exit)
+                with open(ratio_1_exit_eval_path, 'w') as f:
+                    json.dump(merged_exit, f)
+                
+
+            
+            # fx, fy = fuse_curves_take_max(slim_x_list, slim_y_list, ref_ratio=1.0)
+            # area, acc = area_under_fitted_curve(fy, fx)
+            # # print(slim_x_list)
+            # # print(slim_y_list)
+            # minx = min(min(x) for x in slim_x_list.values())
+            # maxx = max(max(x) for x in slim_x_list.values())
+            # print(f"min_flops:{minx}, max_flops: {maxx}, AUC: {area}, ALL SLIM Budgeted Acc: {acc}")
+            # ratio_1_eval_path = eval.eval_dir+eval.model_path+f'_slim_1.0_exits_[2, 5, 8, 11]_eval.json'
+            # print(ratio_1_eval_path)
+            # with open(ratio_1_eval_path, 'r') as f:
+            #     ratio_1_dct = json.load(f)
+            # merged = {'all_slim_budgeted_auc': area, 'min_flops': minx, 'max_flops': maxx, 'd': maxx - minx, 'all_slim_budgeted_acc': acc, **{k: v for k, v in ratio_1_dct.items() if k not in ['all_slim_budgeted_auc', 'all_slim_budgeted_acc', 'min_flops', 'max_flops']}}
+            # print(merged)
+            # with open(ratio_1_eval_path, 'w') as f:
+            #     json.dump(merged, f)
 
             if exit_indices_by_ratio:
                 # print('in')

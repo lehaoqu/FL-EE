@@ -1,0 +1,88 @@
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: lora
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS2_inout/BASE_CIFAR/lora_boosted/noniid1
+device: 3
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: True
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: False
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS2_inout/BASE_CIFAR/lora_boosted/noniid1/darkflpg_cifar100_noniid1_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 5.94, exits:['0.98', '1.61', '6.43', '14.73'] loss: 12.09
+  slim[0.8]: kd_sims:['0.50', '0.28', '0.25', '0.32']
+  slim[0.9]: kd_sims:['0.53', '0.34', '0.30', '0.37']
+  slim[0.8]: exits:['1.03', '1.69', '2.56', '2.85']
+  slim[0.9]: exits:['1.15', '1.58', '2.87', '5.68']
+  slim[1.0]: exits:['0.98', '1.61', '6.43', '14.73']
+========== Round 10 ==========
+server, accuracy: 25.07, exits:['0.80', '8.12', '36.95', '54.43'] loss: 9.64
+  slim[0.8]: kd_sims:['0.47', '0.34', '0.44', '0.43']
+  slim[0.9]: kd_sims:['0.57', '0.47', '0.51', '0.55']
+  slim[0.8]: exits:['1.68', '5.61', '20.92', '28.33']
+  slim[0.9]: exits:['1.81', '6.65', '27.63', '39.05']
+  slim[1.0]: exits:['0.80', '8.12', '36.95', '54.43']
