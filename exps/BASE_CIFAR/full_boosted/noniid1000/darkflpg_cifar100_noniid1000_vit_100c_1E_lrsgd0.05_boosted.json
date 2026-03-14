@@ -1,6 +1,6 @@
 {
     "return_dict": true,
-    "output_hidden_states": true,
+    "output_hidden_states": false,
     "output_attentions": false,
     "torchscript": false,
     "torch_dtype": null,
@@ -255,7 +255,8 @@
     "task_specific_params": null,
     "problem_type": null,
     "_name_or_path": "",
-    "transformers_version": "4.37.0.dev0",
+    "_attn_implementation_autoset": true,
+    "transformers_version": "4.47.1",
     "hidden_size": 192,
     "num_hidden_layers": 12,
     "num_attention_heads": 3,

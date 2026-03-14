@@ -8,8 +8,8 @@ load_path:
 seed: 1117
 total_num: 100
 sr: 0.1
-suffix: exps/test/1e-3
-device: 2
+suffix: EXPS/BASE_CIFAR/full_boosted/noniid1000
+device: 0
 rnd: 500
 bs: 32
 epoch: 1
@@ -24,6 +24,9 @@ if_mode: all
 cosine: False
 valid_ratio: 0.2
 eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
 is_latent: True
 s_epoches: 2
 s_bs: 32
@@ -57,8 +60,9 @@ sw_type: soft
 exit_p: 30
 s_gamma: 0.99
 wd: 0.001
+increase: True
 ensemble_weight: 0.2
-output: <_io.TextIOWrapper name='./exps/test/1e-3/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+output: <_io.TextIOWrapper name='./EXPS/BASE_CIFAR/full_boosted/noniid1000/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
 ========== Round 0 ==========
 server, accuracy: 10.50, exits:['1.43', '0.91', '11.33', '28.34'] loss: 12.97
 ========== Round 10 ==========

@@ -8,8 +8,8 @@ load_path:
 seed: 1117
 total_num: 100
 sr: 0.1
-suffix: exps/BASE_CIFAR/full_boosted/noniid1000
-device: 0
+suffix: EXPS/BASE_CIFAR/full_boosted/noniid1000
+device: 3
 rnd: 500
 bs: 32
 epoch: 1
@@ -24,9 +24,12 @@ if_mode: all
 cosine: False
 valid_ratio: 0.2
 eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
 T: 1
 ensemble_weight: 0.2
-output: <_io.TextIOWrapper name='./exps/BASE_CIFAR/full_boosted/noniid1000/depthfl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+output: <_io.TextIOWrapper name='./EXPS/BASE_CIFAR/full_boosted/noniid1000/depthfl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
 ========== Round 0 ==========
 server, accuracy: 10.81, exits:['2.16', '1.38', '10.08', '29.60'] loss: 13.03
 ========== Round 10 ==========

@@ -8,7 +8,7 @@ load_path:
 seed: 1117
 total_num: 100
 sr: 0.1
-suffix: exps/ABLATION_CIFAR/distance_diffg/
+suffix: EXPS/BASE_CIFAR/full_boosted/noniid1000
 device: 3
 rnd: 500
 bs: 32
@@ -24,6 +24,9 @@ if_mode: all
 cosine: False
 valid_ratio: 0.2
 eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
 is_latent: True
 s_epoches: 2
 s_bs: 32
@@ -52,12 +55,83 @@ loss_type: kd
 dm: loss
 diff_client_gap: 1
 diff_generator: True
-sw: distance
+sw: static
 sw_type: soft
 exit_p: 30
 s_gamma: 1
+s_wd: 0.001
 ensemble_weight: 0.2
-output: <_io.TextIOWrapper name='./exps/ABLATION_CIFAR/distance_diffg//darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+output: <_io.TextIOWrapper name='./EXPS/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 12.00, exits:['1.33', '1.57', '12.05', '33.04'] loss: 12.97
+========== Round 10 ==========
+server, accuracy: 39.03, exits:['16.12', '34.16', '50.59', '55.24'] loss: 7.74
+========== Round 20 ==========
+server, accuracy: 47.22, exits:['25.80', '45.65', '57.63', '59.79'] loss: 6.07
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS/BASE_CIFAR/full_boosted/noniid1000
+device: 3
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+output: <_io.TextIOWrapper name='./EXPS/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.txt' mode='a' encoding='UTF-8'>
 ========== Round 0 ==========
 server, accuracy: 12.00, exits:['1.33', '1.57', '12.05', '33.04'] loss: 12.97
 ========== Round 10 ==========
