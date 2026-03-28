@@ -1,0 +1,161 @@
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3_teacher/TEST_L_1_F_0.1/full_boosted/noniid1000
+device: 1
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+slim_logits: 1.0
+slim_features: 0.1
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3_teacher/TEST_L_1_F_0.1/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 7.37, exits:['0.91', '1.33', '5.48', '21.77'] loss: 0.00
+  slim[0.8]: exits:['1.09', '2.28', '4.41', '1.85']
+  slim[0.9]: exits:['1.09', '1.92', '4.55', '4.04']
+  slim[1.0]: exits:['0.91', '1.33', '5.48', '21.77']
+========== Round 10 ==========
+server, accuracy: 8.08, exits:['5.47', '5.01', '9.47', '12.39'] loss: 0.00
+  slim[0.8]: exits:['5.31', '4.70', '5.07', '5.28']
+  slim[0.9]: exits:['6.10', '6.63', '6.99', '8.55']
+  slim[1.0]: exits:['5.47', '5.01', '9.47', '12.39']
+========== Round 20 ==========
+server, accuracy: 10.71, exits:['11.83', '11.49', '10.24', '9.28'] loss: 0.00
+  slim[0.8]: exits:['11.03', '8.88', '8.93', '5.58']
+  slim[0.9]: exits:['12.45', '12.52', '10.27', '6.74']
+  slim[1.0]: exits:['11.83', '11.49', '10.24', '9.28']
+========== Round 30 ==========
+server, accuracy: 10.53, exits:['14.23', '11.14', '8.51', '8.25'] loss: 0.00
+  slim[0.8]: exits:['15.31', '12.02', '9.68', '5.96']
+  slim[0.9]: exits:['17.06', '15.03', '11.04', '6.90']
+  slim[1.0]: exits:['14.23', '11.14', '8.51', '8.25']
+========== Round 40 ==========
+server, accuracy: 11.14, exits:['17.15', '11.83', '8.21', '7.36'] loss: 0.00
+  slim[0.8]: exits:['16.79', '14.13', '9.42', '5.90']
+  slim[0.9]: exits:['18.55', '16.06', '10.39', '6.88']
+  slim[1.0]: exits:['17.15', '11.83', '8.21', '7.36']
+========== Round 50 ==========
+server, accuracy: 11.90, exits:['17.62', '12.33', '9.01', '8.67'] loss: 0.00
+  slim[0.8]: exits:['18.85', '14.22', '11.07', '7.52']
+  slim[0.9]: exits:['20.98', '15.91', '11.32', '7.65']
+  slim[1.0]: exits:['17.62', '12.33', '9.01', '8.67']
+========== Round 60 ==========
+server, accuracy: 12.23, exits:['18.32', '12.40', '9.13', '9.07'] loss: 0.00
+  slim[0.8]: exits:['19.90', '14.81', '11.25', '7.46']
+  slim[0.9]: exits:['22.02', '16.68', '11.35', '7.90']
+  slim[1.0]: exits:['18.32', '12.40', '9.13', '9.07']
+========== Round 70 ==========
+server, accuracy: 12.04, exits:['18.82', '12.27', '9.12', '7.94'] loss: 0.00
+  slim[0.8]: exits:['21.29', '15.46', '11.73', '7.97']
+  slim[0.9]: exits:['22.96', '15.78', '10.65', '7.56']
+  slim[1.0]: exits:['18.82', '12.27', '9.12', '7.94']
+========== Round 80 ==========
+server, accuracy: 13.13, exits:['19.96', '13.64', '10.08', '8.84'] loss: 0.00
+  slim[0.8]: exits:['22.75', '16.72', '12.08', '7.92']
+  slim[0.9]: exits:['23.74', '17.58', '11.97', '7.79']
+  slim[1.0]: exits:['19.96', '13.64', '10.08', '8.84']
+========== Round 90 ==========
+server, accuracy: 12.38, exits:['19.78', '12.36', '9.08', '8.31'] loss: 0.00
+  slim[0.8]: exits:['22.62', '15.87', '10.67', '7.49']
+  slim[0.9]: exits:['24.59', '16.12', '11.17', '7.68']
+  slim[1.0]: exits:['19.78', '12.36', '9.08', '8.31']
+========== Round 100 ==========
+server, accuracy: 12.78, exits:['20.21', '13.14', '9.42', '8.37'] loss: 0.00
+  slim[0.8]: exits:['24.46', '16.64', '10.62', '7.17']
+  slim[0.9]: exits:['25.84', '17.14', '10.56', '7.09']
+  slim[1.0]: exits:['20.21', '13.14', '9.42', '8.37']
+========== Round 110 ==========
+server, accuracy: 13.06, exits:['20.11', '13.36', '9.89', '8.86'] loss: 0.00
+  slim[0.8]: exits:['23.25', '16.60', '11.35', '7.77']
+  slim[0.9]: exits:['25.15', '16.96', '11.58', '7.74']
+  slim[1.0]: exits:['20.11', '13.36', '9.89', '8.86']
+========== Round 120 ==========
+server, accuracy: 13.75, exits:['20.04', '14.41', '10.81', '9.75'] loss: 0.00
+  slim[0.8]: exits:['24.45', '17.54', '11.90', '7.88']
+  slim[0.9]: exits:['26.30', '18.60', '12.50', '8.28']
+  slim[1.0]: exits:['20.04', '14.41', '10.81', '9.75']
+========== Round 130 ==========
+server, accuracy: 14.08, exits:['20.08', '15.13', '11.26', '9.84'] loss: 0.00
+  slim[0.8]: exits:['23.88', '17.51', '12.03', '8.36']
+  slim[0.9]: exits:['25.56', '18.41', '13.07', '8.81']
+  slim[1.0]: exits:['20.08', '15.13', '11.26', '9.84']
+========== Round 140 ==========
+server, accuracy: 14.03, exits:['20.37', '15.11', '10.99', '9.66'] loss: 0.00
+  slim[0.8]: exits:['24.33', '17.29', '11.49', '7.72']
+  slim[0.9]: exits:['26.06', '18.56', '12.33', '8.58']
+  slim[1.0]: exits:['20.37', '15.11', '10.99', '9.66']
+========== Round 150 ==========
+server, accuracy: 14.31, exits:['20.28', '15.82', '11.56', '9.58'] loss: 0.00
+  slim[0.8]: exits:['24.72', '18.37', '12.14', '8.21']
+  slim[0.9]: exits:['26.39', '19.61', '12.64', '8.84']
+  slim[1.0]: exits:['20.28', '15.82', '11.56', '9.58']
+========== Round 160 ==========
+server, accuracy: 14.42, exits:['19.98', '15.84', '11.78', '10.06'] loss: 0.00
+  slim[0.8]: exits:['24.43', '18.16', '11.60', '8.15']
+  slim[0.9]: exits:['26.28', '19.47', '12.67', '8.96']
+  slim[1.0]: exits:['19.98', '15.84', '11.78', '10.06']

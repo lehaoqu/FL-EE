@@ -7,7 +7,7 @@ vr=0.2
 
 fts=(full lora)
 pls=(small large)
-noniids=(1000)
+noniids=(1000 1 0.1)
 # noniids=(1 0.1)
 
 ft=$4

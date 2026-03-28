@@ -308,33 +308,34 @@ def get_flops(args, model, stop_exit=3, input_feature=False):
     from thop import profile
     # 定义一个专用的 Module 包装器（放在类内或外均可，这里建议放外面或作为内部类）
     class _ExitWrapper(nn.Module):
-        def __init__(self, model, dummy_input, stop_exit):
+        def __init__(self, model, dummy_input):
             super().__init__()
             self.model = model
             self.dummy_input = dummy_input
-            self.stop_exit = stop_exit
 
         def forward(self, _=None):
             if input_feature:
                 return self.model(**self.dummy_input)
             else:
-                return self.model(**self.dummy_input, stop_exit=self.stop_exit)
+                return self.model(**self.dummy_input)
 
     if input_feature:
-        dummy_input = {'hidden_states': torch.zeros(1, 197, 192).to(args.device)}
+        dummy_input = {'pixel_values': torch.zeros(1, 197, 192).to(args.device), 'is_latent': True, 'input_block': stop_exit, 'stop_exit': stop_exit}
     else:
         if 'cifar' in args.dataset or 'imagenet' in args.dataset:
-            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
+            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device), 'stop_exit': stop_exit}
         elif 'glue' in args.dataset or 'bert' in args.dataset:
             dummy_input = {
                 'input_ids': torch.zeros(1, 128, dtype=torch.long).to(args.device),
-                'attention_mask': torch.ones(1, 128, dtype=torch.long).to(args.device)
+                'attention_mask': torch.ones(1, 128, dtype=torch.long).to(args.device),
+                'stop_exit': stop_exit
             }
         else:
-            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device)}
+            dummy_input = {'pixel_values': torch.zeros(1, 3, 224, 224).to(args.device), 'stop_exit': stop_exit}
 
     # ✅ 使用 _ExitWrapper 包装（是 nn.Module！）
-    wrapped_model = _ExitWrapper(model, dummy_input, stop_exit=stop_exit).to(args.device)
+    # print(f'stop_exit: {stop_exit}')
+    wrapped_model = _ExitWrapper(model, dummy_input).to(args.device)
 
     # thop 需要一个 dummy input tensor（即使不用）
     dummy_tensor_for_thop = torch.zeros(1, 1).to(args.device)
@@ -571,7 +572,8 @@ def fuse_curves_take_max(slim_x, slim_y, *, ref_ratio: float = 1.0, grid: str = 
         if xy is None:
             continue
         x_i, y_i = xy
-        y_interp = np.interp(x_grid, x_i, y_i, left=np.nan, right=np.nan)
+        # 左侧按 0 延展，右侧按最后一个值 (y_i[-1]) 延展
+        y_interp = np.interp(x_grid, x_i, y_i, left=0.0, right=float(y_i[-1]))
         ys.append(y_interp)
 
     if not ys:

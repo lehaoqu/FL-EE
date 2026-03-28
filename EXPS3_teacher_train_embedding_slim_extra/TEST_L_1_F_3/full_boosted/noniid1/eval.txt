@@ -1,0 +1,35 @@
+==========eval slim-block model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0]===========
+[INFO] model=darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0], blocks=4, slim_ratios=[0.8, 0.9, 1.0]
+[INFO] global flops bounds (from exp_flops_list): [476796000.00, 2125590272.00]
+
+============================================================
+Block delta_auc per upgrade step:
+ Block |                 Step |    delta_auc |   delta_params |   gain/param
+----------------------------------------------------------------------------
+     0 |     0.80->    0.90 | -2373937858.4615 |         132882 |  -1.7865e+04
+     0 |     0.90->    1.00 | -2980634801.4284 |         135195 |  -2.2047e+04
+     1 |     0.80->    0.90 | 814458486.2774 |         132882 |   6.1292e+03
+     1 |     0.90->    1.00 | 224740900.3440 |         135195 |   1.6623e+03
+     2 |     0.80->    0.90 | -19219330.6264 |         132882 |  -1.4463e+02
+     2 |     0.90->    1.00 | 138748153.4012 |         135195 |   1.0263e+03
+     3 |     0.80->    0.90 | -332964697.7041 |         132882 |  -2.5057e+03
+     3 |     0.90->    1.00 | -145548541.8440 |         135195 |  -1.0766e+03
+
+============================================================
+Greedy config evolution along budget curve:
+  budget=4492444  cfg=[0.8, 0.8, 0.8, 0.8]
+  budget=4645631  cfg=[0.8, 0.9, 0.8, 0.8]
+  budget=4776934  cfg=[0.8, 1.0, 0.8, 0.8]
+  budget=4908237  cfg=[0.8, 1.0, 0.9, 0.8]
+  budget=5039540  cfg=[0.8, 1.0, 1.0, 0.8]
+  budget=5170843  cfg=[0.8, 1.0, 1.0, 0.9]
+  budget=5302146  cfg=[0.8, 1.0, 1.0, 1.0]
+  budget=5433449  cfg=[0.9, 1.0, 1.0, 1.0]
+  budget=5564752  cfg=[1.0, 1.0, 1.0, 1.0]
+============================================================
+[COMPARE] blockwise_curve_auc=112671569770461104.000000, uniform_curve_auc=116167305034872400.000000
+[DONE] base_acc=63.0349, base_auc=103931558101.4488, base_params=4492444
+[DONE] curve_auc=112671569770461104.000000
+[SAVE] ./EXPS3_teacher_train_embedding_slim_extra/TEST_L_1_F_3//full_boosted/noniid1/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0]_slim_block_budgeted.json
+[SAVE] ./EXPS3_teacher_train_embedding_slim_extra/TEST_L_1_F_3//full_boosted/noniid1/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0]_slim_block_budgeted.png
+[SAVE] ./EXPS3_teacher_train_embedding_slim_extra/TEST_L_1_F_3//full_boosted/noniid1/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0]_slim_block_vs_uniform.png

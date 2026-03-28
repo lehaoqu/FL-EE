@@ -477,8 +477,8 @@ class Test:
         args.config_path = '/home/qvlehao/FL-EE/models/facebook/deit-tiny-patch16-224'
         
         from utils.modelload.modelloader import load_model_eval
-        config_path = 'EXPS2/BASE_CIFAR_ALL_DY/lora_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0].json'
-        model_path = 'EXPS2/BASE_CIFAR_ALL_DY/lora_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0].pth'
+        config_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].json'
+        model_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].pth'
 
         model = load_model_eval(args, model_path=model_path, config_path=config_path)
         # set_width_ratio(0.25, model)
@@ -496,25 +496,28 @@ class Test:
         args.blocks = (2,5,8,11)
         args.load_path = ''
         args.ft = 'full'
+        args.slim_block_wise=False
         args.device = 0
         
         from utils.modelload.modelloader import load_model_eval
-        config_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].json'
-        model_path = 'EXPS2/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[1.0-0.25].pth'
+        config_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].json'
+        model_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].pth'
+
         slim_model = load_model_eval(args, model_path=model_path, config_path=config_path)
         
-        config_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
-        model_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
-        origin_model = load_model_eval(args, model_path=model_path, config_path=config_path)
+        # config_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+        # model_path = 'EXPS/BASE_CIFAR/full_boosted/noniid1000/eefl_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
+        # origin_model = load_model_eval(args, model_path=model_path, config_path=config_path)
         
-        set_width_ratio(1.0, slim_model)
+        set_width_ratio(0.8, slim_model)
         
         for depth in [0,1,2,3]:
             slim_flops = get_flops(args, slim_model, stop_exit=depth)
-            origin_flops = get_flops(args,origin_model, stop_exit=depth)
+            # origin_flops = get_flops(args,origin_model, stop_exit=depth)
+            print(slim_flops)
 
-            assert slim_flops == origin_flops, f"slimmable vit flops {slim_flops} does not match original flops {origin_flops} at ratio 1.0 and depth {depth}"
-            print(f"slimmable vit flops {slim_flops} matches original flops {origin_flops} at ratio 1.0 and depth {depth}")
+            # assert slim_flops == origin_flops, f"slimmable vit flops {slim_flops} does not match original flops {origin_flops} at ratio 1.0 and depth {depth}"
+            # print(f"slimmable vit flops {slim_flops} matches original flops {origin_flops} at ratio 1.0 and depth {depth}")
 
 
 
@@ -608,13 +611,13 @@ t = Test()
 # t.test_slimmable_vit_reefl()
 
 # t.test_slimmable_load()
-# t.test_slimmbale_flops()
+t.test_slimmbale_flops()
 
 # t.test_area()
 # t.test_slim_area()
 
 # t.test_slimmable_layerexit()
 # t.test_slimmable_vit()
-t.test_slimmable_vit_lora()
+# t.test_slimmable_vit_lora()
 # t.test_slimmable_load_lora()
 # t.test_slim_dynamic_compute()

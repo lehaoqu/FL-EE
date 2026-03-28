@@ -167,6 +167,7 @@ class ViTExitEncoder(nn.Module):
         
         exits_logits = ()
         exits_feature = ()
+        exits_full_feature = ()
         if input_block is not None:
             layer_index_input = 0 if input_block == 0 else self.config.exits[input_block - 1] + 1
             for i in range(layer_index_input, self.config.num_hidden_layers):
@@ -177,9 +178,10 @@ class ViTExitEncoder(nn.Module):
                 if layer_module.exit:
                     exits_logits += (exit_logits,)
                     exits_feature += (hidden_states[:, 0, :], )
+                    exits_full_feature += (hidden_states[:, :, :], )
                     hidden_states = hidden_states.detach() if frozen is True else hidden_states
                 if stop_exit is not None and i == self.config.exits[stop_exit]: break
-            return exits_logits, exits_feature
+            return exits_logits, exits_feature, exits_full_feature
 
         for i, layer_module in enumerate(self.layer):
             layer_head_mask = head_mask[i] if head_mask is not None else None
@@ -188,9 +190,10 @@ class ViTExitEncoder(nn.Module):
             if layer_module.exit:
                 exits_logits += (exit_logits,)
                 exits_feature += (hidden_states[:, 0, :], )
+                exits_full_feature += (hidden_states[:, :, :], )
                 hidden_states = hidden_states.detach() if frozen is True else hidden_states
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
-        return exits_logits, exits_feature
+        return exits_logits, exits_feature, exits_full_feature
         
 
 
@@ -231,6 +234,7 @@ class ViTExitEncoderRee(nn.Module):
         cls_tokens = []
         exits_logits = ()
         exits_feature = ()
+        exits_full_feature = ()
 
         for i, layer_module in enumerate(self.layer):    
 
@@ -255,6 +259,7 @@ class ViTExitEncoderRee(nn.Module):
                 # 记录每个exit的logits  exits_num * (batch*label_nums)
                 exits_logits += (_outputs, )
                 exits_feature += (hidden_states[:, 0], )
+                exits_full_feature += (hidden_states[:, :, :], )
             
             if self.accumulator.modulation:
                 if mod_tokens is None:
@@ -265,7 +270,7 @@ class ViTExitEncoderRee(nn.Module):
             if stop_exit is not None and i == self.config.exits[stop_exit]: break
 
 
-        return exits_logits, exits_feature
+        return exits_logits, exits_feature, exits_full_feature
 
 
 class ViTExitModel(ViTPreTrainedModel):
@@ -315,7 +320,7 @@ class ViTExitModel(ViTPreTrainedModel):
             return hidden_states
         
         # 这里应该可以指定具体流经encoder的哪个block
-        exits_logits, exits_feature = self.encoder(
+        exits_logits, exits_feature, exits_full_feature = self.encoder(
             hidden_states,
             head_mask=head_mask,
             stop_exit=stop_exit,
@@ -323,7 +328,7 @@ class ViTExitModel(ViTPreTrainedModel):
             frozen=frozen
         )
             
-        return (exits_logits, exits_feature)
+        return (exits_logits, exits_feature, exits_full_feature)
 
 
 
@@ -355,6 +360,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         stop_exit:Optional[int] = None,
         rt_embedding:Optional[bool]=False,
         rt_feature:Optional[bool]=False,
+        rt_full_feature:Optional[bool]=False,
         frozen:Optional[bool]=False,
         input_ids=None, 
         attention_mask=None,
@@ -364,6 +370,7 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
         return_dict=None,
     ) -> Union[tuple, ImageClassifierOutput, torch.Tensor]:
         
+        # print(f'vit. input_block: {input_block}, stop_exit: {stop_exit}')
         outputs = self.vit(
             pixel_values,
             head_mask=head_mask,
@@ -375,7 +382,8 @@ class ExitModel(ViTPreTrainedModel, BaseModule):
             input_block=input_block,
         )
         if rt_embedding: return outputs
-        if rt_feature: return outputs
+        if rt_full_feature: return outputs
+        if rt_feature: return outputs[:2]
         if input_block is not None: return outputs
         return outputs[0]
 

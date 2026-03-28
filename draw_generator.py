@@ -13,6 +13,10 @@ from utils.train_utils import RkdDistance, RKdAngle, HardDarkRank, calc_target_p
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['Times New Roman', 'Noto Sans CJK JP', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False # 解决负号显示问题
 import numpy as np
 import os
 import numpy as np

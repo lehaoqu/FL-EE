@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import random
 
+from utils.modelload.slimmable import set_width_ratio
 from typing import *
 from trainer.baseHFL import BaseServer, BaseClient, GLUE
 from trainer.generator.generator import Generator_LATENT, Generator_CIFAR
@@ -75,9 +76,79 @@ class Client(BaseClient):
                 self.optim.zero_grad()
 
                 batch, label = self.adapt_batch(data)
-                
-                if self.args.slimmable:
-                    from utils.modelload.slimmable import set_width_ratio
+                if self.args.slimmable and self.args.slim_block_wise:
+                    ce_loss = torch.zeros(1).to(self.device)
+                    # train full model
+                    set_width_ratio(1.0, self.model)
+                    if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                        self.policy.train_meta(self.model, batch, label, self.optim)
+                    exits_full_ce_loss, exits_full_logits, exits_full_features = self.policy.train(self.model, batch, label, rt_full_feature=True)
+                    
+                    ce_loss += sum(exits_full_ce_loss)
+                    # 测试
+                    # ce_loss += exits_full_ce_loss[0]
+                    
+                    full_embeddings = self.model(**batch, rt_embedding=True)
+                    # kd & ce for each block with each slim ratio
+                    kd_loss = torch.zeros(1).to(self.device)
+                    features_kd_loss = torch.zeros(1).to(self.device)
+                    logits_kd_loss = torch.zeros(1).to(self.device)
+                    # kd_exits_weights = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else [1.0 for _ in range(self.exits_num)]
+                    for block_index in range(self.exits_num):
+                        block_kd_loss = torch.zeros(1).to(self.device)
+                        for slim_ratio in self.args.slim_ratios:
+                            if slim_ratio == 1.0:
+                                continue
+                            set_width_ratio(slim_ratio, self.model)
+                            if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                                self.policy.train_meta(self.model, batch, label, self.optim)
+
+                            # batch['pixel_values'] = full_embeddings.detach()
+                            input_feature = full_embeddings.detach() if block_index == 0 else exits_full_features[block_index-1].detach()
+                            batch['pixel_values'] = input_feature
+                            logits, features, full_token_features = self.model(**batch, is_latent=True, input_block=block_index, stop_exit=block_index)
+                            block_slim_logit = logits[0]
+                            block_slim_feature = full_token_features[0]
+                            # print('block_slim_feature:', block_slim_feature.shape)
+
+                            # feature_kd_loss = kd_loss_func(block_slim_feature, exits_full_features[block_index].detach(), T=self.args.T_slim)
+                            feature_kd_loss = nn.MSELoss()(block_slim_feature, exits_full_features[block_index].detach())
+                            logit_kd_loss = kd_loss_func(block_slim_logit, exits_full_logits[block_index].detach(), T=self.args.T_slim)
+                            # logit_kd_loss = torch.zeros(1).to(self.device)
+                            # feature_kd_loss = F.mse_loss(block_slim_feature, exits_full_features[block_index].detach())
+                            # logit_kd_loss = F.mse_loss(block_slim_logit, exits_full_logits[block_index].detach())
+
+                            features_kd_loss += feature_kd_loss * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            logits_kd_loss += logit_kd_loss * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            
+                            block_kd_loss += (feature_kd_loss + logit_kd_loss) * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            # if slim_ratio == 0.9 and block_index == 1:
+                            #     print(f"Client {self.id} block {block_index} slim_ratio {slim_ratio} feature kd loss: {feature_kd_loss.item()}, logit kd loss: {logit_kd_loss.item()}")
+                        kd_loss += block_kd_loss
+
+                    # full model ce loss & slim model kd loss (1:1)
+                    loss = ce_loss + kd_loss
+                    # loss = ce_loss
+
+
+                    ## TODO add slim model train
+                    slim_extra_ce_loss = torch.zeros(1).to(self.device)
+                    batch, label = self.adapt_batch(data)
+                    for slim_ratio in self.args.slim_ratios:
+                        set_width_ratio(slim_ratio, self.model)
+                        if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                            self.policy.train_meta(self.model, batch, label, self.optim)
+                        exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                        slim_extra_ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
+                    loss = loss + slim_extra_ce_loss
+
+                    print(f'Client {self.id} epoch {epoch:<4} loss: {loss.item()}, extra_ce_loss: {slim_extra_ce_loss.item()}, kd_loss: {kd_loss.item()}, F: {features_kd_loss.item()}, L: {logits_kd_loss.item()}')
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
+                    set_width_ratio(1.0, self.model)
+             
+                elif self.args.slimmable:
 
                     ce_loss = torch.zeros(1).to(self.device)
                     ratio_exits_logits = {}

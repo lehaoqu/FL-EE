@@ -58,6 +58,12 @@ def args_parser():
     parser.add_argument('--slim_kd_weights', type=float, nargs='+', default=[1.0, 1.0, 1.0, 1.0], help='the kd weights for slimmable model cross various depths')
     parser.add_argument('--slim_sim_last_type', type=str, default='ind', help='the similarity calculation type for last exit: ind | cum')
     parser.add_argument('--slim_block_wise', action='store_true', help='whether use block-wise training for slimmable model')
+    parser.add_argument('--slim_logits', type=float, default=1.0, help='the loss weight for logit kd loss for slimmable model')
+    parser.add_argument('--slim_features', type=float, default=0.0, help='the loss weight for feature kd loss for slimmable model')
+
+    # ====== Slim block wise =====
+    parser.add_argument('--t_config_path', type=str, default='/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json', help='teacher model config path for slimmable block-wise training')
+    parser.add_argument('--t_model_path', type=str, default='/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth', help='teacher model path for slimmable block-wise training')
 
     # ===== Method Specific Setting =====
     spec_alg = sys.argv[1]

@@ -236,6 +236,9 @@ if __name__ == '__main__':
                     }
                     # print(exit_indices_by_ratio[str(ratio)]['exit_counts'])
             
+            # base_name = os.path.basename(model_path + '.pth')
+            # name_without_extension = os.path.splitext(base_name)[0]
+            # eval.model_path = name_without_extension
             for exit_index in range(1, len(full_model.config.exits)):
                 print(f"Calculating AUC for exit {exit_index} across slim ratios...")
                 exit_slim_flops_list = {}

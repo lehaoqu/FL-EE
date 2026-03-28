@@ -1,0 +1,160 @@
+alg: darkflpa2
+policy: boosted
+dataset: cifar100_noniid1
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3/BASE_CIFAR_N/full_boosted/noniid1
+device: 4
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 1
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: False
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+wd: 0.001
+increase: True
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3/BASE_CIFAR_N/full_boosted/noniid1/darkflpa2_cifar100_noniid1_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 3.45, exits:['0.97', '0.97', '3.29', '8.59'] loss: 12.14
+  slim[0.8]: exits:['1.22', '0.96', '2.33', '2.73']
+  slim[0.9]: exits:['0.68', '1.25', '3.03', '4.44']
+  slim[1.0]: exits:['0.97', '0.97', '3.29', '8.59']
+========== Round 10 ==========
+server, accuracy: 3.33, exits:['4.06', '3.95', '3.56', '1.75'] loss: 10.65
+  slim[0.8]: exits:['4.22', '4.04', '3.49', '1.75']
+  slim[0.9]: exits:['4.13', '3.79', '3.52', '1.74']
+  slim[1.0]: exits:['4.06', '3.95', '3.56', '1.75']
+========== Round 20 ==========
+server, accuracy: 4.48, exits:['5.48', '5.32', '5.48', '1.65'] loss: 10.40
+  slim[0.8]: exits:['5.24', '5.33', '5.41', '1.68']
+  slim[0.9]: exits:['5.35', '5.29', '5.55', '1.70']
+  slim[1.0]: exits:['5.48', '5.32', '5.48', '1.65']
+========== Round 30 ==========
+server, accuracy: 5.77, exits:['7.27', '7.14', '6.63', '2.04'] loss: 9.66
+  slim[0.8]: exits:['6.82', '6.70', '6.31', '2.07']
+  slim[0.9]: exits:['7.19', '6.74', '6.72', '2.05']
+  slim[1.0]: exits:['7.27', '7.14', '6.63', '2.04']
+========== Round 40 ==========
+server, accuracy: 8.02, exits:['10.80', '10.29', '8.30', '2.68'] loss: 8.13
+  slim[0.8]: exits:['10.68', '9.85', '8.04', '2.62']
+  slim[0.9]: exits:['10.86', '10.28', '8.07', '2.65']
+  slim[1.0]: exits:['10.80', '10.29', '8.30', '2.68']
+========== Round 50 ==========
+server, accuracy: 9.21, exits:['12.03', '11.41', '9.93', '3.48'] loss: 11.12
+  slim[0.8]: exits:['11.50', '10.87', '9.53', '3.35']
+  slim[0.9]: exits:['11.54', '10.98', '9.66', '3.46']
+  slim[1.0]: exits:['12.03', '11.41', '9.93', '3.48']
+========== Round 60 ==========
+server, accuracy: 10.10, exits:['13.84', '13.14', '10.65', '2.76'] loss: 10.19
+  slim[0.8]: exits:['13.30', '12.93', '10.63', '2.76']
+  slim[0.9]: exits:['13.37', '12.79', '10.59', '2.72']
+  slim[1.0]: exits:['13.84', '13.14', '10.65', '2.76']
+========== Round 70 ==========
+server, accuracy: 11.56, exits:['15.26', '14.85', '12.96', '3.18'] loss: 7.43
+  slim[0.8]: exits:['14.77', '14.32', '12.73', '3.08']
+  slim[0.9]: exits:['15.01', '14.85', '12.96', '3.15']
+  slim[1.0]: exits:['15.26', '14.85', '12.96', '3.18']
+========== Round 80 ==========
+server, accuracy: 12.11, exits:['16.09', '15.68', '12.72', '3.95'] loss: 8.51
+  slim[0.8]: exits:['15.70', '15.07', '12.48', '4.05']
+  slim[0.9]: exits:['15.98', '15.42', '12.75', '4.09']
+  slim[1.0]: exits:['16.09', '15.68', '12.72', '3.95']
+========== Round 90 ==========
+server, accuracy: 13.26, exits:['17.65', '17.03', '13.55', '4.80'] loss: 6.67
+  slim[0.8]: exits:['17.08', '16.36', '13.38', '4.85']
+  slim[0.9]: exits:['17.15', '16.58', '13.18', '4.86']
+  slim[1.0]: exits:['17.65', '17.03', '13.55', '4.80']
+========== Round 100 ==========
+server, accuracy: 13.78, exits:['18.28', '18.01', '14.66', '4.14'] loss: 9.88
+  slim[0.8]: exits:['17.72', '17.36', '14.17', '4.18']
+  slim[0.9]: exits:['17.77', '17.66', '14.36', '4.21']
+  slim[1.0]: exits:['18.28', '18.01', '14.66', '4.14']
+========== Round 110 ==========
+server, accuracy: 14.33, exits:['19.14', '18.83', '15.77', '3.57'] loss: 9.12
+  slim[0.8]: exits:['18.64', '18.19', '15.15', '3.56']
+  slim[0.9]: exits:['18.84', '18.54', '15.42', '3.55']
+  slim[1.0]: exits:['19.14', '18.83', '15.77', '3.57']
+========== Round 120 ==========
+server, accuracy: 15.06, exits:['19.65', '19.32', '16.21', '5.05'] loss: 10.05
+  slim[0.8]: exits:['19.13', '18.95', '15.61', '4.96']
+  slim[0.9]: exits:['19.43', '19.05', '15.90', '5.03']
+  slim[1.0]: exits:['19.65', '19.32', '16.21', '5.05']
+========== Round 130 ==========
+server, accuracy: 15.90, exits:['20.76', '20.56', '17.57', '4.69'] loss: 7.77
+  slim[0.8]: exits:['20.01', '19.78', '16.78', '4.68']
+  slim[0.9]: exits:['20.53', '20.21', '17.19', '4.64']
+  slim[1.0]: exits:['20.76', '20.56', '17.57', '4.69']
+========== Round 140 ==========
+server, accuracy: 16.09, exits:['21.46', '21.26', '17.48', '4.14'] loss: 8.81
+  slim[0.8]: exits:['20.55', '20.27', '16.81', '4.12']
+  slim[0.9]: exits:['21.06', '20.97', '16.94', '4.14']
+  slim[1.0]: exits:['21.46', '21.26', '17.48', '4.14']
+========== Round 150 ==========
+server, accuracy: 16.27, exits:['21.25', '20.78', '18.59', '4.45'] loss: 7.26
+  slim[0.8]: exits:['20.42', '20.10', '17.72', '4.42']
+  slim[0.9]: exits:['21.04', '20.38', '18.29', '4.38']
+  slim[1.0]: exits:['21.25', '20.78', '18.59', '4.45']
+========== Round 160 ==========
+server, accuracy: 17.64, exits:['22.53', '22.54', '20.04', '5.43'] loss: 9.15
+  slim[0.8]: exits:['21.85', '21.58', '19.04', '5.31']
+  slim[0.9]: exits:['22.19', '22.19', '19.65', '5.36']
+  slim[1.0]: exits:['22.53', '22.54', '20.04', '5.43']

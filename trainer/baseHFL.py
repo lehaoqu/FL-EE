@@ -140,13 +140,16 @@ class BaseClient:
                     set_width_ratio(1.0, self.model)
                     if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                         self.policy.train_meta(self.model, batch, label, self.optim)
-                    exits_full_ce_loss, exits_full_logits, exits_full_features = self.policy.train(self.model, batch, label, rt_feature=True)
+                    exits_full_ce_loss, exits_full_logits, exits_full_features = self.policy.train(self.model, batch, label, rt_full_feature=True)
                     
                     ce_loss += sum(exits_full_ce_loss)
                     # 测试
                     # ce_loss += exits_full_ce_loss[0]
                     
                     full_embeddings = self.model(**batch, rt_embedding=True)
+
+                    # print('embedding:', full_embeddings.shape, full_embeddings)
+                    # print('exits_full_features:', [f.shape for f in exits_full_features], [f for f in exits_full_features])
                     # kd & ce for each block with each slim ratio
                     kd_loss = torch.zeros(1).to(self.device)
                     features_kd_loss = torch.zeros(1).to(self.device)
@@ -161,31 +164,49 @@ class BaseClient:
                             if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
                                 self.policy.train_meta(self.model, batch, label, self.optim)
 
-                            batch['pixel_values'] = full_embeddings.detach()
-                            logits, features = self.model(**batch, is_latent=True, input_block=block_index, stop_exit=block_index)
+                            # batch['pixel_values'] = full_embeddings.detach()
+                            input_feature = full_embeddings.detach() if block_index == 0 else exits_full_features[block_index-1].detach()
+                            batch['pixel_values'] = input_feature
+                            logits, features, channels_features = self.model(**batch, is_latent=True, input_block=block_index, stop_exit=block_index)
                             block_slim_logit = logits[0]
-                            block_slim_feature = features[0]
+                            block_slim_feature = channels_features[0]
+                            # print('block_slim_feature:', block_slim_feature.shape)
 
                             # feature_kd_loss = kd_loss_func(block_slim_feature, exits_full_features[block_index].detach(), T=self.args.T_slim)
                             feature_kd_loss = nn.MSELoss()(block_slim_feature, exits_full_features[block_index].detach())
-                            # logit_kd_loss = kd_loss_func(block_slim_logit, exits_full_logits[block_index].detach(), T=self.args.T_slim)
-                            logit_kd_loss = torch.zeros(1).to(self.device)
+                            if torch.isnan(feature_kd_loss) or torch.isinf(feature_kd_loss):
+                                print(f"Warning: Client {self.id} block {block_index} slim_ratio {slim_ratio} feature_kd_loss is {feature_kd_loss.item()}, zeroing it.")
+                                feature_kd_loss = torch.zeros(1).to(self.device)
+
+                            logit_kd_loss = kd_loss_func(block_slim_logit, exits_full_logits[block_index].detach(), T=self.args.T_slim)
+                            if torch.isnan(logit_kd_loss) or torch.isinf(logit_kd_loss):
+                                print(f"Warning: Client {self.id} block {block_index} slim_ratio {slim_ratio} logit_kd_loss is {logit_kd_loss.item()}, zeroing it.")
+                                logit_kd_loss = torch.zeros(1).to(self.device)
+
+                            # logit_kd_loss = torch.zeros(1).to(self.device)
                             # feature_kd_loss = F.mse_loss(block_slim_feature, exits_full_features[block_index].detach())
                             # logit_kd_loss = F.mse_loss(block_slim_logit, exits_full_logits[block_index].detach())
 
-                            block_kd_loss += (feature_kd_loss + logit_kd_loss) * kd_exits_weights[block_index] / (len(self.args.slim_ratios)-1)
                             features_kd_loss += feature_kd_loss * kd_exits_weights[block_index] / (len(self.args.slim_ratios)-1)
                             logits_kd_loss += logit_kd_loss * kd_exits_weights[block_index] / (len(self.args.slim_ratios)-1)
+                            
+                            block_kd_loss += (feature_kd_loss + logit_kd_loss) * kd_exits_weights[block_index] / (len(self.args.slim_ratios)-1)
                             # if slim_ratio == 0.9 and block_index == 1:
                             #     print(f"Client {self.id} block {block_index} slim_ratio {slim_ratio} feature kd loss: {feature_kd_loss.item()}, logit kd loss: {logit_kd_loss.item()}")
                         kd_loss += block_kd_loss
 
                     # full model ce loss & slim model kd loss (1:1)
                     loss = ce_loss + kd_loss
-                    # loss = ce_loss
+                    if torch.isnan(loss) or torch.isinf(loss):
+                        print(f"Warning: Client {self.id} epoch {epoch} loss is {loss.item()}. Skipping gradient update.")
+                        self.optim.zero_grad()
+                    else:
+                        loss.backward()
+                        # Clip gradients to prevent explosion during slimmable training
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                        self.optim.step()
+                        
                     print(f'Client {self.id} epoch {epoch:<4} loss: {loss.item()}, ce_loss: {ce_loss.item()}, kd_loss: {kd_loss.item()}, F: {features_kd_loss.item()}, L: {logits_kd_loss.item()}')
-                    loss.backward()
-                    self.optim.step()
                     batch_loss.append(ce_loss.detach().cpu().item())
                     set_width_ratio(1.0, self.model)
 

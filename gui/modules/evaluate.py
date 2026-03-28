@@ -166,9 +166,18 @@ def _is_eval_target_pth(filename: str) -> bool:
     return True
 
 
-def _plot_budget_curves(selected: List[EvalRunItem]):
+def _plot_budget_curves(
+    selected: List[EvalRunItem], 
+    show_legend: bool = True, 
+    render_st: bool = True,
+    fitting_indices: List[int] = None,
+    fitting_color: str = "blue",
+    fill_alpha: float = 0.2
+):
     import numpy as np
     import matplotlib.pyplot as plt
+    from scipy.interpolate import interp1d
+    
     try:
         import draw_budget as db
     except Exception:
@@ -184,6 +193,7 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
     for spine in ax.spines.values():
         spine.set_visible(False)
 
+    curve_data = []
     for item in selected:
         try:
             with open(item.eval_json_path, "r") as f:
@@ -196,8 +206,24 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         acc = np.asarray(data.get("test", []), dtype=float)
         if flops.size == 0 or acc.size == 0:
             continue
-
+        
         x = flops / 1e9  # GFLOPs
+        curve_data.append({"x": x, "y": acc, "item": item})
+
+    # Find common X range for potential fitting
+    all_x = np.concatenate([c["x"] for c in curve_data]) if curve_data else np.array([])
+    if all_x.size > 0:
+        min_x, max_x = all_x.min(), all_x.max()
+        x_grid = np.linspace(min_x, max_x, 500)
+    else:
+        x_grid = None
+
+    fitting_curves_y = []
+    
+    for i, data in enumerate(curve_data):
+        item = data["item"]
+        x, acc = data["x"], data["y"]
+        
         color = (getattr(db, "COLOR", {}) if db else {}).get(item.policy, None)
         marker = (getattr(db, "MARKER", {}) if db else {}).get(item.policy, "o")
         style = (getattr(db, "STYLE", {}) if db else {}).get(item.policy, "-")
@@ -205,38 +231,81 @@ def _plot_budget_curves(selected: List[EvalRunItem]):
         extra = f", {item.slim}, {item.exits}" if item.slim or item.exits else ""
         label = f"{name} ({item.dataset}, {item.mode}, {item.ft}{extra}|{item.rel_dir.split('/')[0]})".strip()
 
-        ax.plot(
-            x,
-            acc,
-            color=color,
-            marker=marker,
-            linestyle=style,
-            markeredgecolor="white",
-            markeredgewidth=1,
-            linewidth=2 if "darkfl" in item.policy else 1,
-            label=label,
-        )
+        # Check if this curve is selected for fitting
+        is_fitting = (fitting_indices is not None and i in fitting_indices)
 
+        if not is_fitting:
+            # Regular plot with shadow
+            line, = ax.plot(
+                x, acc,
+                color=color, marker=marker, linestyle=style,
+                markeredgecolor="white", markeredgewidth=1,
+                linewidth=2 if "darkfl" in item.policy else 1,
+                label=label
+            )
+            ax.fill_between(x, acc, 0, color=line.get_color(), alpha=fill_alpha)
+        else:
+            # Store for max-fitting calculation
+            # Use interpolation to get values on x_grid
+            if x_grid is not None:
+                f_interp = interp1d(x, acc, bounds_error=False, fill_value=0)
+                fitting_curves_y.append(f_interp(x_grid))
+            # Still plot the original points/line but maybe thinner or dashed?
+            # User asked for "拟合线和未选中进行拟合的线的线下阴影", 
+            # implying selected ones are replaced by the max-line.
+            # Let's not plot individual fitting curves to keep it clean, or plot them faintly.
+            ax.plot(x, acc, color=color, marker=marker, linestyle=":", alpha=0.3, label=f"{label} (included in fit)")
+
+    # Plot the max-fitting line
+    if fitting_curves_y:
+        max_y = np.max(np.array(fitting_curves_y), axis=0)
+        ax.plot(x_grid, max_y, color=fitting_color, linewidth=2, label="Max-Fitting Envelope", linestyle="--")
+        ax.fill_between(x_grid, max_y, 0, color=fitting_color, alpha=fill_alpha)
+
+    ax.set_ylim(bottom=0)
     ax.set_xlabel("Budget (GFLOPs)")
     ax.set_ylabel("Accuracy (%)")
 
     # Put legend outside the plot to avoid covering curves.
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        ax.legend(
-            handles,
-            labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, -0.28),
-            ncol=min(2, len(labels)),
-            frameon=False,
-            fontsize=10,
-        )
+    if show_legend:
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(
+                handles,
+                labels,
+                loc="center left",
+                bbox_to_anchor=(1.02, 0.5),
+                ncol=1,
+                frameon=False,
+                fontsize=10,
+            )
 
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.25)
-    st.pyplot(fig, use_container_width=True)
-    return fig
+    if render_st:
+        st.pyplot(fig, use_container_width=True)
+    
+    # Return both fig and legend info for separate download
+    return fig, ax.get_legend_handles_labels()
+
+
+def _get_legend_fig(handles, labels):
+    import matplotlib.pyplot as plt
+    if not handles:
+        return None
+    # Figure size should be adaptive based on number of labels
+    # Rough estimate: 0.3 inch per label vertical
+    fig_leg = plt.figure(figsize=(8, len(labels) * 0.3 + 0.5))
+    fig_leg.legend(
+        handles,
+        labels,
+        loc="center",
+        ncol=1,
+        frameon=False,
+        fontsize=10,
+    )
+    # Remove all margins / axes
+    plt.axis("off")
+    return fig_leg
 
 
 def _fig_to_bytes(fig, fmt: str, dpi: int = 300) -> bytes:
@@ -577,29 +646,84 @@ def show():
         )
         selected_items = [label_to_item[lbl] for lbl in selected_labels]
 
+        # Fitting options
+        fitting_indices = []
+        fitting_color = "red"
+        if selected_items:
+            with st.expander("曲线拟合与阴影设置"):
+                fitting_labels = st.multiselect(
+                    "选择要参与‘最大值拟合’的曲线",
+                    options=selected_labels,
+                    default=[],
+                    help="选中的曲线将被聚合成一条取其最大包络的新曲线。",
+                )
+                fitting_indices = [i for i, lbl in enumerate(selected_labels) if lbl in fitting_labels]
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    fitting_color = st.color_picker("拟合曲线颜色", "#FF0000")
+                with c2:
+                    fill_alpha = st.slider("阴影透明度", 0.0, 0.5, 0.15)
+
         if st.button("绘制曲线", use_container_width=True):
             if not selected_items:
                 st.warning("请至少选择一个评估结果。")
             else:
-                fig = _plot_budget_curves(selected_items)
-                if fig:
-                    png_bytes = _fig_to_bytes(fig, "png", dpi=300)
-                    pdf_bytes = _fig_to_bytes(fig, "pdf", dpi=300)
-                    c1, c2 = st.columns(2)
-                    with c1:
+                import matplotlib.pyplot as plt
+                
+                # 1. 页面显示的图：不带图例
+                # 函数现在返回 (fig, (handles, labels))
+                fig_no_legend, (handles, labels) = _plot_budget_curves(
+                    selected_items, 
+                    show_legend=False, 
+                    render_st=True,
+                    fitting_indices=fitting_indices,
+                    fitting_color=fitting_color,
+                    fill_alpha=fill_alpha
+                )
+                
+                # 为下载准备主图的 PDF/PNG (不含图例)
+                png_bytes = _fig_to_bytes(fig_no_legend, "png", dpi=300)
+                pdf_bytes = _fig_to_bytes(fig_no_legend, "pdf", dpi=300)
+                
+                # 2. 准备单独的图例 Figure 用于独立下载
+                fig_legend = _get_legend_fig(handles, labels)
+                legend_pdf_bytes = None
+                if fig_legend:
+                    legend_pdf_bytes = _fig_to_bytes(fig_legend, "pdf", dpi=300)
+                
+                # 清理
+                plt.close(fig_no_legend)
+                if fig_legend:
+                    plt.close(fig_legend)
+
+                # 下载按钮：三列布局
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.download_button(
+                        "Download Plot (PNG)",
+                        data=png_bytes,
+                        file_name="budget_curves.png",
+                        mime="image/png",
+                        use_container_width=True,
+                    )
+                with c2:
+                    st.download_button(
+                        "Download Plot (PDF)",
+                        data=pdf_bytes,
+                        file_name="budget_curves.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                with c3:
+                    if legend_pdf_bytes:
                         st.download_button(
-                            "Download PNG (300 DPI)",
-                            data=png_bytes,
-                            file_name="budget_curves.png",
-                            mime="image/png",
-                            use_container_width=True,
-                        )
-                    with c2:
-                        st.download_button(
-                            "Download PDF (vector)",
-                            data=pdf_bytes,
-                            file_name="budget_curves.pdf",
+                            "Download Legend (PDF)",
+                            data=legend_pdf_bytes,
+                            file_name="budget_curves_legend.pdf",
                             mime="application/pdf",
                             use_container_width=True,
                         )
+                    else:
+                        st.button("No Legend", disabled=True, use_container_width=True)
 

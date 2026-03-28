@@ -1,0 +1,399 @@
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+slim_logits: 1.0
+slim_features: 0.0
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+slim_logits: 1.0
+slim_features: 0.0
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+slim_logits: 1.0
+slim_features: 0.0
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+alg: darkflpg
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000
+device: 0
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.8, 0.9, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+slim_logits: 1.0
+slim_features: 0.0
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 0
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: True
+sw: static
+sw_type: soft
+exit_p: 30
+s_gamma: 1
+s_wd: 0.001
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.8-0.9-1.0]
+output: <_io.TextIOWrapper name='./EXPS3_teacher/TEST_L_1_F_0/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 7.34, exits:['0.97', '1.53', '5.56', '21.28'] loss: 0.00
+  slim[0.8]: exits:['1.10', '2.28', '3.90', '1.65']
+  slim[0.9]: exits:['1.08', '1.91', '4.37', '3.70']
+  slim[1.0]: exits:['0.97', '1.53', '5.56', '21.28']
+========== Round 10 ==========
+server, accuracy: 7.45, exits:['5.29', '3.96', '9.25', '11.30'] loss: 0.00
+  slim[0.8]: exits:['4.92', '3.85', '4.62', '5.94']
+  slim[0.9]: exits:['5.61', '5.26', '6.35', '7.80']
+  slim[1.0]: exits:['5.29', '3.96', '9.25', '11.30']
+========== Round 20 ==========
+server, accuracy: 9.08, exits:['11.63', '9.37', '7.52', '7.80'] loss: 0.00
+  slim[0.8]: exits:['10.57', '7.51', '7.38', '5.15']
+  slim[0.9]: exits:['11.90', '10.14', '8.30', '5.60']
+  slim[1.0]: exits:['11.63', '9.37', '7.52', '7.80']
+========== Round 30 ==========
+server, accuracy: 9.98, exits:['13.84', '10.88', '7.51', '7.70'] loss: 0.00
+  slim[0.8]: exits:['14.69', '10.44', '7.67', '5.29']
+  slim[0.9]: exits:['16.16', '13.43', '8.73', '5.82']
+  slim[1.0]: exits:['13.84', '10.88', '7.51', '7.70']
+========== Round 40 ==========
+server, accuracy: 10.32, exits:['16.58', '10.81', '7.18', '6.70'] loss: 0.00
+  slim[0.8]: exits:['16.35', '11.38', '7.42', '5.17']
+  slim[0.9]: exits:['18.05', '13.56', '7.67', '5.30']
+  slim[1.0]: exits:['16.58', '10.81', '7.18', '6.70']
+========== Round 50 ==========
+server, accuracy: 10.32, exits:['17.38', '10.65', '6.54', '6.72'] loss: 0.00
+  slim[0.8]: exits:['18.60', '11.37', '7.83', '5.42']
+  slim[0.9]: exits:['20.60', '13.54', '7.96', '5.08']
+  slim[1.0]: exits:['17.38', '10.65', '6.54', '6.72']
+========== Round 60 ==========
+server, accuracy: 10.43, exits:['17.63', '10.72', '6.78', '6.60'] loss: 0.00
+  slim[0.8]: exits:['19.47', '11.73', '8.70', '5.18']
+  slim[0.9]: exits:['21.59', '14.06', '8.33', '5.25']
+  slim[1.0]: exits:['17.63', '10.72', '6.78', '6.60']
+========== Round 70 ==========
+server, accuracy: 10.46, exits:['18.36', '10.53', '6.96', '5.99'] loss: 0.00
+  slim[0.8]: exits:['21.15', '12.04', '8.65', '5.47']
+  slim[0.9]: exits:['22.49', '13.59', '7.75', '5.23']
+  slim[1.0]: exits:['18.36', '10.53', '6.96', '5.99']
+========== Round 80 ==========
+server, accuracy: 11.11, exits:['19.32', '11.34', '7.52', '6.26'] loss: 0.00
+  slim[0.8]: exits:['22.29', '12.41', '8.82', '5.58']
+  slim[0.9]: exits:['23.48', '14.41', '7.88', '5.08']
+  slim[1.0]: exits:['19.32', '11.34', '7.52', '6.26']
+========== Round 90 ==========
+server, accuracy: 10.28, exits:['19.22', '10.05', '6.30', '5.54'] loss: 0.00
+  slim[0.8]: exits:['22.65', '11.94', '8.13', '5.17']
+  slim[0.9]: exits:['24.35', '13.26', '7.12', '4.91']
+  slim[1.0]: exits:['19.22', '10.05', '6.30', '5.54']
+========== Round 100 ==========
+server, accuracy: 10.37, exits:['20.03', '9.87', '6.37', '5.19'] loss: 0.00
+  slim[0.8]: exits:['24.27', '12.42', '8.09', '4.94']
+  slim[0.9]: exits:['25.87', '13.49', '6.83', '4.36']
+  slim[1.0]: exits:['20.03', '9.87', '6.37', '5.19']
+========== Round 110 ==========
+server, accuracy: 10.44, exits:['20.08', '9.99', '6.40', '5.30'] loss: 0.00
+  slim[0.8]: exits:['23.53', '11.91', '7.99', '5.32']
+  slim[0.9]: exits:['25.07', '12.98', '7.08', '4.67']
+  slim[1.0]: exits:['20.08', '9.99', '6.40', '5.30']
+========== Round 120 ==========
+server, accuracy: 10.72, exits:['20.19', '10.23', '6.69', '5.76'] loss: 0.00
+  slim[0.8]: exits:['24.73', '12.61', '8.54', '5.39']
+  slim[0.9]: exits:['26.03', '13.53', '7.52', '5.00']
+  slim[1.0]: exits:['20.19', '10.23', '6.69', '5.76']
+========== Round 130 ==========
+server, accuracy: 10.74, exits:['20.04', '10.43', '6.63', '5.85'] loss: 0.00
+  slim[0.8]: exits:['24.22', '12.44', '8.47', '5.55']
+  slim[0.9]: exits:['25.57', '13.16', '7.35', '5.11']
+  slim[1.0]: exits:['20.04', '10.43', '6.63', '5.85']
+========== Round 140 ==========
+server, accuracy: 10.58, exits:['20.65', '10.07', '6.20', '5.42'] loss: 0.00
+  slim[0.8]: exits:['24.56', '12.00', '7.83', '5.27']
+  slim[0.9]: exits:['26.05', '12.97', '6.80', '5.00']
+  slim[1.0]: exits:['20.65', '10.07', '6.20', '5.42']
+========== Round 150 ==========
+server, accuracy: 10.78, exits:['20.53', '10.54', '6.47', '5.60'] loss: 0.00
+  slim[0.8]: exits:['24.72', '12.93', '8.39', '5.55']
+  slim[0.9]: exits:['26.15', '13.69', '7.15', '5.11']
+  slim[1.0]: exits:['20.53', '10.54', '6.47', '5.60']
+========== Round 160 ==========
+server, accuracy: 10.72, exits:['20.13', '10.34', '6.54', '5.86'] loss: 0.00
+  slim[0.8]: exits:['24.71', '12.84', '7.95', '5.36']
+  slim[0.9]: exits:['26.21', '13.42', '7.23', '5.04']
+  slim[1.0]: exits:['20.13', '10.34', '6.54', '5.86']
+========== Round 170 ==========
+server, accuracy: 10.83, exits:['20.88', '10.41', '6.42', '5.62'] loss: 0.00
+  slim[0.8]: exits:['25.34', '12.91', '7.87', '5.33']
+  slim[0.9]: exits:['26.92', '13.51', '7.25', '5.02']
+  slim[1.0]: exits:['20.88', '10.41', '6.42', '5.62']
+========== Round 180 ==========
+server, accuracy: 10.80, exits:['20.68', '10.15', '6.53', '5.86'] loss: 0.00
+  slim[0.8]: exits:['25.17', '12.61', '7.95', '5.30']
+  slim[0.9]: exits:['26.58', '12.98', '7.32', '5.10']
+  slim[1.0]: exits:['20.68', '10.15', '6.53', '5.86']

@@ -9,7 +9,9 @@ import re
 from scipy.interpolate import make_interp_spline
 
 plt.rcParams['axes.prop_cycle']
-matplotlib.rcParams['font.family'] = 'Times New Roman'
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['Times New Roman', 'Noto Sans CJK JP', 'DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False # 解决负号显示问题
 
 RATIO=1.7
 

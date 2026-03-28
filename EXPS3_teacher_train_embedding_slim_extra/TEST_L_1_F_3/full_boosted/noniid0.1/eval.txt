@@ -1,0 +1,3 @@
+==========eval slim-block model:darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0]===========
+[INFO] model=darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.8-0.9-1.0], blocks=4, slim_ratios=[0.8, 0.9, 1.0]
+[INFO] global flops bounds (from exp_flops_list): [477382272.00, 2124172800.00]

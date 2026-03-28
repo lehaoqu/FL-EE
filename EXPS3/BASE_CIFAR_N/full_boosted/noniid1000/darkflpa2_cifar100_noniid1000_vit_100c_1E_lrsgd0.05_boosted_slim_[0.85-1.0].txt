@@ -1,0 +1,108 @@
+alg: darkflpa2
+policy: boosted
+dataset: cifar100_noniid1000
+model: vit
+config_path: models/facebook/deit-tiny-patch16-224
+ft: full
+load_path: 
+seed: 1117
+total_num: 100
+sr: 0.1
+suffix: EXPS3/BASE_CIFAR_N/full_boosted/noniid1000
+device: 6
+rnd: 500
+bs: 32
+epoch: 1
+lr: 0.05
+gamma: 0.99
+optim: sgd
+valid_gap: 10
+eq_ratios: (0.25, 0.25, 0.25, 0.25)
+eq_depths: (3, 6, 9, 12)
+multi_exit: False
+if_mode: all
+cosine: False
+valid_ratio: 0.2
+eval_models_dir: script/0818-1e-1
+eval_test: False
+noise: -1
+hidden_dim: -1
+slimmable: True
+slim_ratios: [0.85, 1.0]
+slim_ce: True
+slim_kd: True
+slim_kd_dyn_weights: False
+slim_kd_weights: [1.0, 1.0, 1.0, 1.0]
+slim_sim_last_type: ind
+slim_block_wise: True
+is_latent: True
+s_epoches: 2
+s_bs: 32
+adaptive_epoches: False
+kd_skip: 1
+kd_begin: 0
+kd_lr: 0.05
+kd_response_ratio: 3
+kd_dist_ratio: 5
+kd_angle_ratio: 10
+kd_dark_ratio: 0
+kd_n_iters: 5
+kd_gap: 1
+g_skip: 1
+g_begin: 0
+g_lr: 0.01
+g_y: 1
+g_div: 1
+g_gap: 1
+g_diff: 1
+g_n_iters: 1
+kd_direction: sl
+kd_join: last
+agg: after
+loss_type: kd
+dm: loss
+diff_client_gap: 1
+diff_generator: False
+sw: learn
+sw_type: soft
+exit_p: 30
+s_gamma: 0.99
+wd: 0.001
+increase: True
+ensemble_weight: 0.2
+T_slim: 3.0
+slim_str: _slim_[0.85-1.0]
+output: <_io.TextIOWrapper name='./EXPS3/BASE_CIFAR_N/full_boosted/noniid1000/darkflpa2_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted_slim_[0.85-1.0].txt' mode='a' encoding='UTF-8'>
+========== Round 0 ==========
+server, accuracy: 2.55, exits:['1.69', '1.84', '2.88', '3.80'] loss: 13.06
+  slim[0.85]: exits:['1.31', '1.65', '2.33', '3.03']
+  slim[1.0]: exits:['1.69', '1.84', '2.88', '3.80']
+========== Round 10 ==========
+server, accuracy: 33.03, exits:['12.47', '29.73', '43.40', '46.52'] loss: 8.21
+  slim[0.85]: exits:['11.52', '23.60', '32.87', '34.53']
+  slim[1.0]: exits:['12.47', '29.73', '43.40', '46.52']
+========== Round 20 ==========
+server, accuracy: 44.13, exits:['22.89', '43.62', '54.61', '55.40'] loss: 6.63
+  slim[0.85]: exits:['21.32', '39.26', '47.80', '47.68']
+  slim[1.0]: exits:['22.89', '43.62', '54.61', '55.40']
+========== Round 30 ==========
+server, accuracy: 47.22, exits:['28.50', '48.10', '56.10', '56.21'] loss: 5.83
+  slim[0.85]: exits:['27.25', '44.23', '50.51', '50.12']
+  slim[1.0]: exits:['28.50', '48.10', '56.10', '56.21']
+========== Round 40 ==========
+server, accuracy: 47.67, exits:['31.84', '51.21', '55.89', '51.74'] loss: 5.14
+  slim[0.85]: exits:['29.98', '47.56', '51.73', '44.73']
+  slim[1.0]: exits:['31.84', '51.21', '55.89', '51.74']
+========== Round 50 ==========
+server, accuracy: 52.96, exits:['35.67', '55.48', '61.74', '58.96'] loss: 4.86
+  slim[0.85]: exits:['33.75', '52.11', '57.26', '53.74']
+  slim[1.0]: exits:['35.67', '55.48', '61.74', '58.96']
+========== Round 60 ==========
+server, accuracy: 55.25, exits:['38.16', '58.52', '63.34', '60.96'] loss: 4.76
+  slim[0.85]: exits:['36.23', '54.82', '59.65', '56.40']
+  slim[1.0]: exits:['38.16', '58.52', '63.34', '60.96']
+==========Summary==========
+server, max accuracy: 55.25
+server, final accuracy: 54.10 +- 0.00
+Anytime:
+[38.29, 58.31, 63.22, 60.21], avg:55.0075

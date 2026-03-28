@@ -7,6 +7,8 @@ import numpy as np
 import os
 import copy
 import warnings, json
+from utils.modelload.slimmable import set_width_ratio
+from utils.modelload.modelloader import load_model_eval
 warnings.simplefilter('always', UserWarning)
 
 from typing import *
@@ -73,9 +75,29 @@ class Client(BaseClient):
         self.client_crt_rnd = 0
         self.batch_num = len(self.loader_train)
         self.args.diff_client_gap = self.args.diff_client_gap if self.args.diff_generator else 100
+
+        # self.args.t_config_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.json'
+        # self.args.t_model_path = '/home/qvlehao/FL-EE/EXPS2_inout/BASE_CIFAR_ORIGIN/full_boosted/noniid1000/darkflpg_cifar100_noniid1000_vit_100c_1E_lrsgd0.05_boosted.pth'
         
-    
-    def train(self):
+        self.teacher_model = load_model_eval(args, model_path=self.args.t_model_path, config_path=self.args.t_config_path).to(self.args.device)
+        
+        # Assign classifier weights from teacher_model to self.model
+        # teacher_state_dict = self.teacher_model.state_dict()
+        # model_state_dict = self.model.state_dict()
+        # for name, param in teacher_state_dict.items():
+        #     if 'classifier' in name and name in model_state_dict:
+        #         model_state_dict[name].copy_(param)
+        # self.model.load_state_dict(model_state_dict)
+        # self.model.to(self.device) 
+        # for n , p in self.model.named_parameters():
+        #     if 'classifier' in n:
+        #         print(f'model {p.device} | teacher {teacher_state_dict[n].device}')
+        #         if torch.allclose(p, teacher_state_dict[n]):
+        #             print(f'grad: {p.grad} | Parameter {n} is successfully copied from teacher model.')
+        #         else:
+        #             print(f' grad: {p.grad} | Parameter {n} copy failed. Max absolute difference: {(p - teacher_state_dict[n]).abs().max().item()}')
+
+    def train(self,):
         self.sample_exits_diff = torch.zeros(len(self.dataset_train), 1).to(self.device)
         self.sample_y = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
         self.sample_sl = torch.zeros(len(self.dataset_train), 1, dtype=torch.long).to(self.device)
@@ -110,14 +132,117 @@ class Client(BaseClient):
             if not self.args.slim_kd_dyn_weights:
                 kd_exits_weights_by_ratio = {str(ratio): self.args.slim_kd_weights for ratio in self.args.slim_ratios if ratio != 1.0}
             
+            # TODO
+            kd_exits_weights_by_ratio = {str(ratio): [1.0 for _ in range(self.exits_num)] for ratio in self.args.slim_ratios} 
+
+            # ws = [self.exits_num-idx for idx in range(self.exits_num)]
+            # kd_exits_weights_by_ratio = {str(ratio): [w/sum(ws)*len(ws) for w in ws] for ratio in self.args.slim_ratios} 
+            
         for epoch in range(self.epoch):
             for idx, data in enumerate(self.loader_train):
                 self.optim.zero_grad()
 
                 batch, label = self.adapt_batch(data)
-                
-                if self.args.slimmable:
-                    from utils.modelload.slimmable import set_width_ratio
+                if self.args.slimmable and self.args.slim_block_wise:
+                    ce_loss = torch.zeros(1).to(self.device)
+
+                    # ========================================================
+                    # train full model
+                    # set_width_ratio(1.0, self.model)
+                    # if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                    #     self.policy.train_meta(self.model, batch, label, self.optim)
+                    # exits_full_ce_loss, exits_full_logits, exits_full_features = self.policy.train(self.model, batch, label, rt_full_feature=True)
+                    # ce_loss += sum(exits_full_ce_loss)
+                    # full_embeddings = self.model(**batch, rt_embedding=True)
+                    # ========================================================
+
+                    # ========================================================
+                    exits_full_ce_loss, exits_full_logits, exits_full_features = self.policy.train(self.teacher_model, batch, label, rt_full_feature=True)
+                    full_embeddings = self.teacher_model(**batch, rt_embedding=True)
+                    # ========================================================
+
+
+
+                    # kd & ce for each block with each slim ratio
+                    kd_loss = torch.zeros(1).to(self.device)
+                    features_kd_loss = torch.zeros(1).to(self.device)
+                    logits_kd_loss = torch.zeros(1).to(self.device)
+                    # kd_exits_weights = self.args.slim_kd_weights if len(self.args.slim_kd_weights) == self.exits_num else [1.0 for _ in range(self.exits_num)]
+                    for block_index in range(self.exits_num):
+                        block_kd_loss = torch.zeros(1).to(self.device)
+                        for slim_ratio in self.args.slim_ratios:
+                            # if slim_ratio == 1.0:
+                            #     continue
+                            set_width_ratio(slim_ratio, self.model)
+                            if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                                self.policy.train_meta(self.model, batch, label, self.optim)
+
+                            # batch['pixel_values'] = full_embeddings.detach()
+                            if block_index == 0:
+                                logits, features, full_features = self.model(**batch, input_block=block_index, stop_exit=block_index)
+                            else:
+                                batch['pixel_values'] = exits_full_features[block_index-1].detach()
+                                logits, features, full_features = self.model(**batch, input_block=block_index, stop_exit=block_index, is_latent=True)
+
+                            block_slim_logit = logits[0]
+                            block_slim_feature = full_features[0]
+                            # print('block_slim_feature:', block_slim_feature.shape)
+                            # print('exits_full_features[block_index]:', exits_full_features[block_index].shape)
+
+                            # feature_kd_loss = torch.zeros(1).to(self.device)
+                            # feature_kd_loss = kd_loss_func(block_slim_feature, exits_full_features[block_index].detach(), T=self.args.T_slim)
+                            feature_kd_loss = self.args.slim_features * nn.MSELoss()(block_slim_feature, exits_full_features[block_index].detach())
+                            logit_kd_loss = self.args.slim_logits * kd_loss_func(block_slim_logit, exits_full_logits[block_index].detach(), T=self.args.T_slim)
+                            # logit_kd_loss = torch.zeros(1).to(self.device)
+                            # feature_kd_loss = F.mse_loss(block_slim_feature, exits_full_features[block_index].detach())
+                            # logit_kd_loss = F.mse_loss(block_slim_logit, exits_full_logits[block_index].detach())
+
+                            features_kd_loss += feature_kd_loss * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            logits_kd_loss += logit_kd_loss * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            
+                            block_kd_loss += (feature_kd_loss + logit_kd_loss) * kd_exits_weights_by_ratio[str(slim_ratio)][block_index] / (len(self.args.slim_ratios)-1)
+                            # if slim_ratio == 0.9 and block_index == 1:
+                            #     print(f"Client {self.id} block {block_index} slim_ratio {slim_ratio} feature kd loss: {feature_kd_loss.item()}, logit kd loss: {logit_kd_loss.item()}")
+                        kd_loss += block_kd_loss
+
+                    if epoch == self.epoch-1:
+                        for index in range(label.shape[0]):
+                            diff, exits_diff = difficulty_measure([exits_full_logits[0][index]], label[index], metric=self.args.dm, rt_exits_diff=True)
+                            self.sample_exits_diff[sample_idx] = exits_diff.detach()
+                            self.sample_y[sample_idx] = label[index]
+                            if 'attention_mask' in data.keys():
+                                attention_mask = data['attention_mask'].cpu().tolist()
+                                sentence_len = len([x for x in attention_mask[index] if x != 0]) -1
+                                self.sample_sl[sample_idx] = torch.tensor(sentence_len, dtype=torch.long)
+                            sample_idx += 1
+
+                    
+                    
+                    # full model ce loss & slim model kd loss (1:1)
+                    loss = ce_loss + kd_loss
+
+
+                    ## TODO add slim model train
+                    slim_extra_ce_loss = torch.zeros(1).to(self.device)
+                    batch, label = self.adapt_batch(data)
+                    for slim_ratio in self.args.slim_ratios:
+                        set_width_ratio(slim_ratio, self.model)
+                        if self.policy.name == 'l2w' and idx % self.args.meta_gap == 0:
+                            self.policy.train_meta(self.model, batch, label, self.optim)
+                        exits_ce_loss, exits_logits = self.policy.train(self.model, batch, label)
+                        slim_extra_ce_loss += sum(exits_ce_loss) / len(self.args.slim_ratios)
+                    loss = loss + slim_extra_ce_loss
+
+                    
+                    # loss = ce_loss
+                    print(f'Client {self.id} epoch {epoch:<4} loss: {loss.item()}, extra_ce_loss: {slim_extra_ce_loss.item()}, kd_loss: {kd_loss.item()}, F: {features_kd_loss.item()}, L: {logits_kd_loss.item()}')
+                    loss.backward()
+                    self.optim.step()
+                    batch_loss.append(ce_loss.detach().cpu().item())
+                    set_width_ratio(1.0, self.model)
+             
+                elif self.args.slimmable:
+                    
 
                     ce_loss = torch.zeros(1).to(self.device)
                     ratio_exits_logits = {}
