@@ -75,8 +75,7 @@ def _show_existing_datasets() -> None:
         )
 
     m = matrix[:max_clients]
-
-    stats_matrix = matrix[: min(100, matrix.shape[0])]
+    stats_matrix = matrix[:max_clients]
 
     if viz_type == "堆叠柱状图":
         _plot_stacked_bar(m)

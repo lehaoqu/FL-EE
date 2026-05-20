@@ -119,6 +119,30 @@ def show():
         value="./models",
         help="模型保存路径（相对项目根目录）"
     )
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div style='font-size:13px;font-weight:600;color:#374151;margin-bottom:4px'>🌐 代理设置</div>",
+        unsafe_allow_html=True,
+    )
+    default_http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or ""
+    default_https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
+    proxy_disable = st.checkbox(
+        "禁用系统代理（HTTP_PROXY / HTTPS_PROXY）",
+        value=False,
+        help="当环境中的代理不可用时可勾选此项，强制直连 HuggingFace。",
+    )
+    http_proxy = st.text_input(
+        "HTTP_PROXY",
+        value=default_http_proxy,
+        disabled=proxy_disable,
+        help="留空表示不使用该代理；默认读取系统环境变量。",
+    )
+    https_proxy = st.text_input(
+        "HTTPS_PROXY",
+        value=default_https_proxy,
+        disabled=proxy_disable,
+        help="留空表示不使用该代理；默认读取系统环境变量。",
+    )
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -182,6 +206,24 @@ def show():
                     # Force unbuffered output for real-time streaming
                     env = os.environ.copy()
                     env["PYTHONUNBUFFERED"] = "1"
+                    if proxy_disable:
+                        for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+                            env.pop(key, None)
+                    else:
+                        http_proxy_value = http_proxy.strip()
+                        https_proxy_value = https_proxy.strip()
+                        if http_proxy_value:
+                            env["HTTP_PROXY"] = http_proxy_value
+                            env["http_proxy"] = http_proxy_value
+                        else:
+                            env.pop("HTTP_PROXY", None)
+                            env.pop("http_proxy", None)
+                        if https_proxy_value:
+                            env["HTTPS_PROXY"] = https_proxy_value
+                            env["https_proxy"] = https_proxy_value
+                        else:
+                            env.pop("HTTPS_PROXY", None)
+                            env.pop("https_proxy", None)
 
                     # Execute command with real-time output (non-blocking)
                     process = subprocess.Popen(
