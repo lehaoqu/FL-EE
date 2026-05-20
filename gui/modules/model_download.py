@@ -7,6 +7,8 @@ import time
 
 import streamlit as st
 
+from modules._utils import page_header, section_label, info_card
+
 
 def _get_conda_python_path(env_name):
     """Get the Python executable path for a conda environment or system python"""
@@ -66,60 +68,84 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 
 
 def show():
-    st.header("模型下载")
-    st.write(
-        "从 HuggingFace Hub 下载预训练模型，默认保存到 ./models/ 目录。"
+    page_header(
+        "📦 模型下载",
+        "从 HuggingFace Hub 下载预训练模型，默认保存到 <code>./models/</code> 目录。",
     )
 
-    # Model selection
-    st.subheader("选择要下载的模型")
-    
+    # --- Model selection ---
+    section_label("选择要下载的模型", "#1a73e8")
+
     selected_models = []
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
-        st.write("**BERT 模型**")
+        st.markdown(
+            "<div style='background:#1a73e810;padding:8px 14px;border-radius:6px;"
+            "font-weight:600;color:#1a73e8;font-size:15px;margin-bottom:6px'>"
+            "🔤 BERT 文本模型</div>",
+            unsafe_allow_html=True,
+        )
         for key in ["BERT-12-128", "BERT-12-256"]:
             config = MODEL_CONFIGS[key]
             if st.checkbox(
-                f"{key}",
+                f"**{key}** — {config['description']}",
                 key=f"check_{key}",
-                help=config["description"]
-            ):
-                selected_models.append(key)
-    
-    with col2:
-        st.write("**视觉模型**")
-        for key in ["DeiT-Tiny", "DeiT-Small", "DeiT-Base"]:
-            config = MODEL_CONFIGS[key]
-            if st.checkbox(
-                f"{key}",
-                key=f"check_{key}",
-                help=config["description"]
             ):
                 selected_models.append(key)
 
-    # Download options
-    st.subheader("下载选项")
+    with col2:
+        st.markdown(
+            "<div style='background:#34a85310;padding:8px 14px;border-radius:6px;"
+            "font-weight:600;color:#34a853;font-size:15px;margin-bottom:6px'>"
+            "🖼️ 视觉 Transformer</div>",
+            unsafe_allow_html=True,
+        )
+        for key in ["DeiT-Tiny", "DeiT-Small", "DeiT-Base"]:
+            config = MODEL_CONFIGS[key]
+            if st.checkbox(
+                f"**{key}** — {config['description']}",
+                key=f"check_{key}",
+            ):
+                selected_models.append(key)
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # --- Download options ---
+    section_label("下载选项", "#7c3aed")
     save_dir = st.text_input(
         "保存目录",
         value="./models",
         help="模型保存路径（相对项目根目录）"
     )
 
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
     # --- Command Preview and Execution ---
+    section_label("下载执行", "#ff8c00")
     with st.expander("下载已选择的模型", expanded=True):
         if not selected_models:
             st.warning("⚠️ 未选择模型，请至少选择一个模型后再下载。")
             return
-        
-        st.subheader("已选模型")
+
+        st.markdown(
+            "<div style='font-size:15px;font-weight:600;color:#374151;margin:6px 0 4px'>📋 已选模型</div>",
+            unsafe_allow_html=True,
+        )
         for model_key in selected_models:
             config = MODEL_CONFIGS[model_key]
-            st.write(f"- **{model_key}**: `{config['model_name']}`")
-        
-        st.subheader("命令预览")
+            st.markdown(
+                f"<div style='padding:6px 12px;background:#f9fafb;border-left:3px solid #ff8c00;"
+                f"border-radius:4px;margin:4px 0;font-size:14px'>"
+                f"<b>{model_key}</b> &nbsp;→&nbsp; <code>{config['model_name']}</code></div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            "<div style='font-size:15px;font-weight:600;color:#374151;margin:14px 0 4px'>💻 命令预览</div>",
+            unsafe_allow_html=True,
+        )
         # Build command with selected models
         command_args = ["python", "download_models.py"]
         command_args.append("--models")

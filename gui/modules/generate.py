@@ -9,6 +9,8 @@ import altair as alt
 import streamlit as st
 import streamlit.components.v1 as components
 
+from modules._utils import page_header, section_label, info_card
+
 
 
 
@@ -129,12 +131,15 @@ def _parse_eq_ratios(raw_text: str):
 
 def show():
     """显示 Generate & Monitor 页面"""
-    st.header("训练与监控")
+    page_header(
+        "🚀 训练与监控",
+        "配置训练参数，启动联邦学习实验，并通过 W&B 实时监控训练曲线。",
+    )
     st.session_state.setdefault("slim_ratios_text", SLIM_RATIOS_DEFAULT)
-    
+
     # --- Part 1: Configuration ---
-    with st.expander("实验配置", expanded=True):
-        st.write("配置与 run_cifar_base.sh、run_speechcmds_base.sh、run_svhn_base.sh、run_glue_base.sh 一致的训练参数。")
+    section_label("实验配置", "#1a73e8")
+    with st.expander("配置训练参数（与 run_*_base.sh 保持一致）", expanded=True):
         
         col1, col2 = st.columns(2)
         
@@ -249,7 +254,10 @@ def show():
         )
         st.code(cmd, language="bash")
 
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
     # --- Part 2: Run Training ---
+    section_label("训练执行", "#ff8c00")
     with st.expander("运行训练脚本", expanded=True):
         # Get conda environment from global settings
         conda_env = st.session_state.get("conda_env", "searchr1")
@@ -347,8 +355,8 @@ def show():
                 st.info("请确认该环境存在，并在“设置”页重新配置。")
 
     # --- Part 3: Weights & Biases Integration ---
-    st.divider()
-    st.subheader("Weights & Biases 仪表盘")
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    section_label("Weights & Biases 仪表盘", "#34a853")
     
     # 输入 Entity 和 API Key
     col_entity, col_api = st.columns([1, 1])

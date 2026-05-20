@@ -19,8 +19,12 @@ def _discover_conda_envs():
 
 def show():
     """显示设置页面"""
-    st.header("设置")
-    st.write("应用设置")
+    st.markdown(
+        "<div style='font-size:2.4rem;font-weight:700;line-height:1.2;margin-bottom:2px'>⚙️ 设置</div>"
+        "<p style='color:#6b7280;font-size:14px;margin-top:0'>配置运行环境与全局参数。</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     
     # 全局 Conda 环境设置
     st.subheader("🐍 Python 环境")

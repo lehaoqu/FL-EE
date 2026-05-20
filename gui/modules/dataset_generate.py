@@ -7,6 +7,8 @@ import time
 
 import streamlit as st
 
+from modules._utils import page_header, section_label, info_card
+
 
 def _get_conda_python_path(env_name):
     """Get the Python executable path for a conda environment or system python"""
@@ -93,15 +95,17 @@ def _build_command(config, niid, balance, partition, test_flag, alpha=None, glue
 
 
 def show():
-    st.header("数据集生成")
-    st.write(
-        "运行官方生成脚本，使 `dataset/` 下的文件结构与训练脚本的默认设置一致。"
+    page_header(
+        "🗄️ 数据集生成",
+        "运行官方生成脚本，使 <code>dataset/</code> 下的文件结构与训练脚本的默认设置保持一致。",
     )
 
-    dataset_key = st.selectbox("目标数据集", list(DATASET_CONFIGS.keys()))
+    # --- Dataset choice ---
+    section_label("目标数据集", "#1a73e8")
+    dataset_key = st.selectbox("目标数据集", list(DATASET_CONFIGS.keys()), label_visibility="collapsed")
     config = DATASET_CONFIGS[dataset_key]
-    st.caption(config["description"])
-    
+    info_card("📦", dataset_key, config["description"], color="#1a73e8")
+
     # GLUE task selection
     glue_task = None
     if dataset_key == "GLUE (SST-2 etc.)" and "glue_tasks" in config:
@@ -115,7 +119,8 @@ def show():
         else:
             st.caption("将生成 **全部 6 个任务**：sst2、mrpc、qqp、qnli、rte、wnli")
 
-    st.subheader("划分选项")
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    section_label("划分选项", "#34a853")
     col1, col2 = st.columns(2)
     with col1:
         distribution = st.selectbox("数据分布", ["iid", "noniid"])
@@ -157,9 +162,15 @@ def show():
         if config.get("needs_test_flag"):
             test_flag = st.checkbox("生成单独测试集", value=True)
 
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
     # --- Command Preview and Execution ---
+    section_label("生成执行", "#ff8c00")
     with st.expander("运行数据生成脚本", expanded=True):
-        st.subheader("命令预览")
+        st.markdown(
+            "<div style='font-size:15px;font-weight:600;color:#374151;margin:6px 0 4px'>💻 命令预览</div>",
+            unsafe_allow_html=True,
+        )
         command_args, env_vars = _build_command(config, niid, balance, partition.strip(), test_flag, alpha, glue_task)
         
         # Build command preview

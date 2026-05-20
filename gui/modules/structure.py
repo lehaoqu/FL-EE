@@ -119,8 +119,13 @@ def _existing_key_paths(root: Path) -> list[KeyPath]:
 
 
 def show() -> None:
-    st.header("项目结构")
-    st.caption("可视化浏览 FL-EE 的关键目录/文件（支持选择目录与控制深度）。")
+    st.markdown(
+        "<div style='font-size:2.4rem;font-weight:700;line-height:1.2;margin-bottom:2px'>🗂️ 项目结构</div>"
+        "<p style='color:#6b7280;font-size:14px;margin-top:0'>"
+        "浏览 FL-EE 的关键目录与文件。</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
     root = _repo_root()
 

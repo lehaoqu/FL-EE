@@ -317,8 +317,13 @@ def _fig_to_bytes(fig, fmt: str, dpi: int = 300) -> bytes:
 
 def show():
     """显示 Evaluate 页面"""
-    st.header("评估")
-    st.write("对指定结果目录下已训练模型运行评估")
+    st.markdown(
+        "<div style='font-size:2.4rem;font-weight:700;line-height:1.2;margin-bottom:2px'>🔬 模型评估</div>"
+        "<p style='color:#6b7280;font-size:14px;margin-top:0'>"
+        "对指定结果目录下已训练模型运行评估，并可视化预算–准确率曲线。</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
     project_root = _project_root()
 
