@@ -76,14 +76,16 @@ def _show_existing_datasets() -> None:
 
     m = matrix[:max_clients]
 
+    stats_matrix = matrix[: min(100, matrix.shape[0])]
+
     if viz_type == "堆叠柱状图":
         _plot_stacked_bar(m)
     elif viz_type == "类别分布热图":
         _plot_heatmap(m, num_classes=d["num_classes"])
     elif viz_type == "每客户端类别数":
-        _plot_classes_per_client(matrix, num_classes=d["num_classes"])
+        _plot_classes_per_client(stats_matrix, num_classes=d["num_classes"])
     elif viz_type == "每客户端样本量":
-        _plot_samples_per_client(matrix)
+        _plot_samples_per_client(stats_matrix)
 
 
 def _plot_stacked_bar(m: np.ndarray) -> None:
@@ -146,7 +148,7 @@ def _plot_classes_per_client(full_matrix: np.ndarray, num_classes: int) -> None:
     )
     st.altair_chart(chart, use_container_width=True)
     st.caption(
-        f"均值 {counts.mean():.2f} / {num_classes}，标准差 {counts.std():.2f}，"
+        f"按 {len(counts)} 个客户端统计：均值 {counts.mean():.2f} / {num_classes}，标准差 {counts.std():.2f}，"
         f"最小 {int(counts.min())}，最大 {int(counts.max())}。"
     )
 
@@ -166,7 +168,7 @@ def _plot_samples_per_client(full_matrix: np.ndarray) -> None:
     )
     st.altair_chart(chart, use_container_width=True)
     st.caption(
-        f"均值 {totals.mean():.0f}，标准差 {totals.std():.0f}，"
+        f"按 {len(totals)} 个客户端统计：均值 {totals.mean():.0f}，标准差 {totals.std():.0f}，"
         f"最小 {int(totals.min())}，最大 {int(totals.max())}。"
     )
 
