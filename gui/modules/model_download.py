@@ -207,8 +207,17 @@ def show():
                     env = os.environ.copy()
                     env["PYTHONUNBUFFERED"] = "1"
                     if proxy_disable:
-                        for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+                        for key in (
+                            "HTTP_PROXY",
+                            "HTTPS_PROXY",
+                            "ALL_PROXY",
+                            "http_proxy",
+                            "https_proxy",
+                            "all_proxy",
+                        ):
                             env.pop(key, None)
+                        env["NO_PROXY"] = "*"
+                        env["no_proxy"] = "*"
                     else:
                         http_proxy_value = http_proxy.strip()
                         https_proxy_value = https_proxy.strip()
